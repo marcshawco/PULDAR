@@ -8,6 +8,8 @@ struct SettingsView: View {
     @Environment(StoreKitManager.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \RecurringExpense.createdAt, order: .reverse)
+    private var recurringExpenses: [RecurringExpense]
 
     @State private var incomeText: String = ""
     @FocusState private var isIncomeFocused: Bool
@@ -16,6 +18,12 @@ struct SettingsView: View {
     @State private var newCategoryBucket: BudgetBucket = .fun
     @State private var addCategoryError: String?
     @State private var draftPercentages: [String: Double] = [:]
+    @State private var showAddRecurringSheet = false
+    @State private var newRecurringName = ""
+    @State private var newRecurringAmount = ""
+    @State private var newRecurringBucket: BudgetBucket = .fun
+    @State private var addRecurringError: String?
+    @State private var showPaywall = false
 
     var body: some View {
         NavigationStack {
@@ -91,6 +99,67 @@ struct SettingsView: View {
                             : "Must equal exactly 100% to save.")
                     )
                     .foregroundStyle(isAllocationValid ? AppColors.textTertiary : AppColors.overspend)
+                }
+
+                // ── Recurring Expenses ─────────────────────────────────
+                Section {
+                    if store.isPro {
+                        if recurringExpenses.isEmpty {
+                            Text("No recurring expenses yet.")
+                                .foregroundStyle(AppColors.textTertiary)
+                        } else {
+                            ForEach(recurringExpenses) { recurring in
+                                HStack(spacing: 10) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(recurring.name)
+                                            .font(.subheadline.weight(.medium))
+                                        Text(recurringBucketLabel(recurring.budgetBucket))
+                                            .font(.caption2)
+                                            .foregroundStyle(AppColors.textTertiary)
+                                    }
+
+                                    Spacer()
+
+                                    Text(recurring.safeAmount, format: .currency(code: "USD"))
+                                        .font(.subheadline.weight(.semibold))
+
+                                    Toggle("", isOn: recurringActiveBinding(for: recurring.id))
+                                        .labelsHidden()
+                                }
+                                .padding(.vertical, 2)
+                            }
+                            .onDelete(perform: deleteRecurringExpenses)
+                        }
+
+                        Button {
+                            newRecurringName = ""
+                            newRecurringAmount = ""
+                            newRecurringBucket = .fun
+                            addRecurringError = nil
+                            showAddRecurringSheet = true
+                        } label: {
+                            Label("Add Recurring Expense", systemImage: "plus")
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Recurring expenses are a Pro feature.")
+                                .font(.subheadline)
+                                .foregroundStyle(AppColors.textSecondary)
+                            Button {
+                                showPaywall = true
+                            } label: {
+                                Label("Unlock Pro (\(AppConstants.proPrice))", systemImage: "lock.open")
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Recurring Expenses")
+                } footer: {
+                    Text(
+                        store.isPro
+                            ? "These are auto-accounted for every month."
+                            : "Upgrade to Pro for recurring transactions and unlimited entries."
+                    )
                 }
 
                 // ── Custom Categories ──────────────────────────────────
@@ -188,6 +257,40 @@ struct SettingsView: View {
                 await store.loadProducts()
                 await store.checkEntitlement()
             }
+            .sheet(isPresented: $showAddRecurringSheet) {
+                NavigationStack {
+                    Form {
+                        TextField("Name (e.g. Hulu)", text: $newRecurringName)
+                            .textInputAutocapitalization(.words)
+
+                        TextField("Monthly amount", text: $newRecurringAmount)
+                            .keyboardType(.decimalPad)
+
+                        Picker("Category", selection: $newRecurringBucket) {
+                            ForEach(BudgetBucket.allCases) { bucket in
+                                Text(recurringBucketLabel(bucket)).tag(bucket)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        if let addRecurringError {
+                            Text(addRecurringError)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                    .navigationTitle("Recurring Expense")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { showAddRecurringSheet = false }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Add") { addRecurringExpense() }
+                        }
+                    }
+                }
+            }
             .sheet(isPresented: $showAddCategorySheet) {
                 NavigationStack {
                     Form {
@@ -217,6 +320,9 @@ struct SettingsView: View {
                         }
                     }
                 }
+            }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView()
             }
         }
     }
@@ -288,6 +394,87 @@ struct SettingsView: View {
         }
 
         showAddCategorySheet = false
+    }
+
+    private func recurringBucketLabel(_ bucket: BudgetBucket) -> String {
+        switch bucket {
+        case .fundamentals: return "Need"
+        case .fun: return "Want"
+        case .future: return "Invest"
+        }
+    }
+
+    private func recurringActiveBinding(for id: UUID) -> Binding<Bool> {
+        Binding(
+            get: {
+                recurringExpenses.first(where: { $0.id == id })?.isActive ?? true
+            },
+            set: { isOn in
+                guard store.isPro else {
+                    showPaywall = true
+                    return
+                }
+                guard let recurring = recurringExpenses.first(where: { $0.id == id }) else { return }
+                recurring.isActive = isOn
+                do {
+                    try modelContext.save()
+                } catch {
+                    print("Failed to update recurring active state: \(error)")
+                }
+            }
+        )
+    }
+
+    private func addRecurringExpense() {
+        guard store.isPro else {
+            showPaywall = true
+            return
+        }
+
+        let trimmedName = newRecurringName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            addRecurringError = "Please enter a name."
+            return
+        }
+
+        guard let amount = Double(newRecurringAmount), amount.isFinite, amount > 0 else {
+            addRecurringError = "Please enter a valid monthly amount."
+            return
+        }
+
+        let recurring = RecurringExpense(
+            name: trimmedName.normalizedMerchantName(),
+            amount: amount,
+            bucket: newRecurringBucket
+        )
+
+        modelContext.insert(recurring)
+        do {
+            try modelContext.save()
+            showAddRecurringSheet = false
+        } catch {
+            addRecurringError = "Could not save recurring expense."
+            print("Failed to save recurring expense: \(error)")
+        }
+    }
+
+    private func deleteRecurringExpenses(at offsets: IndexSet) {
+        guard store.isPro else {
+            showPaywall = true
+            return
+        }
+
+        for index in offsets {
+            guard recurringExpenses.indices.contains(index) else { continue }
+            modelContext.delete(recurringExpenses[index])
+        }
+
+        do {
+            try modelContext.save()
+            HapticManager.warning()
+        } catch {
+            print("Failed to delete recurring expenses: \(error)")
+        }
     }
 
     // MARK: - Data Operations

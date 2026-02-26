@@ -46,5 +46,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Expense.self, inMemory: true)
+        .modelContainer(for: [Expense.self, RecurringExpense.self], inMemory: true)
 }

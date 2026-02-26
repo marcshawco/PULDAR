@@ -24,6 +24,8 @@ struct DashboardView: View {
 
     @Query(sort: \Expense.date, order: .reverse)
     private var expenses: [Expense]
+    @Query(sort: \RecurringExpense.createdAt, order: .reverse)
+    private var recurringExpenses: [RecurringExpense]
 
     // MARK: - Local State
 
@@ -50,8 +52,17 @@ struct DashboardView: View {
                     modelStatusBanner
 
                     // ── 1. Donut Chart ─────────────────────────────────
-                    let statuses = budgetEngine.calculateStatus(expenses: expenses)
-                    let monthlyOverspent = budgetEngine.monthlyOverspentAmount(expenses: expenses)
+                    let statuses = budgetEngine.calculateStatus(
+                        expenses: expenses,
+                        recurringExpenses: storeKit.isPro ? recurringExpenses : []
+                    )
+                    let monthlyOverspent = budgetEngine.monthlyOverspentAmount(
+                        expenses: expenses,
+                        recurringExpenses: storeKit.isPro ? recurringExpenses : []
+                    )
+                    let recurringMonthlyTotal = storeKit.isPro
+                        ? budgetEngine.recurringTotal(recurringExpenses)
+                        : 0
 
                     BucketDonutChart(statuses: statuses)
                         .padding(.top, 4)
@@ -67,6 +78,14 @@ struct DashboardView: View {
                     if monthlyOverspent > 0 {
                         overspentSummaryRow(amount: monthlyOverspent)
                             .padding(.horizontal)
+                    }
+
+                    if recurringMonthlyTotal > 0 {
+                        recurringSummaryRow(
+                            amount: recurringMonthlyTotal,
+                            count: recurringExpenses.filter(\.isActive).count
+                        )
+                        .padding(.horizontal)
                     }
 
                     // ── Income Prompt ──────────────────────────────────
@@ -371,10 +390,41 @@ struct DashboardView: View {
         )
     }
 
+    private func recurringSummaryRow(amount: Double, count: Int) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "repeat")
+                .font(.system(size: 11, weight: .regular))
+                .foregroundStyle(AppColors.textSecondary)
+
+            Text("Recurring (\(count))")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(AppColors.textSecondary)
+
+            Spacer()
+
+            Text(amount, format: .currency(code: "USD"))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppColors.textPrimary)
+
+            Text("/ month")
+                .font(.caption2)
+                .foregroundStyle(AppColors.textTertiary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(AppColors.secondaryBg)
+        )
+    }
+
     private func isExpenseOverspent(amount: Double) -> Bool {
         guard amount > 0 else { return false }
         guard budgetEngine.monthlyIncome > 0 else { return false }
-        let projected = budgetEngine.totalSpent(expenses: expenses) + amount
+        let projected = budgetEngine.totalSpent(
+            expenses: expenses,
+            recurringExpenses: storeKit.isPro ? recurringExpenses : []
+        ) + amount
         return projected > budgetEngine.monthlyIncome
     }
 

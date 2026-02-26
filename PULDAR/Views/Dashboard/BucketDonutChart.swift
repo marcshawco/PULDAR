@@ -10,6 +10,7 @@ struct BucketDonutChart: View {
     @Environment(BudgetEngine.self) private var budgetEngine
     let statuses: [BudgetEngine.BucketStatus]
     @State private var appeared = false
+    @State private var showsLeftAmount = false
 
     private var sanitizedStatuses: [BudgetEngine.BucketStatus] {
         statuses.map { status in
@@ -38,6 +39,16 @@ struct BucketDonutChart: View {
         sanitizedStatuses.reduce(0) { $0 + $1.spent }
     }
 
+    private var totalBudget: Double {
+        sanitizedStatuses.reduce(0) { partial, status in
+            partial + sanitizedAmount(status.budgeted)
+        }
+    }
+
+    private var totalLeft: Double {
+        max(totalBudget - totalSpent, 0)
+    }
+
     var body: some View {
         Chart(chartData) { status in
             SectorMark(
@@ -50,15 +61,27 @@ struct BucketDonutChart: View {
         }
         .chartLegend(.hidden)
         .chartBackground { _ in
-            VStack(spacing: 2) {
+            Group {
                 if totalSpent > 0 {
-                    Text("Spent")
-                        .font(.caption2)
-                        .foregroundStyle(AppColors.textTertiary)
-                    Text(totalSpent, format: .currency(code: "USD"))
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(AppColors.textPrimary)
-                        .contentTransition(.numericText())
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            showsLeftAmount.toggle()
+                        }
+                        HapticManager.light()
+                    } label: {
+                        centerValueView(
+                            title: showsLeftAmount ? "Available" : "Spent",
+                            amount: showsLeftAmount ? totalLeft : totalSpent
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel(
+                        showsLeftAmount
+                            ? "Available funds \(totalLeft.formatted(.currency(code: "USD")))"
+                            : "Spent funds \(totalSpent.formatted(.currency(code: "USD")))"
+                    )
+                    .accessibilityHint("Double tap to toggle between spent and available funds")
                 } else {
                     Text("No expenses")
                         .font(.caption)
@@ -92,5 +115,17 @@ struct BucketDonutChart: View {
     private func angleValue(for status: BudgetEngine.BucketStatus) -> Double {
         let spent = sanitizedAmount(status.spent)
         return appeared ? max(spent, 0.01) : 0.01
+    }
+
+    private func centerValueView(title: String, amount: Double) -> some View {
+        VStack(spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(AppColors.textTertiary)
+            Text(amount, format: .currency(code: "USD"))
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(AppColors.textPrimary)
+                .contentTransition(.numericText())
+        }
     }
 }

@@ -12,7 +12,8 @@ import SwiftData
 struct PULDARApp: App {
     static let sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Expense.self
+            Expense.self,
+            RecurringExpense.self
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

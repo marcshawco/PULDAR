@@ -91,21 +91,39 @@ final class BudgetEngine {
     }
 
     /// Amount spent above monthly income for the month.
-    func monthlyOverspentAmount(expenses: [Expense], for month: Date = .now) -> Double {
+    func monthlyOverspentAmount(
+        expenses: [Expense],
+        recurringExpenses: [RecurringExpense] = [],
+        for month: Date = .now
+    ) -> Double {
         guard monthlyIncome > 0 else { return 0 }
-        return max(totalSpent(expenses: expenses, for: month) - monthlyIncome, 0)
+        return max(
+            totalSpent(
+                expenses: expenses,
+                recurringExpenses: recurringExpenses,
+                for: month
+            ) - monthlyIncome,
+            0
+        )
     }
 
     /// Total spent across all buckets this month.
-    func totalSpent(expenses: [Expense], for month: Date = .now) -> Double {
-        filterToMonth(expenses, month: month).reduce(0) { partial, expense in
+    func totalSpent(
+        expenses: [Expense],
+        recurringExpenses: [RecurringExpense] = [],
+        for month: Date = .now
+    ) -> Double {
+        let directSpent = filterToMonth(expenses, month: month).reduce(0) { partial, expense in
             partial + (expense.amount.isFinite ? expense.amount : 0)
         }
+        let recurringSpent = recurringTotal(recurringExpenses)
+        return directSpent + recurringSpent
     }
 
     /// Build status snapshots for every bucket in the current month.
     func calculateStatus(
         expenses: [Expense],
+        recurringExpenses: [RecurringExpense] = [],
         for month: Date = .now
     ) -> [BucketStatus] {
         let monthExpenses = filterToMonth(expenses, month: month)
@@ -117,7 +135,10 @@ final class BudgetEngine {
         }
 
         return BudgetBucket.allCases.map { bucket in
-            let spent = spentByBucket[bucket] ?? 0
+            let spent = (spentByBucket[bucket] ?? 0) + recurringTotal(
+                recurringExpenses,
+                bucket: bucket
+            )
 
             return BucketStatus(
                 bucket: bucket,
@@ -128,8 +149,25 @@ final class BudgetEngine {
     }
 
     /// Quick check: is *any* bucket over its allocation?
-    func hasAnyOverspend(expenses: [Expense]) -> Bool {
-        calculateStatus(expenses: expenses).contains { $0.isOverspent }
+    func hasAnyOverspend(
+        expenses: [Expense],
+        recurringExpenses: [RecurringExpense] = []
+    ) -> Bool {
+        calculateStatus(expenses: expenses, recurringExpenses: recurringExpenses)
+            .contains { $0.isOverspent }
+    }
+
+    func recurringTotal(
+        _ recurringExpenses: [RecurringExpense],
+        bucket: BudgetBucket? = nil
+    ) -> Double {
+        recurringExpenses
+            .filter { recurring in
+                recurring.isActive && (bucket == nil || recurring.budgetBucket == bucket)
+            }
+            .reduce(0) { partial, recurring in
+                partial + recurring.safeAmount
+            }
     }
 
     // MARK: - Helpers

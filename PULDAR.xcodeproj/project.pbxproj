@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		905C2C592F4F3781002A4368 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = A1E2F3042F4B14A0005F8971 /* MLX */; };
+		905C2C5A2F4F3781002A4368 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = A1E2F3052F4B14A0005F8971 /* MLXLLM */; };
+		905C2C5B2F4F3781002A4368 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = A1E2F3062F4B14A0005F8971 /* MLXLMCommon */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		90DFF9262F4B13B1005F8971 /* PULDAR.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PULDAR.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +29,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				905C2C5B2F4F3781002A4368 /* MLXLMCommon in Frameworks */,
+				905C2C5A2F4F3781002A4368 /* MLXLLM in Frameworks */,
+				905C2C592F4F3781002A4368 /* MLX in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +74,9 @@
 			);
 			name = PULDAR;
 			packageProductDependencies = (
+				A1E2F3042F4B14A0005F8971 /* MLX */,
+				A1E2F3052F4B14A0005F8971 /* MLXLLM */,
+				A1E2F3062F4B14A0005F8971 /* MLXLMCommon */,
 			);
 			productName = PULDAR;
 			productReference = 90DFF9262F4B13B1005F8971 /* PULDAR.app */;
@@ -94,6 +106,10 @@
 			);
 			mainGroup = 90DFF91D2F4B13B1005F8971;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A1E2F3012F4B14A0005F8971 /* XCRemoteSwiftPackageReference "mlx-swift" */,
+				A1E2F3022F4B14A0005F8971 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 90DFF9272F4B13B1005F8971 /* Products */;
 			projectDirPath = "";
@@ -251,6 +267,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = PULDAR/PULDAR.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3LZ2R96K44;
@@ -261,6 +278,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -283,6 +301,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = PULDAR/PULDAR.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 3LZ2R96K44;
@@ -293,6 +312,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -332,6 +352,43 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A1E2F3012F4B14A0005F8971 /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.21.2;
+			};
+		};
+		A1E2F3022F4B14A0005F8971 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.30.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A1E2F3042F4B14A0005F8971 /* MLX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1E2F3012F4B14A0005F8971 /* XCRemoteSwiftPackageReference "mlx-swift" */;
+			productName = MLX;
+		};
+		A1E2F3052F4B14A0005F8971 /* MLXLLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1E2F3022F4B14A0005F8971 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLLM;
+		};
+		A1E2F3062F4B14A0005F8971 /* MLXLMCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1E2F3022F4B14A0005F8971 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			productName = MLXLMCommon;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 90DFF91E2F4B13B1005F8971 /* Project object */;
 }

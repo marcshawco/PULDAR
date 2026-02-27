@@ -21,6 +21,8 @@ struct HistoryView: View {
     @State private var sortMode: SortMode = .newest
     @State private var exportURL: URL?
     @State private var showPaywall = false
+    @State private var showFiltersSheet = false
+    @State private var showExportSheet = false
     @FocusState private var focusedField: FocusField?
     @AppStorage("autoMonthlyCSVExportEnabled") private var autoMonthlyCSVExportEnabled = false
     @AppStorage("lastAutoMonthlyCSVExportKey") private var lastAutoMonthlyCSVExportKey = ""
@@ -157,91 +159,11 @@ struct HistoryView: View {
                     .pickerStyle(.menu)
                 }
 
-                Section("Filters") {
-                    Picker("Category", selection: $selectedCategoryFilter) {
-                        ForEach(categoryFilterOptions, id: \.self) { category in
-                            Text(category).tag(category)
-                        }
-                    }
-
-                    Picker("Date Range", selection: $selectedDateRange) {
-                        ForEach(DateRangeFilter.allCases) { range in
-                            Text(range.title).tag(range)
-                        }
-                    }
-
-                    if selectedDateRange == .custom {
-                        DatePicker("Start", selection: $customStartDate, displayedComponents: .date)
-                        DatePicker("End", selection: $customEndDate, displayedComponents: .date)
-                    }
-
-                    HStack {
-                        TextField("Min Amount", text: $minAmountText)
-                            .keyboardType(.decimalPad)
-                            .focused($focusedField, equals: .minAmount)
-                        TextField("Max Amount", text: $maxAmountText)
-                            .keyboardType(.decimalPad)
-                            .focused($focusedField, equals: .maxAmount)
-                    }
-
-                    TextField("Merchant", text: $merchantFilter)
-                        .textInputAutocapitalization(.words)
-                        .focused($focusedField, equals: .merchant)
-                }
-
-                Section("View") {
-                    Picker("Group", selection: $groupingMode) {
-                        ForEach(GroupingMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    Picker("Sort", selection: $sortMode) {
-                        ForEach(SortMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-
                 Section("Summary") {
                     LabeledContent("Total", value: selectedTotal.formatted(.currency(code: "USD")))
-                    ForEach(selectedStatuses) { status in
-                        HStack {
-                            Label(status.bucket.rawValue, systemImage: status.bucket.icon)
-                            Spacer()
-                            Text(status.spent, format: .currency(code: "USD"))
-                        }
-                        .foregroundStyle(status.isOverspent ? AppColors.overspend : AppColors.textPrimary)
-                    }
-                }
-
-                Section("Export") {
-                    if store.isPro {
-                        Button("Export Selected Month (CSV)") {
-                            exportCSV(for: filteredExpenses, scope: monthLabel(selectedMonth))
-                        }
-                        Button("Export All Data (CSV)") {
-                            exportCSV(for: expenses, scope: "all_months")
-                        }
-
-                        Toggle("Auto Monthly CSV Export", isOn: $autoMonthlyCSVExportEnabled)
-                            .tint(AppColors.accent)
-
-                        if let exportURL {
-                            ShareLink(item: exportURL) {
-                                Label("Share Last Export", systemImage: "square.and.arrow.up")
-                            }
-                        }
-                    } else {
-                        Text("Exports are available on Pro.")
-                            .foregroundStyle(AppColors.textTertiary)
-                        lockedExportPreview
-                        Button {
-                            showPaywall = true
-                        } label: {
-                            Label("Unlock Pro (\(AppConstants.proPrice))", systemImage: "lock.open")
+                    HStack(spacing: 8) {
+                        ForEach(selectedStatuses) { status in
+                            summaryCard(status)
                         }
                     }
                 }
@@ -264,7 +186,7 @@ struct HistoryView: View {
                                     .foregroundStyle(AppColors.textSecondary)
 
                                 ForEach(group.items) { expense in
-                                    expenseRow(expense)
+                                    expenseRow(expense, showDate: groupingMode != .day)
                                 }
                             }
                             .padding(.vertical, 2)
@@ -272,7 +194,28 @@ struct HistoryView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    focusedField = nil
+                }
+            )
             .navigationTitle("History")
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        focusedField = nil
+                        showFiltersSheet = true
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                    }
+                    Button {
+                        showExportSheet = true
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+            }
             .onAppear {
                 if let first = monthOptions.first {
                     selectedMonth = first
@@ -286,22 +229,20 @@ struct HistoryView: View {
             .onChange(of: autoMonthlyCSVExportEnabled) {
                 runAutoMonthlyExportIfNeeded()
             }
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") {
-                        focusedField = nil
-                    }
-                }
-            }
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
+            }
+            .sheet(isPresented: $showFiltersSheet) {
+                filtersSheet
+            }
+            .sheet(isPresented: $showExportSheet) {
+                exportSheet
             }
         }
     }
 
     @ViewBuilder
-    private func expenseRow(_ expense: Expense) -> some View {
+    private func expenseRow(_ expense: Expense, showDate: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(expense.normalizedMerchant)
@@ -316,8 +257,10 @@ struct HistoryView: View {
                     Text("Overspent")
                         .foregroundStyle(AppColors.overspend)
                 }
-                Text(expense.date.formatted(date: .abbreviated, time: .omitted))
-                    .foregroundStyle(AppColors.textTertiary)
+                if showDate {
+                    Text(expense.date.formatted(date: .abbreviated, time: .omitted))
+                        .foregroundStyle(AppColors.textTertiary)
+                }
             }
             .font(.caption)
         }
@@ -397,6 +340,139 @@ struct HistoryView: View {
         groupingMode = .day
         sortMode = .newest
         focusedField = nil
+    }
+
+    @ViewBuilder
+    private func summaryCard(_ status: BudgetEngine.BucketStatus) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(status.bucket.rawValue, systemImage: status.bucket.icon)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+            Text(status.spent, format: .currency(code: "USD"))
+                .font(.caption.weight(.semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+        }
+        .foregroundStyle(status.isOverspent ? AppColors.overspend : AppColors.textPrimary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(AppColors.secondaryBg)
+        )
+    }
+
+    private var filtersSheet: some View {
+        NavigationStack {
+            Form {
+                Section("Filters") {
+                    Picker("Category", selection: $selectedCategoryFilter) {
+                        ForEach(categoryFilterOptions, id: \.self) { category in
+                            Text(category).tag(category)
+                        }
+                    }
+
+                    Picker("Date Range", selection: $selectedDateRange) {
+                        ForEach(DateRangeFilter.allCases) { range in
+                            Text(range.title).tag(range)
+                        }
+                    }
+
+                    if selectedDateRange == .custom {
+                        DatePicker("Start", selection: $customStartDate, displayedComponents: .date)
+                        DatePicker("End", selection: $customEndDate, displayedComponents: .date)
+                    }
+
+                    HStack {
+                        TextField("Min Amount", text: $minAmountText)
+                            .keyboardType(.decimalPad)
+                            .focused($focusedField, equals: .minAmount)
+                        TextField("Max Amount", text: $maxAmountText)
+                            .keyboardType(.decimalPad)
+                            .focused($focusedField, equals: .maxAmount)
+                    }
+
+                    TextField("Merchant", text: $merchantFilter)
+                        .textInputAutocapitalization(.words)
+                        .focused($focusedField, equals: .merchant)
+                }
+
+                Section("View") {
+                    Picker("Group", selection: $groupingMode) {
+                        ForEach(GroupingMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Picker("Sort", selection: $sortMode) {
+                        ForEach(SortMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(TapGesture().onEnded { focusedField = nil })
+            .navigationTitle("Filters & Sort")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Reset") { resetFilters() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        focusedField = nil
+                        showFiltersSheet = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private var exportSheet: some View {
+        NavigationStack {
+            List {
+                if store.isPro {
+                    Section("Export") {
+                        Button("Export Selected Month (CSV)") {
+                            exportCSV(for: filteredExpenses, scope: monthLabel(selectedMonth))
+                        }
+                        Button("Export All Data (CSV)") {
+                            exportCSV(for: expenses, scope: "all_months")
+                        }
+                        Toggle("Auto Monthly CSV Export", isOn: $autoMonthlyCSVExportEnabled)
+                            .tint(AppColors.accent)
+                        if let exportURL {
+                            ShareLink(item: exportURL) {
+                                Label("Share Last Export", systemImage: "square.and.arrow.up")
+                            }
+                        }
+                    }
+                } else {
+                    Section("Pro Export") {
+                        Text("Exports are available on Pro.")
+                            .foregroundStyle(AppColors.textTertiary)
+                        lockedExportPreview
+                        Button {
+                            showPaywall = true
+                        } label: {
+                            Label("Unlock Pro (\(AppConstants.proPrice))", systemImage: "lock.open")
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Export")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { showExportSheet = false }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 
     private func exportCSV(for items: [Expense], scope: String) {

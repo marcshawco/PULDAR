@@ -42,8 +42,11 @@ struct SettingsView: View {
     @State private var addRecurringError: String?
     @State private var showPaywall = false
     @State private var exportURL: URL?
+    @State private var backupURL: URL?
     @State private var selectedAllocationPreset: AllocationPreset = .custom
     @State private var showZeroFunWarning = false
+    @State private var showDeleteAllConfirmation = false
+    @State private var deleteConfirmText = ""
     @AppStorage("appThemeMode") private var appThemeMode = "system"
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
     @AppStorage("hourlyPayRate") private var hourlyPayRate: Double = 0
@@ -173,10 +176,7 @@ struct SettingsView: View {
                                     in: 0...1,
                                     step: 0.01
                                 )
-                                Text(
-                                    draftBucketBudget(for: bucket),
-                                    format: .currency(code: "USD")
-                                )
+                                Text(draftBucketBudgetDisplay(for: bucket))
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(AppColors.textSecondary)
                                 .monospacedDigit()
@@ -187,13 +187,38 @@ struct SettingsView: View {
                 } header: {
                     Text("Bucket Allocation")
                 } footer: {
-                    Text(
-                        "Total: \(Int(totalDraftPercentage * 100))%. " +
-                        (isAllocationValid
-                            ? "Tap Done to save."
-                            : "Must equal exactly 100% to save.")
-                    )
-                    .foregroundStyle(isAllocationValid ? AppColors.textTertiary : AppColors.overspend)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(
+                            "Total: \(Int(totalDraftPercentage * 100))%. " +
+                            (isAllocationValid
+                                ? "Tap Done to save."
+                                : "Must equal exactly 100% to save.")
+                        )
+                        .foregroundStyle(isAllocationValid ? AppColors.textTertiary : AppColors.overspend)
+
+                        if budgetEngine.monthlyIncome <= 0 {
+                            Text("Enter income above to calculate dollar targets.")
+                                .foregroundStyle(AppColors.textTertiary)
+                        }
+                    }
+                }
+
+                if !store.isPro {
+                    Section("Puldar Pro") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Unlock Premium Features")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Unlimited entries, recurring expenses, rollover budgets, and CSV exports.")
+                                .font(.caption)
+                                .foregroundStyle(AppColors.textSecondary)
+                            Button {
+                                showPaywall = true
+                            } label: {
+                                Label("Upgrade for \(AppConstants.proPrice)", systemImage: "sparkles")
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
 
                 // ── Recurring Expenses ─────────────────────────────────
@@ -238,11 +263,6 @@ struct SettingsView: View {
                     } else {
                         Text("Recurring expenses are available on Pro.")
                             .foregroundStyle(AppColors.textTertiary)
-                        Button {
-                            showPaywall = true
-                        } label: {
-                            Label("Unlock Pro (\(AppConstants.proPrice))", systemImage: "lock.open")
-                        }
                     }
                 } header: {
                     Text("Recurring Expenses")
@@ -265,11 +285,6 @@ struct SettingsView: View {
                     } else {
                         Text("Rollover balances are available on Pro.")
                             .foregroundStyle(AppColors.textTertiary)
-                        Button {
-                            showPaywall = true
-                        } label: {
-                            Label("Unlock Pro (\(AppConstants.proPrice))", systemImage: "lock.open")
-                        }
                     }
                 }
 
@@ -293,12 +308,20 @@ struct SettingsView: View {
                         Text("Exports are available on Pro.")
                             .foregroundStyle(AppColors.textTertiary)
                         lockedExportPreview
-                        Button {
-                            showPaywall = true
-                        } label: {
-                            Label("Unlock Pro (\(AppConstants.proPrice))", systemImage: "lock.open")
+                    }
+                }
+
+                Section("Local Backup") {
+                    Button("Create Device Backup (JSON)") {
+                        exportLocalBackupJSON()
+                    }
+                    if let backupURL {
+                        ShareLink(item: backupURL) {
+                            Label("Share Last Backup", systemImage: "square.and.arrow.up")
                         }
                     }
+                } footer: {
+                    Text("Creates a raw on-device backup file you can transfer to another phone.")
                 }
 
                 Section("Appearance") {
@@ -367,7 +390,8 @@ struct SettingsView: View {
                 // ── Danger Zone ────────────────────────────────────────
                 Section {
                     Button(role: .destructive) {
-                        clearAllExpenses()
+                        deleteConfirmText = ""
+                        showDeleteAllConfirmation = true
                     } label: {
                         Label("Delete All Expenses", systemImage: "trash")
                             .font(.subheadline)
@@ -496,6 +520,9 @@ struct SettingsView: View {
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
             }
+            .sheet(isPresented: $showDeleteAllConfirmation) {
+                deleteConfirmationSheet
+            }
             .alert("Fun is 0%", isPresented: $showZeroFunWarning) {
                 Button("Keep 0%") {
                     saveAndDismiss()
@@ -522,6 +549,11 @@ struct SettingsView: View {
 
     private func draftBucketBudget(for bucket: BudgetBucket) -> Double {
         budgetEngine.monthlyIncome * draftPercentage(for: bucket)
+    }
+
+    private func draftBucketBudgetDisplay(for bucket: BudgetBucket) -> String {
+        guard budgetEngine.monthlyIncome > 0 else { return "$ --" }
+        return draftBucketBudget(for: bucket).formatted(.currency(code: "USD"))
     }
 
     private var incomeInputMode: IncomeInputMode {
@@ -776,6 +808,41 @@ struct SettingsView: View {
         }
     }
 
+    private var deleteConfirmationSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Type DELETE to permanently remove all expenses.")
+                        .font(.subheadline)
+                    TextField("DELETE", text: $deleteConfirmText)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled(true)
+                }
+
+                Section {
+                    Button(role: .destructive) {
+                        guard deleteConfirmText == "DELETE" else { return }
+                        clearAllExpenses()
+                        showDeleteAllConfirmation = false
+                    } label: {
+                        Text("Delete Everything")
+                    }
+                    .disabled(deleteConfirmText != "DELETE")
+                }
+            }
+            .navigationTitle("Confirm Deletion")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        showDeleteAllConfirmation = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
     private enum AllocationPreset: String, CaseIterable, Identifiable {
         case fiftyThirtyTwenty
         case sixtyTwentyTwenty
@@ -884,9 +951,83 @@ struct SettingsView: View {
     private func clearAllExpenses() {
         do {
             try modelContext.delete(model: Expense.self)
+            try modelContext.delete(model: RecurringExpense.self)
             HapticManager.warning()
         } catch {
             print("Failed to delete expenses: \(error)")
         }
+    }
+
+    private func exportLocalBackupJSON() {
+        let payload = LocalBackupPayload(
+            createdAt: .now,
+            monthlyIncome: budgetEngine.monthlyIncome,
+            percentages: currentPercentagesSnapshot(),
+            expenses: expenses.map {
+                LocalBackupExpense(
+                    id: $0.id,
+                    date: $0.date,
+                    merchant: $0.merchant,
+                    amount: $0.amount,
+                    category: $0.category,
+                    bucket: $0.bucket,
+                    isOverspent: $0.isOverspent,
+                    notes: $0.notes
+                )
+            },
+            recurring: recurringExpenses.map {
+                LocalBackupRecurring(
+                    id: $0.id,
+                    name: $0.name,
+                    amount: $0.amount,
+                    bucket: $0.bucket,
+                    isActive: $0.isActive,
+                    createdAt: $0.createdAt
+                )
+            }
+        )
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+
+        let filename = "puldar_backup_\(Int(Date.now.timeIntervalSince1970)).json"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+
+        do {
+            let data = try encoder.encode(payload)
+            try data.write(to: url, options: .atomic)
+            backupURL = url
+        } catch {
+            print("Failed to create local backup: \(error)")
+        }
+    }
+
+    private struct LocalBackupPayload: Codable {
+        let createdAt: Date
+        let monthlyIncome: Double
+        let percentages: [String: Double]
+        let expenses: [LocalBackupExpense]
+        let recurring: [LocalBackupRecurring]
+    }
+
+    private struct LocalBackupExpense: Codable {
+        let id: UUID
+        let date: Date
+        let merchant: String
+        let amount: Double
+        let category: String
+        let bucket: String
+        let isOverspent: Bool
+        let notes: String
+    }
+
+    private struct LocalBackupRecurring: Codable {
+        let id: UUID
+        let name: String
+        let amount: Double
+        let bucket: String
+        let isActive: Bool
+        let createdAt: Date
     }
 }

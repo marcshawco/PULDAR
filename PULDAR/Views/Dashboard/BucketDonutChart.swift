@@ -162,7 +162,7 @@ struct BucketDonutChart: View {
                 .font(.caption2)
                 .foregroundStyle(AppColors.textTertiary)
             Text(displayMode.centerValue(totalSpent: totalSpent, totalLeft: totalLeft, percentUsed: percentUsed))
-                .font(.title3.weight(.semibold))
+                .font(.system(size: 50, weight: .bold, design: .rounded))
                 .foregroundStyle(AppColors.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
@@ -170,16 +170,6 @@ struct BucketDonutChart: View {
                 .monospacedDigit()
                 .contentTransition(.numericText())
                 .frame(maxWidth: 130)
-            if displayMode == .breakdown {
-                Text("\(totalSpent.formatted(.currency(code: "USD"))) of \(totalBudget.formatted(.currency(code: "USD")))")
-                    .font(.caption2)
-                    .foregroundStyle(AppColors.textTertiary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .allowsTightening(true)
-                    .monospacedDigit()
-                    .frame(maxWidth: 130)
-            }
         }
         .multilineTextAlignment(.center)
         .frame(maxWidth: 130)

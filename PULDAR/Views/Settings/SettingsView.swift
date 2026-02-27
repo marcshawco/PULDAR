@@ -3,6 +3,19 @@ import SwiftData
 
 /// Settings sheet — income, allocation, and category management.
 struct SettingsView: View {
+    private enum IncomeInputMode: String, CaseIterable, Identifiable {
+        case monthly
+        case hourly
+
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .monthly: return "Monthly"
+            case .hourly: return "Hourly"
+            }
+        }
+    }
+
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(StoreKitManager.self) private var store
@@ -14,6 +27,8 @@ struct SettingsView: View {
     private var recurringExpenses: [RecurringExpense]
 
     @State private var incomeText: String = ""
+    @State private var hourlyPayText: String = ""
+    @State private var hoursPerWeekText: String = ""
     @FocusState private var isIncomeFocused: Bool
     @State private var showAddCategorySheet = false
     @State private var newCategoryName = ""
@@ -30,6 +45,9 @@ struct SettingsView: View {
     @State private var selectedAllocationPreset: AllocationPreset = .custom
     @State private var showZeroFunWarning = false
     @AppStorage("appThemeMode") private var appThemeMode = "system"
+    @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
+    @AppStorage("hourlyPayRate") private var hourlyPayRate: Double = 0
+    @AppStorage("hoursPerWeek") private var hoursPerWeek: Double = 40
     @AppStorage("autoMonthlyCSVExportEnabled") private var autoMonthlyCSVExportEnabled = false
     @AppStorage("lastAutoMonthlyCSVExportKey") private var lastAutoMonthlyCSVExportKey = ""
 
@@ -54,22 +72,63 @@ struct SettingsView: View {
             Form {
                 // ── Income Section ─────────────────────────────────────
                 Section {
-                    HStack {
-                        Text("$")
-                            .foregroundStyle(AppColors.textTertiary)
-                        TextField("Monthly income", text: $incomeText)
-                            .keyboardType(.decimalPad)
-                            .focused($isIncomeFocused)
-                            .onChange(of: incomeText) {
-                                if let value = Double(incomeText) {
-                                    budgetEngine.monthlyIncome = value
+                    Picker("Income Type", selection: incomeInputModeBinding) {
+                        ForEach(IncomeInputMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    if incomeInputMode == .monthly {
+                        HStack {
+                            Text("$")
+                                .foregroundStyle(AppColors.textTertiary)
+                            TextField("Monthly income", text: $incomeText)
+                                .keyboardType(.decimalPad)
+                                .focused($isIncomeFocused)
+                                .onChange(of: incomeText) {
+                                    if let value = Double(incomeText) {
+                                        budgetEngine.monthlyIncome = value
+                                    }
                                 }
-                            }
+                        }
+                    } else {
+                        HStack {
+                            Text("$")
+                                .foregroundStyle(AppColors.textTertiary)
+                            TextField("Hourly pay", text: $hourlyPayText)
+                                .keyboardType(.decimalPad)
+                                .onChange(of: hourlyPayText) {
+                                    recalculateMonthlyIncomeFromHourlyInputs()
+                                }
+                        }
+
+                        HStack {
+                            Text("hrs")
+                                .foregroundStyle(AppColors.textTertiary)
+                            TextField("Hours per week", text: $hoursPerWeekText)
+                                .keyboardType(.decimalPad)
+                                .onChange(of: hoursPerWeekText) {
+                                    recalculateMonthlyIncomeFromHourlyInputs()
+                                }
+                        }
+
+                        LabeledContent("Estimated monthly income") {
+                            Text(
+                                estimatedMonthlyIncome,
+                                format: .currency(code: "USD")
+                            )
+                            .fontWeight(.semibold)
+                        }
                     }
                 } header: {
                     Text("Monthly Income")
                 } footer: {
-                    Text("Base monthly income. Add Income transactions to handle variable month-to-month earnings.")
+                    Text(
+                        incomeInputMode == .monthly
+                        ? "Base monthly income. Add Income transactions to handle variable month-to-month earnings."
+                        : "Hourly estimate uses: hourly pay × hours/week × 52 ÷ 12. Add Income transactions for extra variable earnings."
+                    )
                 }
 
                 // ── Bucket Allocation ──────────────────────────────────
@@ -346,8 +405,13 @@ struct SettingsView: View {
                 if budgetEngine.monthlyIncome > 0 {
                     incomeText = String(format: "%.0f", budgetEngine.monthlyIncome)
                 }
+                hourlyPayText = String(format: "%.2f", max(hourlyPayRate, 0))
+                hoursPerWeekText = String(format: "%.2f", max(hoursPerWeek, 0))
                 draftPercentages = currentPercentagesSnapshot()
                 selectedAllocationPreset = AllocationPreset.matching(draftPercentages) ?? .custom
+                if incomeInputMode == .hourly {
+                    recalculateMonthlyIncomeFromHourlyInputs()
+                }
                 runAutoMonthlyExportIfNeeded()
             }
             .onChange(of: store.isPro) {
@@ -458,6 +522,40 @@ struct SettingsView: View {
 
     private func draftBucketBudget(for bucket: BudgetBucket) -> Double {
         budgetEngine.monthlyIncome * draftPercentage(for: bucket)
+    }
+
+    private var incomeInputMode: IncomeInputMode {
+        IncomeInputMode(rawValue: incomeInputModeRaw) ?? .monthly
+    }
+
+    private var incomeInputModeBinding: Binding<IncomeInputMode> {
+        Binding(
+            get: { incomeInputMode },
+            set: { newValue in
+                incomeInputModeRaw = newValue.rawValue
+                if newValue == .hourly {
+                    recalculateMonthlyIncomeFromHourlyInputs()
+                }
+            }
+        )
+    }
+
+    private var estimatedMonthlyIncome: Double {
+        let hourly = max(hourlyPayRate, 0)
+        let hours = max(hoursPerWeek, 0)
+        return (hourly * hours * 52) / 12
+    }
+
+    private func recalculateMonthlyIncomeFromHourlyInputs() {
+        let parsedHourly = Double(hourlyPayText) ?? hourlyPayRate
+        let parsedHours = Double(hoursPerWeekText) ?? hoursPerWeek
+        let safeHourly = (parsedHourly.isFinite ? max(parsedHourly, 0) : 0)
+        let safeHours = (parsedHours.isFinite ? max(parsedHours, 0) : 0)
+
+        hourlyPayRate = safeHourly
+        hoursPerWeek = safeHours
+        budgetEngine.monthlyIncome = estimatedMonthlyIncome
+        incomeText = String(format: "%.0f", budgetEngine.monthlyIncome)
     }
 
     private var totalDraftPercentage: Double {

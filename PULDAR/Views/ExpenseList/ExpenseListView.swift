@@ -57,25 +57,14 @@ struct ExpenseListView: View {
     var body: some View {
         LazyVStack(spacing: 8) {
             ForEach(visibleExpenses) { expense in
-                ExpenseRowView(
-                    expense: expense,
-                    highlightText: searchText,
-                    onEdit: { beginEditing(expense) }
-                )
-                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                    Button {
-                        beginEditing(expense)
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
-                    }
-                    .tint(AppColors.accent)
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        onDeleteExpense(expense)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
+                SwipeToDeleteRow(
+                    onDelete: { onDeleteExpense(expense) }
+                ) {
+                    ExpenseRowView(
+                        expense: expense,
+                        highlightText: searchText,
+                        onEdit: { beginEditing(expense) }
+                    )
                 }
             }
 
@@ -162,6 +151,66 @@ struct ExpenseListView: View {
                     }
                 }
             }
+        }
+    }
+
+    private struct SwipeToDeleteRow<Content: View>: View {
+        let onDelete: () -> Void
+        @ViewBuilder let content: Content
+
+        @State private var offsetX: CGFloat = 0
+        @State private var isDeleteRevealed = false
+
+        private let revealWidth: CGFloat = 84
+
+        init(
+            onDelete: @escaping () -> Void,
+            @ViewBuilder content: () -> Content
+        ) {
+            self.onDelete = onDelete
+            self.content = content()
+        }
+
+        var body: some View {
+            ZStack(alignment: .trailing) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.red.opacity(0.9))
+                    .overlay(alignment: .trailing) {
+                        Button(role: .destructive) {
+                            onDelete()
+                            withAnimation(.easeOut(duration: 0.18)) {
+                                offsetX = 0
+                                isDeleteRevealed = false
+                            }
+                        } label: {
+                            Image(systemName: "trash.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .frame(width: revealWidth, height: 56)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.white)
+                    }
+
+                content
+                    .offset(x: offsetX)
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 10)
+                            .onChanged { value in
+                                let base = isDeleteRevealed ? -revealWidth : 0
+                                let candidate = base + value.translation.width
+                                offsetX = min(0, max(-revealWidth, candidate))
+                            }
+                            .onEnded { value in
+                                let velocity = value.predictedEndTranslation.width - value.translation.width
+                                let shouldReveal = (value.translation.width + velocity * 0.2) < -36
+                                withAnimation(.spring(duration: 0.28, bounce: 0.1)) {
+                                    isDeleteRevealed = shouldReveal
+                                    offsetX = shouldReveal ? -revealWidth : 0
+                                }
+                            }
+                    )
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 

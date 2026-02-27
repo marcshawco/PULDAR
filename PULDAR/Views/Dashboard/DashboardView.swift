@@ -101,7 +101,7 @@ struct DashboardView: View {
                     .padding(.vertical)
                 }
             }
-            .scrollDismissesKeyboard(.immediately)
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("PULDAR")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -485,12 +485,6 @@ struct DashboardView: View {
         guard focused else { return }
         withAnimation(.easeInOut(duration: 0.2)) {
             proxy.scrollTo("expense-input-anchor", anchor: .bottom)
-        }
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(160))
-            withAnimation(.easeInOut(duration: 0.2)) {
-                proxy.scrollTo("expense-input-anchor", anchor: .bottom)
-            }
         }
     }
 

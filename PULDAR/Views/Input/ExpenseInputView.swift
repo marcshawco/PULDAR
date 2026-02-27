@@ -50,7 +50,6 @@ struct ExpenseInputView: View {
                             .foregroundStyle(AppColors.textTertiary)
                     }
                     .buttonStyle(.plain)
-                    .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
             }
             .padding(.horizontal, 14)
@@ -94,8 +93,6 @@ struct ExpenseInputView: View {
             .animation(.spring(duration: 0.3), value: isProcessing)
         }
         .padding(.horizontal)
-        .padding(.bottom, isFocused ? 42 : 0)
-        .animation(.easeInOut(duration: 0.2), value: isFocused)
     }
 
     // MARK: - Actions

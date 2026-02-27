@@ -157,20 +157,32 @@ struct BucketDonutChart: View {
     }
 
     private var centerValueView: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 4) {
             Text(displayMode.centerTitle)
                 .font(.caption2)
                 .foregroundStyle(AppColors.textTertiary)
             Text(displayMode.centerValue(totalSpent: totalSpent, totalLeft: totalLeft, percentUsed: percentUsed))
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(AppColors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.55)
+                .allowsTightening(true)
+                .monospacedDigit()
                 .contentTransition(.numericText())
+                .frame(maxWidth: 130)
             if displayMode == .breakdown {
                 Text("\(totalSpent.formatted(.currency(code: "USD"))) of \(totalBudget.formatted(.currency(code: "USD")))")
                     .font(.caption2)
                     .foregroundStyle(AppColors.textTertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .allowsTightening(true)
+                    .monospacedDigit()
+                    .frame(maxWidth: 130)
             }
         }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: 130)
     }
 
     private var accessibilityLabel: String {

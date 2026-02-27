@@ -21,6 +21,7 @@ struct HistoryView: View {
     @State private var sortMode: SortMode = .newest
     @State private var exportURL: URL?
     @State private var showPaywall = false
+    @FocusState private var focusedField: FocusField?
     @AppStorage("autoMonthlyCSVExportEnabled") private var autoMonthlyCSVExportEnabled = false
     @AppStorage("lastAutoMonthlyCSVExportKey") private var lastAutoMonthlyCSVExportKey = ""
 
@@ -177,12 +178,15 @@ struct HistoryView: View {
                     HStack {
                         TextField("Min Amount", text: $minAmountText)
                             .keyboardType(.decimalPad)
+                            .focused($focusedField, equals: .minAmount)
                         TextField("Max Amount", text: $maxAmountText)
                             .keyboardType(.decimalPad)
+                            .focused($focusedField, equals: .maxAmount)
                     }
 
                     TextField("Merchant", text: $merchantFilter)
                         .textInputAutocapitalization(.words)
+                        .focused($focusedField, equals: .merchant)
                 }
 
                 Section("View") {
@@ -244,8 +248,14 @@ struct HistoryView: View {
 
                 Section("Entries") {
                     if filteredExpenses.isEmpty {
-                        Text("No entries match your filters.")
-                            .foregroundStyle(AppColors.textTertiary)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("No entries match your filters.")
+                                .foregroundStyle(AppColors.textTertiary)
+                            Button("Reset Filters") {
+                                resetFilters()
+                            }
+                            .font(.caption.weight(.semibold))
+                        }
                     } else {
                         ForEach(groupedExpenses) { group in
                             VStack(alignment: .leading, spacing: 8) {
@@ -275,6 +285,14 @@ struct HistoryView: View {
             }
             .onChange(of: autoMonthlyCSVExportEnabled) {
                 runAutoMonthlyExportIfNeeded()
+            }
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        focusedField = nil
+                    }
+                }
             }
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
@@ -360,6 +378,25 @@ struct HistoryView: View {
 
         customStartDate = monthStart
         customEndDate = monthEnd
+
+        // Relative ranges are easy to misread when a past month is selected.
+        // Fall back to the selected month to keep data visible/predictable.
+        if !calendar.isDate(selectedMonth, equalTo: .now, toGranularity: .month) {
+            if selectedDateRange == .last7Days || selectedDateRange == .last30Days {
+                selectedDateRange = .month
+            }
+        }
+    }
+
+    private func resetFilters() {
+        selectedCategoryFilter = "All"
+        selectedDateRange = .month
+        minAmountText = ""
+        maxAmountText = ""
+        merchantFilter = ""
+        groupingMode = .day
+        sortMode = .newest
+        focusedField = nil
     }
 
     private func exportCSV(for items: [Expense], scope: String) {
@@ -521,5 +558,11 @@ struct HistoryView: View {
             case .custom: return "Custom"
             }
         }
+    }
+
+    private enum FocusField: Hashable {
+        case minAmount
+        case maxAmount
+        case merchant
     }
 }

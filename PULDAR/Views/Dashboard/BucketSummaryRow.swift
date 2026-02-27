@@ -6,6 +6,8 @@ import SwiftUI
 /// the bucket's allocation.  Text also shifts to red.
 struct BucketSummaryRow: View {
     let status: BudgetEngine.BucketStatus
+    var isSelected: Bool = false
+    var onTap: (() -> Void)? = nil
     @State private var animatedProgress: Double = 0
 
     var body: some View {
@@ -32,6 +34,28 @@ struct BucketSummaryRow: View {
                     .foregroundStyle(AppColors.textTertiary)
             }
 
+            if overByAmount > 0 {
+                HStack {
+                    Text("Over by \(overByAmount, format: .currency(code: "USD"))")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(AppColors.overspend)
+                        )
+                    Spacer()
+                }
+            } else {
+                HStack {
+                    Text("Left \(remainingAmount, format: .currency(code: "USD"))")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(AppColors.textSecondary)
+                    Spacer()
+                }
+            }
+
             // Progress bar
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -45,6 +69,16 @@ struct BucketSummaryRow: View {
             }
             .frame(height: 5)
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap?()
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isSelected ? status.bucket.color.opacity(0.12) : Color.clear)
+        )
         .onAppear {
             withAnimation(.spring(duration: 0.7, bounce: 0.2)) {
                 animatedProgress = safeProgress
@@ -73,6 +107,15 @@ struct BucketSummaryRow: View {
 
     private var safeBudgeted: Double {
         status.budgeted.isFinite ? max(status.budgeted, 0) : 0
+    }
+
+    private var overByAmount: Double {
+        guard safeSpent > safeBudgeted else { return 0 }
+        return safeSpent - safeBudgeted
+    }
+
+    private var remainingAmount: Double {
+        max(safeBudgeted - safeSpent, 0)
     }
 
     private var safeProgress: Double {

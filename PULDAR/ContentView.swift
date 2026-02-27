@@ -20,6 +20,7 @@ struct ContentView: View {
     @State private var networkMonitor = NetworkMonitor()
     @State private var storeKitManager = StoreKitManager()
     @State private var usageTracker = UsageTracker()
+    @AppStorage("appThemeMode") private var appThemeMode = "system"
 
     // MARK: - Body
 
@@ -41,6 +42,18 @@ struct ContentView: View {
         .environment(networkMonitor)
         .environment(storeKitManager)
         .environment(usageTracker)
+        .preferredColorScheme(preferredColorScheme)
+    }
+
+    private var preferredColorScheme: ColorScheme? {
+        switch appThemeMode {
+        case "light":
+            return .light
+        case "dark":
+            return .dark
+        default:
+            return nil
+        }
     }
 }
 

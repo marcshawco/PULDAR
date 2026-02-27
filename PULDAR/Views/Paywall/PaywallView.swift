@@ -52,6 +52,8 @@ struct PaywallView: View {
             VStack(alignment: .leading, spacing: 12) {
                 featureRow(icon: "sparkles",         text: "Unlimited AI-powered entries")
                 featureRow(icon: "repeat",           text: "Recurring monthly transactions")
+                featureRow(icon: "arrow.triangle.2.circlepath", text: "Rollover monthly balances")
+                featureRow(icon: "tablecells",       text: "Clean CSV export tools")
                 featureRow(icon: "chart.pie",        text: "Full budget analytics")
                 featureRow(icon: "infinity",         text: "One-time purchase, lifetime access")
                 featureRow(icon: "lock.shield",      text: "100% local & private")

@@ -42,4 +42,14 @@ struct LLMExpenseResult: Codable {
 
         return creditSignals.contains { normalized.contains($0) }
     }
+
+    func isIncome(fallbackInput: String) -> Bool {
+        let normalized = fallbackInput.lowercased()
+        let incomeSignals = [
+            "salary", "paycheck", "pay check", "got paid", "paid me",
+            "direct deposit", "payroll", "wages", "bonus",
+            "freelance", "invoice", "client paid", "income"
+        ]
+        return incomeSignals.contains { normalized.contains($0) }
+    }
 }

@@ -25,6 +25,12 @@ final class BudgetEngine {
         }
     }
 
+    var rolloverEnabled: Bool = UserDefaults.standard.bool(forKey: "rolloverEnabled") {
+        didSet {
+            UserDefaults.standard.set(rolloverEnabled, forKey: "rolloverEnabled")
+        }
+    }
+
     /// Persisted bucket percentages keyed by `BudgetBucket.rawValue`.
     var bucketPercentages: [String: Double] {
         didSet { Self.saveBucketPercentages(bucketPercentages) }
@@ -61,9 +67,29 @@ final class BudgetEngine {
 
     /// Budget allocated to a single bucket this month.
     func bucketBudget(for bucket: BudgetBucket) -> Double {
+        bucketBudget(for: bucket, monthIncome: monthlyIncome)
+    }
+
+    /// Budget allocated to a single bucket for a provided month income.
+    func bucketBudget(for bucket: BudgetBucket, monthIncome: Double) -> Double {
         let income = monthlyIncome.isFinite ? max(monthlyIncome, 0) : 0
-        let budget = income * percentage(for: bucket)
+        let safeMonthIncome = monthIncome.isFinite ? max(monthIncome, 0) : income
+        let budget = safeMonthIncome * percentage(for: bucket)
         return budget.isFinite ? budget : 0
+    }
+
+    func monthSpendCapacity(
+        expenses: [Expense],
+        recurringExpenses: [RecurringExpense] = [],
+        for month: Date = .now
+    ) -> Double {
+        let base = effectiveMonthlyIncome(expenses: expenses, for: month)
+        guard rolloverEnabled else { return base }
+        return base + totalRolloverCarryover(
+            expenses: expenses,
+            recurringExpenses: recurringExpenses,
+            for: month
+        )
     }
 
     /// Current percentage (0...1) configured for a bucket.
@@ -96,13 +122,18 @@ final class BudgetEngine {
         recurringExpenses: [RecurringExpense] = [],
         for month: Date = .now
     ) -> Double {
-        guard monthlyIncome > 0 else { return 0 }
+        let capacity = monthSpendCapacity(
+            expenses: expenses,
+            recurringExpenses: recurringExpenses,
+            for: month
+        )
+        guard capacity > 0 else { return 0 }
         return max(
             totalSpent(
                 expenses: expenses,
                 recurringExpenses: recurringExpenses,
                 for: month
-            ) - monthlyIncome,
+            ) - capacity,
             0
         )
     }
@@ -113,9 +144,11 @@ final class BudgetEngine {
         recurringExpenses: [RecurringExpense] = [],
         for month: Date = .now
     ) -> Double {
-        let directSpent = filterToMonth(expenses, month: month).reduce(0) { partial, expense in
-            partial + (expense.amount.isFinite ? expense.amount : 0)
-        }
+        let directSpent = filterToMonth(expenses, month: month)
+            .filter { !isIncomeTransaction($0) }
+            .reduce(0) { partial, expense in
+                partial + (expense.amount.isFinite ? expense.amount : 0)
+            }
         let recurringSpent = recurringTotal(recurringExpenses)
         return directSpent + recurringSpent
     }
@@ -127,6 +160,8 @@ final class BudgetEngine {
         for month: Date = .now
     ) -> [BucketStatus] {
         let monthExpenses = filterToMonth(expenses, month: month)
+            .filter { !isIncomeTransaction($0) }
+        let effectiveIncome = effectiveMonthlyIncome(expenses: expenses, for: month)
         var spentByBucket: [BudgetBucket: Double] = [:]
 
         for expense in monthExpenses {
@@ -142,8 +177,51 @@ final class BudgetEngine {
 
             return BucketStatus(
                 bucket: bucket,
-                budgeted: bucketBudget(for: bucket),
+                budgeted: bucketBudgetWithRollover(
+                    for: bucket,
+                    monthIncome: effectiveIncome,
+                    expenses: expenses,
+                    recurringExpenses: recurringExpenses,
+                    month: month
+                ),
                 spent: spent
+            )
+        }
+    }
+
+    /// Base monthly income plus any explicit income transactions in the same month.
+    func effectiveMonthlyIncome(
+        expenses: [Expense],
+        for month: Date = .now
+    ) -> Double {
+        let base = monthlyIncome.isFinite ? max(monthlyIncome, 0) : 0
+        return base + incomeTransactionsTotal(expenses: expenses, for: month)
+    }
+
+    func incomeTransactionsTotal(
+        expenses: [Expense],
+        for month: Date = .now
+    ) -> Double {
+        filterToMonth(expenses, month: month)
+            .filter { isIncomeTransaction($0) }
+            .reduce(0) { partial, expense in
+                let safe = expense.amount.isFinite ? abs(expense.amount) : 0
+                return partial + safe
+            }
+    }
+
+    func totalRolloverCarryover(
+        expenses: [Expense],
+        recurringExpenses: [RecurringExpense] = [],
+        for month: Date = .now
+    ) -> Double {
+        rolloverEligibleBuckets.reduce(0) { partial, bucket in
+            partial + rolloverCarryover(
+                for: bucket,
+                expenses: expenses,
+                recurringExpenses: recurringExpenses,
+                month: month,
+                depth: 0
             )
         }
     }
@@ -179,9 +257,90 @@ final class BudgetEngine {
         }
     }
 
+    private func isIncomeTransaction(_ expense: Expense) -> Bool {
+        normalize(expense.category) == "income"
+    }
+
+    private let rolloverEligibleBuckets: [BudgetBucket] = [.fundamentals, .fun]
+
+    private func bucketBudgetWithRollover(
+        for bucket: BudgetBucket,
+        monthIncome: Double,
+        expenses: [Expense],
+        recurringExpenses: [RecurringExpense],
+        month: Date
+    ) -> Double {
+        let base = bucketBudget(for: bucket, monthIncome: monthIncome)
+        guard rolloverEnabled, rolloverEligibleBuckets.contains(bucket) else { return base }
+        let carry = rolloverCarryover(
+            for: bucket,
+            expenses: expenses,
+            recurringExpenses: recurringExpenses,
+            month: month,
+            depth: 0
+        )
+        return base + carry
+    }
+
+    private func rolloverCarryover(
+        for bucket: BudgetBucket,
+        expenses: [Expense],
+        recurringExpenses: [RecurringExpense],
+        month: Date,
+        depth: Int
+    ) -> Double {
+        guard rolloverEnabled else { return 0 }
+        guard rolloverEligibleBuckets.contains(bucket) else { return 0 }
+        guard depth < 24 else { return 0 }
+
+        let calendar = Calendar.current
+        guard let previousMonth = calendar.date(byAdding: .month, value: -1, to: month) else {
+            return 0
+        }
+
+        let prevIncome = effectiveMonthlyIncome(expenses: expenses, for: previousMonth)
+        let prevBaseBudget = bucketBudget(for: bucket, monthIncome: prevIncome)
+        let prevCarry = rolloverCarryover(
+            for: bucket,
+            expenses: expenses,
+            recurringExpenses: recurringExpenses,
+            month: previousMonth,
+            depth: depth + 1
+        )
+        let prevBudgetTotal = prevBaseBudget + prevCarry
+        let prevSpent = spentForBucket(
+            bucket,
+            expenses: expenses,
+            recurringExpenses: recurringExpenses,
+            month: previousMonth
+        )
+
+        return max(prevBudgetTotal - prevSpent, 0)
+    }
+
+    private func spentForBucket(
+        _ bucket: BudgetBucket,
+        expenses: [Expense],
+        recurringExpenses: [RecurringExpense],
+        month: Date
+    ) -> Double {
+        let monthSpent = filterToMonth(expenses, month: month)
+            .filter { !isIncomeTransaction($0) && $0.budgetBucket == bucket }
+            .reduce(0) { $0 + ($1.amount.isFinite ? $1.amount : 0) }
+        return monthSpent + recurringTotal(recurringExpenses, bucket: bucket)
+    }
+
     private func clamp(_ value: Double) -> Double {
         guard value.isFinite else { return 0 }
         return min(max(value, 0), 1)
+    }
+
+    private func normalize(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9 ]", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
     }
 
     private static let bucketPercentageKey = "bucketPercentages"

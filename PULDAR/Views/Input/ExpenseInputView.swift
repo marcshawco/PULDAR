@@ -10,6 +10,7 @@ struct ExpenseInputView: View {
     let isProcessing: Bool
     let isLocked: Bool
     let onSubmit: (String) async -> Bool
+    var onFocusChange: ((Bool) -> Void)? = nil
 
     @State private var inputText = ""
     @State private var showCheckmark = false
@@ -36,6 +37,9 @@ struct ExpenseInputView: View {
                 .disabled(isLocked)
                 .submitLabel(.done)
                 .onSubmit { if !isLocked { handleSubmit() } }
+                .onChange(of: isFocused) {
+                    onFocusChange?(isFocused)
+                }
 
                 if isFocused {
                     Button {
@@ -90,6 +94,8 @@ struct ExpenseInputView: View {
             .animation(.spring(duration: 0.3), value: isProcessing)
         }
         .padding(.horizontal)
+        .padding(.bottom, isFocused ? 42 : 0)
+        .animation(.easeInOut(duration: 0.2), value: isFocused)
     }
 
     // MARK: - Actions
@@ -99,12 +105,14 @@ struct ExpenseInputView: View {
         guard !rawInput.isEmpty else { return }
 
         if isLocked {
-            // Playful shake animation when locked
-            withAnimation(.spring(duration: 0.08).repeatCount(4, autoreverses: true)) {
-                shakeOffset = 8
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                shakeOffset = 0
+            Task { @MainActor in
+                let steps: [CGFloat] = [8, -8, 6, -6, 0]
+                for value in steps {
+                    withAnimation(.easeInOut(duration: 0.045)) {
+                        shakeOffset = value
+                    }
+                    try? await Task.sleep(for: .milliseconds(45))
+                }
             }
             HapticManager.warning()
             return

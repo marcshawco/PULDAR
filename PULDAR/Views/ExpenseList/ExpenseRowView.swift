@@ -8,6 +8,7 @@ struct ExpenseRowView: View {
     @Environment(CategoryManager.self) private var categoryManager
     let expense: Expense
     let highlightText: String
+    var onEdit: (() -> Void)? = nil
 
     @State private var isExpanded = false
 
@@ -44,6 +45,23 @@ struct ExpenseRowView: View {
                 Text(expense.amount, format: .currency(code: "USD"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(expense.amount < 0 ? .green : AppColors.textPrimary)
+
+                if onEdit != nil {
+                    Button {
+                        HapticManager.light()
+                        onEdit?()
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(AppColors.accent)
+                            .padding(6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(AppColors.accent.opacity(0.14))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
             // ── Expanded detail ────────────────────────────────────────

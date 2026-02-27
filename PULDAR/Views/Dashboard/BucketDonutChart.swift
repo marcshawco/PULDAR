@@ -9,8 +9,11 @@ import Charts
 struct BucketDonutChart: View {
     @Environment(BudgetEngine.self) private var budgetEngine
     let statuses: [BudgetEngine.BucketStatus]
+    var selectedBucket: BudgetBucket? = nil
+    var onBucketSelected: ((BudgetBucket?) -> Void)? = nil
     @State private var appeared = false
-    @State private var showsLeftAmount = false
+    @State private var displayMode: DonutDisplayMode = .spent
+    @State private var selectedAngle: Double?
 
     private var sanitizedStatuses: [BudgetEngine.BucketStatus] {
         statuses.map { status in
@@ -49,58 +52,78 @@ struct BucketDonutChart: View {
         max(totalBudget - totalSpent, 0)
     }
 
+    private var percentUsed: Double {
+        guard totalBudget > 0 else { return 0 }
+        return min(max(totalSpent / totalBudget, 0), 1)
+    }
+
     var body: some View {
-        Chart(chartData) { status in
-            SectorMark(
-                angle: .value("Spent", angleValue(for: status)),
-                innerRadius: .ratio(0.618),   // Golden-ratio cutout
-                angularInset: 2.0
-            )
-            .foregroundStyle(sectorColor(for: status))
-            .cornerRadius(5)
-        }
-        .chartLegend(.hidden)
-        .chartBackground { _ in
-            Group {
-                if totalSpent > 0 {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.18)) {
-                            showsLeftAmount.toggle()
-                        }
-                        HapticManager.light()
-                    } label: {
-                        centerValueView(
-                            title: showsLeftAmount ? "Available" : "Spent",
-                            amount: showsLeftAmount ? totalLeft : totalSpent
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .contentShape(Rectangle())
-                    .accessibilityLabel(
-                        showsLeftAmount
-                            ? "Available funds \(totalLeft.formatted(.currency(code: "USD")))"
-                            : "Spent funds \(totalSpent.formatted(.currency(code: "USD")))"
-                    )
-                    .accessibilityHint("Double tap to toggle between spent and available funds")
-                } else {
-                    Text("No expenses")
-                        .font(.caption)
-                        .foregroundStyle(AppColors.textTertiary)
+        VStack(spacing: 10) {
+            Picker("Donut Mode", selection: $displayMode) {
+                ForEach(DonutDisplayMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
                 }
             }
+            .pickerStyle(.segmented)
+
+            Chart(chartData) { status in
+                SectorMark(
+                    angle: .value("Spent", sectorWeight(for: status)),
+                    innerRadius: .ratio(0.618),   // Golden-ratio cutout
+                    angularInset: 2.0
+                )
+                .foregroundStyle(sectorColor(for: status))
+                .cornerRadius(5)
+            }
+            .chartAngleSelection(value: $selectedAngle)
+            .chartLegend(.hidden)
+            .chartBackground { _ in
+                Group {
+                    if totalSpent > 0 {
+                        Button {
+                            cycleDisplayMode()
+                        } label: {
+                            centerValueView
+                        }
+                        .buttonStyle(.plain)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel(accessibilityLabel)
+                        .accessibilityHint("Double tap to switch donut mode")
+                    } else {
+                        Text("No expenses")
+                            .font(.caption)
+                            .foregroundStyle(AppColors.textTertiary)
+                    }
+                }
+            }
+            .frame(height: 220)
         }
-        .frame(height: 220)
         .padding(.horizontal)
         .onAppear {
             withAnimation(.spring(duration: 1.0, bounce: 0.25)) {
                 appeared = true
             }
         }
+        .onChange(of: selectedAngle) {
+            guard totalSpent > 0 else { return }
+            guard let angle = selectedAngle else {
+                onBucketSelected?(nil)
+                return
+            }
+            guard let tappedBucket = bucketForSelectedAngle(angle) else { return }
+            let nextSelection: BudgetBucket? = (selectedBucket == tappedBucket) ? nil : tappedBucket
+            onBucketSelected?(nextSelection)
+            HapticManager.light()
+        }
     }
 
     // MARK: - Colour Logic
 
     private func sectorColor(for status: BudgetEngine.BucketStatus) -> Color {
+        if let selectedBucket, selectedBucket != status.bucket {
+            let base = status.isOverspent ? AppColors.overspend : status.bucket.color
+            return base.opacity(0.32)
+        }
         if totalSpent == 0 {
             return status.bucket.color.opacity(0.25)
         }
@@ -112,20 +135,100 @@ struct BucketDonutChart: View {
         return max(0, value)
     }
 
-    private func angleValue(for status: BudgetEngine.BucketStatus) -> Double {
+    private func sectorWeight(for status: BudgetEngine.BucketStatus) -> Double {
         let spent = sanitizedAmount(status.spent)
         return appeared ? max(spent, 0.01) : 0.01
     }
 
-    private func centerValueView(title: String, amount: Double) -> some View {
+    private func bucketForSelectedAngle(_ angle: Double) -> BudgetBucket? {
+        let values = chartData.map { max(sectorWeight(for: $0), 0.01) }
+        let total = values.reduce(0, +)
+        guard total.isFinite, total > 0 else { return nil }
+
+        let normalized = angle.truncatingRemainder(dividingBy: total)
+        var runningTotal: Double = 0
+        for (index, value) in values.enumerated() {
+            runningTotal += value
+            if normalized <= runningTotal {
+                return chartData[index].bucket
+            }
+        }
+        return chartData.last?.bucket
+    }
+
+    private var centerValueView: some View {
         VStack(spacing: 2) {
-            Text(title)
+            Text(displayMode.centerTitle)
                 .font(.caption2)
                 .foregroundStyle(AppColors.textTertiary)
-            Text(amount, format: .currency(code: "USD"))
+            Text(displayMode.centerValue(totalSpent: totalSpent, totalLeft: totalLeft, percentUsed: percentUsed))
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(AppColors.textPrimary)
                 .contentTransition(.numericText())
+            if displayMode == .breakdown {
+                Text("\(totalSpent.formatted(.currency(code: "USD"))) of \(totalBudget.formatted(.currency(code: "USD")))")
+                    .font(.caption2)
+                    .foregroundStyle(AppColors.textTertiary)
+            }
+        }
+    }
+
+    private var accessibilityLabel: String {
+        switch displayMode {
+        case .spent:
+            return "Spent funds \(totalSpent.formatted(.currency(code: "USD")))"
+        case .remaining:
+            return "Remaining funds \(totalLeft.formatted(.currency(code: "USD")))"
+        case .breakdown:
+            return "Budget used \(percentUsed.formatted(.percent.precision(.fractionLength(0))))"
+        }
+    }
+
+    private func cycleDisplayMode() {
+        displayMode = displayMode.next
+        HapticManager.light()
+    }
+
+    private enum DonutDisplayMode: String, CaseIterable, Identifiable {
+        case spent
+        case remaining
+        case breakdown
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .spent: return "Spent"
+            case .remaining: return "Remaining"
+            case .breakdown: return "Breakdown"
+            }
+        }
+
+        var centerTitle: String {
+            switch self {
+            case .spent: return "Spent"
+            case .remaining: return "Remaining"
+            case .breakdown: return "Used"
+            }
+        }
+
+        func centerValue(totalSpent: Double, totalLeft: Double, percentUsed: Double) -> String {
+            switch self {
+            case .spent:
+                return totalSpent.formatted(.currency(code: "USD"))
+            case .remaining:
+                return totalLeft.formatted(.currency(code: "USD"))
+            case .breakdown:
+                return percentUsed.formatted(.percent.precision(.fractionLength(0)))
+            }
+        }
+
+        var next: DonutDisplayMode {
+            switch self {
+            case .spent: return .remaining
+            case .remaining: return .breakdown
+            case .breakdown: return .spent
+            }
         }
     }
 }

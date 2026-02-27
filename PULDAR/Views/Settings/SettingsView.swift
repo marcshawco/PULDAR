@@ -8,6 +8,8 @@ struct SettingsView: View {
     @Environment(StoreKitManager.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Expense.date, order: .reverse)
+    private var expenses: [Expense]
     @Query(sort: \RecurringExpense.createdAt, order: .reverse)
     private var recurringExpenses: [RecurringExpense]
 
@@ -24,6 +26,28 @@ struct SettingsView: View {
     @State private var newRecurringBucket: BudgetBucket = .fun
     @State private var addRecurringError: String?
     @State private var showPaywall = false
+    @State private var exportURL: URL?
+    @State private var selectedAllocationPreset: AllocationPreset = .custom
+    @State private var showZeroFunWarning = false
+    @AppStorage("appThemeMode") private var appThemeMode = "system"
+    @AppStorage("autoMonthlyCSVExportEnabled") private var autoMonthlyCSVExportEnabled = false
+    @AppStorage("lastAutoMonthlyCSVExportKey") private var lastAutoMonthlyCSVExportKey = ""
+
+    private var monthOptions: [Date] {
+        let calendar = Calendar.current
+        let starts = Set(
+            expenses.map {
+                calendar.date(
+                    from: calendar.dateComponents([.year, .month], from: $0.date)
+                ) ?? calendar.startOfDay(for: $0.date)
+            }
+        )
+        let sorted = starts.sorted(by: >)
+        if sorted.isEmpty {
+            return [calendar.date(from: calendar.dateComponents([.year, .month], from: .now)) ?? .now]
+        }
+        return sorted
+    }
 
     var body: some View {
         NavigationStack {
@@ -45,11 +69,21 @@ struct SettingsView: View {
                 } header: {
                     Text("Monthly Income")
                 } footer: {
-                    Text("Your income is stored locally and never leaves this device.")
+                    Text("Base monthly income. Add Income transactions to handle variable month-to-month earnings.")
                 }
 
                 // ── Bucket Allocation ──────────────────────────────────
                 Section {
+                    Picker("Preset", selection: $selectedAllocationPreset) {
+                        ForEach(AllocationPreset.allCases) { preset in
+                            Text(preset.title).tag(preset)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: selectedAllocationPreset) {
+                        applySelectedPresetIfNeeded()
+                    }
+
                     ForEach(BudgetBucket.allCases) { bucket in
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 10) {
@@ -71,22 +105,24 @@ struct SettingsView: View {
                                 VStack(alignment: .trailing, spacing: 1) {
                                     Text("\(Int(draftPercentage(for: bucket) * 100))%")
                                         .font(.subheadline.weight(.semibold))
-                                    if budgetEngine.monthlyIncome > 0 {
-                                        Text(
-                                            draftBucketBudget(for: bucket),
-                                            format: .currency(code: "USD")
-                                        )
-                                        .font(.caption2)
-                                        .foregroundStyle(AppColors.textTertiary)
-                                    }
                                 }
                             }
 
-                            Slider(
-                                value: percentageBinding(for: bucket),
-                                in: 0...1,
-                                step: 0.01
-                            )
+                            HStack(spacing: 10) {
+                                Slider(
+                                    value: percentageBinding(for: bucket),
+                                    in: 0...1,
+                                    step: 0.01
+                                )
+                                Text(
+                                    draftBucketBudget(for: bucket),
+                                    format: .currency(code: "USD")
+                                )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AppColors.textSecondary)
+                                .monospacedDigit()
+                                .frame(minWidth: 92, alignment: .trailing)
+                            }
                         }
                     }
                 } header: {
@@ -141,15 +177,12 @@ struct SettingsView: View {
                             Label("Add Recurring Expense", systemImage: "plus")
                         }
                     } else {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Recurring expenses are a Pro feature.")
-                                .font(.subheadline)
-                                .foregroundStyle(AppColors.textSecondary)
-                            Button {
-                                showPaywall = true
-                            } label: {
-                                Label("Unlock Pro (\(AppConstants.proPrice))", systemImage: "lock.open")
-                            }
+                        Text("Recurring expenses are available on Pro.")
+                            .foregroundStyle(AppColors.textTertiary)
+                        Button {
+                            showPaywall = true
+                        } label: {
+                            Label("Unlock Pro (\(AppConstants.proPrice))", systemImage: "lock.open")
                         }
                     }
                 } header: {
@@ -160,6 +193,62 @@ struct SettingsView: View {
                             ? "These are auto-accounted for every month."
                             : "Upgrade to Pro for recurring transactions and unlimited entries."
                     )
+                }
+
+                // ── Rollover Budgets (Pro) ─────────────────────────────
+                Section("Rollover Budgets") {
+                    if store.isPro {
+                        Toggle("Enable Rollover Balances", isOn: rolloverBinding)
+                            .tint(AppColors.accent)
+                        Text("Unused Fundamentals and Fun money rolls into next month.")
+                            .font(.caption)
+                            .foregroundStyle(AppColors.textTertiary)
+                    } else {
+                        Text("Rollover balances are available on Pro.")
+                            .foregroundStyle(AppColors.textTertiary)
+                        Button {
+                            showPaywall = true
+                        } label: {
+                            Label("Unlock Pro (\(AppConstants.proPrice))", systemImage: "lock.open")
+                        }
+                    }
+                }
+
+                // ── Data Export ─────────────────────────────────────────
+                Section("Data Export") {
+                    if store.isPro {
+                        Button("Export Current Month (CSV)") {
+                            exportCurrentMonthCSV()
+                        }
+                        Button("Export All Data (CSV)") {
+                            exportCSV(for: expenses, scope: "all_months")
+                        }
+                        Toggle("Auto Monthly CSV Export", isOn: $autoMonthlyCSVExportEnabled)
+                            .tint(AppColors.accent)
+                        if let exportURL {
+                            ShareLink(item: exportURL) {
+                                Label("Share Last Export", systemImage: "square.and.arrow.up")
+                            }
+                        }
+                    } else {
+                        Text("Exports are available on Pro.")
+                            .foregroundStyle(AppColors.textTertiary)
+                        lockedExportPreview
+                        Button {
+                            showPaywall = true
+                        } label: {
+                            Label("Unlock Pro (\(AppConstants.proPrice))", systemImage: "lock.open")
+                        }
+                    }
+                }
+
+                Section("Appearance") {
+                    Picker("Theme", selection: $appThemeMode) {
+                        Text("System Default").tag("system")
+                        Text("Light").tag("light")
+                        Text("Dark").tag("dark")
+                    }
+                    .pickerStyle(.menu)
                 }
 
                 // ── Custom Categories ──────────────────────────────────
@@ -240,18 +329,37 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        budgetEngine.setPercentages(draftPercentages)
-                        dismiss()
+                        if draftPercentage(for: .fun) <= 0.0001 {
+                            showZeroFunWarning = true
+                        } else {
+                            saveAndDismiss()
+                        }
                     }
                         .fontWeight(.medium)
                         .disabled(!isAllocationValid)
                 }
             }
             .onAppear {
+                if !store.isPro, budgetEngine.rolloverEnabled {
+                    budgetEngine.rolloverEnabled = false
+                }
                 if budgetEngine.monthlyIncome > 0 {
                     incomeText = String(format: "%.0f", budgetEngine.monthlyIncome)
                 }
                 draftPercentages = currentPercentagesSnapshot()
+                selectedAllocationPreset = AllocationPreset.matching(draftPercentages) ?? .custom
+                runAutoMonthlyExportIfNeeded()
+            }
+            .onChange(of: store.isPro) {
+                if !store.isPro, budgetEngine.rolloverEnabled {
+                    budgetEngine.rolloverEnabled = false
+                }
+            }
+            .onChange(of: draftPercentages) {
+                selectedAllocationPreset = AllocationPreset.matching(draftPercentages) ?? .custom
+            }
+            .onChange(of: autoMonthlyCSVExportEnabled) {
+                runAutoMonthlyExportIfNeeded()
             }
             .task {
                 await store.loadProducts()
@@ -323,6 +431,14 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
+            }
+            .alert("Fun is 0%", isPresented: $showZeroFunWarning) {
+                Button("Keep 0%") {
+                    saveAndDismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Fun is set to 0%. Are you sure you want to continue?")
             }
         }
     }
@@ -404,6 +520,88 @@ struct SettingsView: View {
         }
     }
 
+    private func monthLabel(_ date: Date) -> String {
+        date.formatted(.dateTime.year().month(.wide))
+    }
+
+    private func exportCurrentMonthCSV() {
+        let calendar = Calendar.current
+        let currentMonth = calendar.date(
+            from: calendar.dateComponents([.year, .month], from: .now)
+        ) ?? .now
+        let currentMonthExpenses = expenses.filter {
+            calendar.isDate($0.date, equalTo: currentMonth, toGranularity: .month)
+        }
+        exportCSV(for: currentMonthExpenses, scope: monthLabel(currentMonth))
+    }
+
+    private func exportCSV(for items: [Expense], scope: String) {
+        let formatter = ISO8601DateFormatter()
+        var csv = "date,merchant,amount,category,bucket,isOverspent,notes\n"
+
+        for expense in items.sorted(by: { $0.date > $1.date }) {
+            let row = [
+                csvEscape(formatter.string(from: expense.date)),
+                csvEscape(expense.merchant),
+                csvEscape(String(format: "%.2f", expense.amount)),
+                csvEscape(categoryManager.displayName(forStoredCategory: expense.category)),
+                csvEscape(expense.bucket),
+                csvEscape(expense.isOverspent ? "true" : "false"),
+                csvEscape(expense.notes)
+            ].joined(separator: ",")
+            csv += row + "\n"
+        }
+
+        let safeScope = scope.replacingOccurrences(
+            of: "[^a-zA-Z0-9_]+",
+            with: "_",
+            options: .regularExpression
+        )
+        let filename = "puldar_\(safeScope.lowercased()).csv"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+
+        do {
+            try csv.write(to: url, atomically: true, encoding: .utf8)
+            exportURL = url
+        } catch {
+            print("Failed to export CSV in settings: \(error)")
+        }
+    }
+
+    private func csvEscape(_ value: String) -> String {
+        let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
+        return "\"\(escaped)\""
+    }
+
+    private func runAutoMonthlyExportIfNeeded() {
+        guard store.isPro, autoMonthlyCSVExportEnabled else { return }
+
+        let calendar = Calendar.current
+        guard let previousMonth = calendar.date(byAdding: .month, value: -1, to: .now) else {
+            return
+        }
+
+        let key = monthKey(previousMonth)
+        guard key != lastAutoMonthlyCSVExportKey else { return }
+
+        let previousMonthExpenses = expenses.filter {
+            calendar.isDate($0.date, equalTo: previousMonth, toGranularity: .month)
+        }
+
+        guard !previousMonthExpenses.isEmpty else {
+            lastAutoMonthlyCSVExportKey = key
+            return
+        }
+
+        exportCSV(for: previousMonthExpenses, scope: "auto_\(monthLabel(previousMonth))")
+        lastAutoMonthlyCSVExportKey = key
+    }
+
+    private func monthKey(_ date: Date) -> String {
+        let comps = Calendar.current.dateComponents([.year, .month], from: date)
+        return "\(comps.year ?? 0)-\(comps.month ?? 0)"
+    }
+
     private func recurringActiveBinding(for id: UUID) -> Binding<Bool> {
         Binding(
             get: {
@@ -423,6 +621,112 @@ struct SettingsView: View {
                 }
             }
         )
+    }
+
+    private var rolloverBinding: Binding<Bool> {
+        Binding(
+            get: { budgetEngine.rolloverEnabled },
+            set: { isOn in
+                guard store.isPro else {
+                    showPaywall = true
+                    return
+                }
+                budgetEngine.rolloverEnabled = isOn
+            }
+        )
+    }
+
+    private func applySelectedPresetIfNeeded() {
+        guard let values = selectedAllocationPreset.values else { return }
+        draftPercentages = values
+    }
+
+    private func saveAndDismiss() {
+        budgetEngine.setPercentages(draftPercentages)
+        dismiss()
+    }
+
+    private var lockedExportPreview: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Preview")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppColors.textSecondary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("date,merchant,amount,category,bucket")
+                Text("2026-02-27,Whole Foods,45.00,Groceries,Fundamentals")
+                Text("2026-02-26,Bitcoin,200.00,Investments,Future You")
+                Text("2026-02-25,Hulu,9.99,Subscriptions,Fun")
+            }
+            .font(.caption2.monospaced())
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(AppColors.tertiaryBg)
+            )
+            .blur(radius: 2.4)
+            .overlay(alignment: .center) {
+                Label("Pro Export Preview", systemImage: "lock.fill")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(AppColors.background.opacity(0.92))
+                    )
+            }
+        }
+    }
+
+    private enum AllocationPreset: String, CaseIterable, Identifiable {
+        case fiftyThirtyTwenty
+        case sixtyTwentyTwenty
+        case custom
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .fiftyThirtyTwenty: return "50/30/20"
+            case .sixtyTwentyTwenty: return "60/20/20"
+            case .custom: return "Custom"
+            }
+        }
+
+        var values: [String: Double]? {
+            switch self {
+            case .fiftyThirtyTwenty:
+                return [
+                    BudgetBucket.fundamentals.rawValue: 0.50,
+                    BudgetBucket.fun.rawValue: 0.30,
+                    BudgetBucket.future.rawValue: 0.20
+                ]
+            case .sixtyTwentyTwenty:
+                return [
+                    BudgetBucket.fundamentals.rawValue: 0.60,
+                    BudgetBucket.fun.rawValue: 0.20,
+                    BudgetBucket.future.rawValue: 0.20
+                ]
+            case .custom:
+                return nil
+            }
+        }
+
+        static func matching(
+            _ values: [String: Double],
+            tolerance: Double = 0.0001
+        ) -> AllocationPreset? {
+            for preset in [AllocationPreset.fiftyThirtyTwenty, .sixtyTwentyTwenty] {
+                guard let presetValues = preset.values else { continue }
+                let isMatch = BudgetBucket.allCases.allSatisfy { bucket in
+                    abs((values[bucket.rawValue] ?? 0) - (presetValues[bucket.rawValue] ?? 0)) <= tolerance
+                }
+                if isMatch {
+                    return preset
+                }
+            }
+            return nil
+        }
     }
 
     private func addRecurringExpense() {

@@ -53,8 +53,14 @@ final class LLMService {
     // MARK: - Internals
 
     private var modelContainer: ModelContainer?
+    private var parseCache: [String: LLMExpenseResult] = [:]
+    private let parseCacheKey = "llmParseCache.v1"
 
     private let defaultCategories = ExpenseCategory.allCases.map(\.rawValue)
+
+    init() {
+        restoreParseCache()
+    }
 
     // MARK: - Model Lifecycle
 
@@ -114,6 +120,10 @@ final class LLMService {
         let categories = (allowedCategories?.isEmpty == false)
             ? (allowedCategories ?? defaultCategories)
             : defaultCategories
+        let cacheKey = makeParseCacheKey(input: input, categories: categories)
+        if let cached = parseCache[cacheKey] {
+            return cached
+        }
         let systemPrompt = makeSystemPrompt(categories: categories)
 
         // Build chat messages for template formatting.
@@ -159,7 +169,9 @@ final class LLMService {
             return collected
         }
 
-        return try extractJSON(from: responseText)
+        let parsed = try extractJSON(from: responseText)
+        cacheParsedExpense(parsed, for: cacheKey)
+        return parsed
     }
 
     private func makeSystemPrompt(categories: [String]) -> String {
@@ -273,5 +285,52 @@ final class LLMService {
                 return "Failed to parse expense data. Raw: \(raw.prefix(120))"
             }
         }
+    }
+
+    // MARK: - Parse Cache
+
+    private func makeParseCacheKey(input: String, categories: [String]) -> String {
+        let normalizedInput = input
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        let normalizedCategories = categories
+            .map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .lowercased()
+            }
+            .sorted()
+            .joined(separator: "|")
+        return "\(normalizedInput)||\(normalizedCategories)"
+    }
+
+    private func cacheParsedExpense(_ parsed: LLMExpenseResult, for key: String) {
+        parseCache[key] = parsed
+        trimParseCacheIfNeeded()
+        persistParseCache()
+    }
+
+    private func trimParseCacheIfNeeded() {
+        let maxCacheEntries = 500
+        guard parseCache.count > maxCacheEntries else { return }
+        // Keep a bounded cache size. Sorted drop is deterministic.
+        let overflowCount = parseCache.count - maxCacheEntries
+        let keysToRemove = parseCache.keys.sorted().prefix(overflowCount)
+        for key in keysToRemove {
+            parseCache.removeValue(forKey: key)
+        }
+    }
+
+    private func restoreParseCache() {
+        guard let data = UserDefaults.standard.data(forKey: parseCacheKey) else { return }
+        guard let decoded = try? JSONDecoder().decode([String: LLMExpenseResult].self, from: data) else {
+            return
+        }
+        parseCache = decoded
+        trimParseCacheIfNeeded()
+    }
+
+    private func persistParseCache() {
+        guard let data = try? JSONEncoder().encode(parseCache) else { return }
+        UserDefaults.standard.set(data, forKey: parseCacheKey)
     }
 }

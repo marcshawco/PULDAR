@@ -22,19 +22,26 @@ final class BudgetEngine {
                 return
             }
             UserDefaults.standard.set(monthlyIncome, forKey: "monthlyIncome")
+            invalidateMonthlyStatusCache()
         }
     }
 
     var rolloverEnabled: Bool = UserDefaults.standard.bool(forKey: "rolloverEnabled") {
         didSet {
             UserDefaults.standard.set(rolloverEnabled, forKey: "rolloverEnabled")
+            invalidateMonthlyStatusCache()
         }
     }
 
     /// Persisted bucket percentages keyed by `BudgetBucket.rawValue`.
     var bucketPercentages: [String: Double] {
-        didSet { Self.saveBucketPercentages(bucketPercentages) }
+        didSet {
+            Self.saveBucketPercentages(bucketPercentages)
+            invalidateMonthlyStatusCache()
+        }
     }
+
+    private var monthlyStatusCache: [String: [BucketStatus]] = [:]
 
     init() {
         bucketPercentages = Self.loadBucketPercentages()
@@ -159,6 +166,15 @@ final class BudgetEngine {
         recurringExpenses: [RecurringExpense] = [],
         for month: Date = .now
     ) -> [BucketStatus] {
+        let cacheKey = makeStatusCacheKey(
+            expenses: expenses,
+            recurringExpenses: recurringExpenses,
+            month: month
+        )
+        if let cached = monthlyStatusCache[cacheKey] {
+            return cached
+        }
+
         let monthExpenses = filterToMonth(expenses, month: month)
             .filter { !isIncomeTransaction($0) }
         let effectiveIncome = effectiveMonthlyIncome(expenses: expenses, for: month)
@@ -169,7 +185,7 @@ final class BudgetEngine {
             spentByBucket[expense.budgetBucket, default: 0] += safeAmount
         }
 
-        return BudgetBucket.allCases.map { bucket in
+        let result = BudgetBucket.allCases.map { bucket in
             let spent = (spentByBucket[bucket] ?? 0) + recurringTotal(
                 recurringExpenses,
                 bucket: bucket
@@ -187,6 +203,8 @@ final class BudgetEngine {
                 spent: spent
             )
         }
+        cacheMonthlyStatus(result, for: cacheKey)
+        return result
     }
 
     /// Base monthly income plus any explicit income transactions in the same month.
@@ -344,6 +362,58 @@ final class BudgetEngine {
     }
 
     private static let bucketPercentageKey = "bucketPercentages"
+    private let maxMonthlyCacheEntries = 36
+
+    private func makeStatusCacheKey(
+        expenses: [Expense],
+        recurringExpenses: [RecurringExpense],
+        month: Date
+    ) -> String {
+        let calendar = Calendar.current
+        let monthKey = calendar.dateComponents([.year, .month], from: month)
+        let monthStamp = "\(monthKey.year ?? 0)-\(monthKey.month ?? 0)"
+
+        let expenseStamp = expenses.map {
+            let amount = $0.amount.isFinite ? $0.amount : 0
+            return "\($0.id.uuidString)|\($0.bucket)|\($0.category)|\(amount)|\($0.date.timeIntervalSince1970)"
+        }
+        .sorted()
+        .joined(separator: ";")
+
+        let recurringStamp = recurringExpenses.map {
+            "\($0.id.uuidString)|\($0.bucket)|\($0.safeAmount)|\($0.isActive)"
+        }
+        .sorted()
+        .joined(separator: ";")
+
+        let percentagesStamp = BudgetBucket.allCases.map { bucket in
+            "\(bucket.rawValue):\(percentage(for: bucket))"
+        }
+        .joined(separator: "|")
+
+        return [
+            monthStamp,
+            "income:\(monthlyIncome)",
+            "rollover:\(rolloverEnabled)",
+            percentagesStamp,
+            expenseStamp,
+            recurringStamp
+        ].joined(separator: "||")
+    }
+
+    private func cacheMonthlyStatus(_ status: [BucketStatus], for key: String) {
+        monthlyStatusCache[key] = status
+        guard monthlyStatusCache.count > maxMonthlyCacheEntries else { return }
+        let overflow = monthlyStatusCache.count - maxMonthlyCacheEntries
+        let keysToRemove = monthlyStatusCache.keys.sorted().prefix(overflow)
+        for keyToRemove in keysToRemove {
+            monthlyStatusCache.removeValue(forKey: keyToRemove)
+        }
+    }
+
+    private func invalidateMonthlyStatusCache() {
+        monthlyStatusCache.removeAll(keepingCapacity: true)
+    }
 
     private static func loadBucketPercentages() -> [String: Double] {
         var defaults: [String: Double] = [:]

@@ -30,5 +30,5 @@ enum AppConstants {
     static let proPrice = "$4.99"
     static let proProductID = "puldar_pro_lifetime"
     static let modelID = "mlx-community/Qwen2.5-0.5B-Instruct-4bit"
-    static let gpuCacheLimitBytes = 20 * 1024 * 1024 // 20 MB
+    static let gpuCacheLimitBytes = 128 * 1024 * 1024 // 128 MB
 }

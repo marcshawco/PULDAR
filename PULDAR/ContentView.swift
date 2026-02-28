@@ -20,6 +20,7 @@ struct ContentView: View {
     @State private var networkMonitor = NetworkMonitor()
     @State private var storeKitManager = StoreKitManager()
     @State private var usageTracker = UsageTracker()
+    @State private var didWarmModelThisLaunch = false
     @AppStorage("appThemeMode") private var appThemeMode = "system"
 
     // MARK: - Body
@@ -43,6 +44,11 @@ struct ContentView: View {
         .environment(storeKitManager)
         .environment(usageTracker)
         .preferredColorScheme(preferredColorScheme)
+        .task {
+            guard !didWarmModelThisLaunch else { return }
+            didWarmModelThisLaunch = true
+            await llmService.loadModel()
+        }
     }
 
     private var preferredColorScheme: ColorScheme? {

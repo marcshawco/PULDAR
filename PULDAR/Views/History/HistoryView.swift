@@ -195,7 +195,9 @@ struct HistoryView: View {
             .scrollDismissesKeyboard(.interactively)
             .simultaneousGesture(
                 TapGesture().onEnded {
-                    focusedField = nil
+                    if focusedField != nil {
+                        focusedField = nil
+                    }
                 }
             )
             .navigationTitle("History")
@@ -429,7 +431,13 @@ struct HistoryView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(TapGesture().onEnded { focusedField = nil })
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    if focusedField != nil {
+                        focusedField = nil
+                    }
+                }
+            )
             .navigationTitle("Filters & Sort")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

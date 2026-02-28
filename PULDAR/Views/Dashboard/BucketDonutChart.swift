@@ -58,13 +58,14 @@ struct BucketDonutChart: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 16) {
             Picker("Donut Mode", selection: $displayMode) {
                 ForEach(DonutDisplayMode.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
             }
             .pickerStyle(.segmented)
+            .padding(.bottom, 4)
 
             Chart(chartData) { status in
                 SectorMark(

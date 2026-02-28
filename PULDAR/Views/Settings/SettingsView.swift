@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import UIKit
 
 /// Settings sheet — income, allocation, and category management.
 struct SettingsView: View {
@@ -96,7 +95,9 @@ struct SettingsView: View {
             .scrollDismissesKeyboard(.interactively)
             .simultaneousGesture(
                 TapGesture().onEnded {
-                    dismissActiveKeyboard()
+                    if focusedIncomeField != nil {
+                        dismissActiveKeyboard()
+                    }
                 }
             )
             .navigationTitle("Settings")
@@ -645,13 +646,9 @@ struct SettingsView: View {
     }
 
     private func dismissActiveKeyboard() {
-        focusedIncomeField = nil
-        UIApplication.shared.sendAction(
-            #selector(UIResponder.resignFirstResponder),
-            to: nil,
-            from: nil,
-            for: nil
-        )
+        if focusedIncomeField != nil {
+            focusedIncomeField = nil
+        }
     }
 
     private func draftPercentage(for bucket: BudgetBucket) -> Double {
@@ -884,7 +881,15 @@ struct SettingsView: View {
 
     private func saveAndDismiss() {
         budgetEngine.setPercentages(draftPercentages)
-        dismiss()
+        if focusedIncomeField != nil {
+            focusedIncomeField = nil
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(120))
+                dismiss()
+            }
+        } else {
+            dismiss()
+        }
     }
 
     private var lockedExportPreview: some View {

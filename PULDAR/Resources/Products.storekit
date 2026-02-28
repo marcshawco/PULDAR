@@ -1,0 +1,26 @@
+{
+  "identifier" : "D3E8F4A2-1B5C-4A9D-8E7F-6C2D1A0B3E4F",
+  "type" : "com.apple.storekit.testing",
+  "version" : 3,
+  "products" : [
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "1A2B3C4D-5E6F-7A8B-9C0D-1E2F3A4B5C6D",
+      "localizations" : [
+        {
+          "description" : "Unlimited AI-powered expense tracking. One-time purchase, lifetime access.",
+          "displayName" : "PULDAR Pro — Lifetime",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "puldar_pro_lifetime",
+      "referenceName" : "PULDAR Pro Lifetime",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "PULDAR",
+    "_developerTeamID" : ""
+  }
+}

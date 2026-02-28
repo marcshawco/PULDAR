@@ -99,6 +99,9 @@ struct DashboardView: View {
                 dashboardContent
                 .padding(.vertical)
             }
+            .refreshable {
+                await refreshDashboard()
+            }
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("PULDAR")
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -709,6 +712,22 @@ struct DashboardView: View {
         try? await Task.sleep(for: .milliseconds(900))
         await MainActor.run {
             runStartupMaintenanceIfNeeded()
+        }
+    }
+
+    private func refreshDashboard() async {
+        await MainActor.run {
+            budgetEngine.markDataChanged()
+            usageTracker.reconcile(with: expenses)
+
+            if !didRunCategoryConsistencyFixV2 {
+                migrateCategoryConsistencyIfNeeded()
+            }
+            if !didNormalizeMerchantsV1 {
+                migrateMerchantCapitalizationIfNeeded()
+            }
+
+            HapticManager.light()
         }
     }
 

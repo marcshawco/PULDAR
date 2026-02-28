@@ -80,14 +80,16 @@ struct BucketSummaryRow: View {
                 .fill(isSelected ? status.bucket.color.opacity(0.12) : Color.clear)
         )
         .onAppear {
-            withAnimation(.spring(duration: 0.7, bounce: 0.2)) {
-                animatedProgress = safeProgress
-            }
+            updateAnimatedProgress(duration: 0.7, bounce: 0.2)
         }
         .onChange(of: status.spent) {
-            withAnimation(.spring(duration: 0.5)) {
-                animatedProgress = safeProgress
-            }
+            updateAnimatedProgress(duration: 0.5, bounce: 0.12)
+        }
+        .onChange(of: status.budgeted) {
+            updateAnimatedProgress(duration: 0.5, bounce: 0.12)
+        }
+        .onChange(of: status.progress) {
+            updateAnimatedProgress(duration: 0.5, bounce: 0.12)
         }
     }
 
@@ -132,5 +134,11 @@ struct BucketSummaryRow: View {
     private func safeWidth(_ value: CGFloat) -> CGFloat {
         guard value.isFinite else { return 0 }
         return max(value, 0)
+    }
+
+    private func updateAnimatedProgress(duration: Double, bounce: Double) {
+        withAnimation(.spring(duration: duration, bounce: bounce)) {
+            animatedProgress = safeProgress
+        }
     }
 }

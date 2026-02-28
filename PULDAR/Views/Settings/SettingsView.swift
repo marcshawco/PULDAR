@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 /// Settings sheet — income, allocation, and category management.
 struct SettingsView: View {
@@ -29,7 +30,7 @@ struct SettingsView: View {
     @State private var incomeText: String = ""
     @State private var hourlyPayText: String = ""
     @State private var hoursPerWeekText: String = ""
-    @FocusState private var isIncomeFocused: Bool
+    @FocusState private var focusedIncomeField: IncomeFocusField?
     @State private var showAddCategorySheet = false
     @State private var newCategoryName = ""
     @State private var newCategoryBucket: BudgetBucket = .fun
@@ -54,6 +55,12 @@ struct SettingsView: View {
     @AppStorage("autoMonthlyCSVExportEnabled") private var autoMonthlyCSVExportEnabled = false
     @AppStorage("lastAutoMonthlyCSVExportKey") private var lastAutoMonthlyCSVExportKey = ""
 
+    private enum IncomeFocusField: Hashable {
+        case monthlyIncome
+        case hourlyPay
+        case hoursPerWeek
+    }
+
     private var monthOptions: [Date] {
         let calendar = Calendar.current
         let starts = Set(
@@ -73,340 +80,25 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                // ── Income Section ─────────────────────────────────────
-                Section {
-                    Picker("Income Type", selection: incomeInputModeBinding) {
-                        ForEach(IncomeInputMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    if incomeInputMode == .monthly {
-                        HStack {
-                            Text("$")
-                                .foregroundStyle(AppColors.textTertiary)
-                            TextField("Monthly income", text: $incomeText)
-                                .keyboardType(.decimalPad)
-                                .focused($isIncomeFocused)
-                                .onChange(of: incomeText) {
-                                    if let value = Double(incomeText) {
-                                        budgetEngine.monthlyIncome = value
-                                    }
-                                }
-                        }
-                    } else {
-                        HStack {
-                            Text("$")
-                                .foregroundStyle(AppColors.textTertiary)
-                            TextField("Hourly pay", text: $hourlyPayText)
-                                .keyboardType(.decimalPad)
-                                .onChange(of: hourlyPayText) {
-                                    recalculateMonthlyIncomeFromHourlyInputs()
-                                }
-                        }
-
-                        HStack {
-                            Text("hrs")
-                                .foregroundStyle(AppColors.textTertiary)
-                            TextField("Hours per week", text: $hoursPerWeekText)
-                                .keyboardType(.decimalPad)
-                                .onChange(of: hoursPerWeekText) {
-                                    recalculateMonthlyIncomeFromHourlyInputs()
-                                }
-                        }
-
-                        LabeledContent("Estimated monthly income") {
-                            Text(
-                                estimatedMonthlyIncome,
-                                format: .currency(code: "USD")
-                            )
-                            .fontWeight(.semibold)
-                        }
-                    }
-                } header: {
-                    Text("Monthly Income")
-                } footer: {
-                    Text(
-                        incomeInputMode == .monthly
-                        ? "Base monthly income. Add Income transactions to handle variable month-to-month earnings."
-                        : "Hourly estimate uses: hourly pay × hours/week × 52 ÷ 12. Add Income transactions for extra variable earnings."
-                    )
-                }
-
-                // ── Bucket Allocation ──────────────────────────────────
-                Section {
-                    Picker("Preset", selection: $selectedAllocationPreset) {
-                        ForEach(AllocationPreset.allCases) { preset in
-                            Text(preset.title).tag(preset)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .onChange(of: selectedAllocationPreset) {
-                        applySelectedPresetIfNeeded()
-                    }
-
-                    ForEach(BudgetBucket.allCases) { bucket in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 10) {
-                                Image(systemName: bucket.icon)
-                                    .font(.system(size: 12, weight: .thin))
-                                    .foregroundStyle(bucket.color)
-                                    .frame(width: 20)
-
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(bucket.rawValue)
-                                        .font(.subheadline.weight(.medium))
-                                    Text(bucket.subtitle)
-                                        .font(.caption2)
-                                        .foregroundStyle(AppColors.textTertiary)
-                                }
-
-                                Spacer()
-
-                                VStack(alignment: .trailing, spacing: 1) {
-                                    Text("\(Int(draftPercentage(for: bucket) * 100))%")
-                                        .font(.subheadline.weight(.semibold))
-                                }
-                            }
-
-                            HStack(spacing: 10) {
-                                Slider(
-                                    value: percentageBinding(for: bucket),
-                                    in: 0...1,
-                                    step: 0.01
-                                )
-                                Text(draftBucketBudgetDisplay(for: bucket))
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(AppColors.textSecondary)
-                                .monospacedDigit()
-                                .frame(minWidth: 92, alignment: .trailing)
-                            }
-                        }
-                    }
-                } header: {
-                    Text("Bucket Allocation")
-                } footer: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(
-                            "Total: \(Int(totalDraftPercentage * 100))%. " +
-                            (isAllocationValid
-                                ? "Tap Done to save."
-                                : "Must equal exactly 100% to save.")
-                        )
-                        .foregroundStyle(isAllocationValid ? AppColors.textTertiary : AppColors.overspend)
-
-                        if budgetEngine.monthlyIncome <= 0 {
-                            Text("Enter income above to calculate dollar targets.")
-                                .foregroundStyle(AppColors.textTertiary)
-                        }
-                    }
-                }
-
-                if !store.isPro {
-                    Section("Puldar Pro") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Unlock Premium Features")
-                                .font(.subheadline.weight(.semibold))
-                            Text("Unlimited entries, recurring expenses, rollover budgets, and CSV exports.")
-                                .font(.caption)
-                                .foregroundStyle(AppColors.textSecondary)
-                            Button {
-                                showPaywall = true
-                            } label: {
-                                Label("Upgrade for \(AppConstants.proPrice)", systemImage: "sparkles")
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-
-                // ── Recurring Expenses ─────────────────────────────────
-                Section {
-                    if store.isPro {
-                        if recurringExpenses.isEmpty {
-                            Text("No recurring expenses yet.")
-                                .foregroundStyle(AppColors.textTertiary)
-                        } else {
-                            ForEach(recurringExpenses) { recurring in
-                                HStack(spacing: 10) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(recurring.name)
-                                            .font(.subheadline.weight(.medium))
-                                        Text(recurringBucketLabel(recurring.budgetBucket))
-                                            .font(.caption2)
-                                            .foregroundStyle(AppColors.textTertiary)
-                                    }
-
-                                    Spacer()
-
-                                    Text(recurring.safeAmount, format: .currency(code: "USD"))
-                                        .font(.subheadline.weight(.semibold))
-
-                                    Toggle("", isOn: recurringActiveBinding(for: recurring.id))
-                                        .labelsHidden()
-                                }
-                                .padding(.vertical, 2)
-                            }
-                            .onDelete(perform: deleteRecurringExpenses)
-                        }
-
-                        Button {
-                            newRecurringName = ""
-                            newRecurringAmount = ""
-                            newRecurringBucket = .fun
-                            addRecurringError = nil
-                            showAddRecurringSheet = true
-                        } label: {
-                            Label("Add Recurring Expense", systemImage: "plus")
-                        }
-                    } else {
-                        Text("Recurring expenses are available on Pro.")
-                            .foregroundStyle(AppColors.textTertiary)
-                    }
-                } header: {
-                    Text("Recurring Expenses")
-                } footer: {
-                    Text(
-                        store.isPro
-                            ? "These are auto-accounted for every month."
-                            : "Upgrade to Pro for recurring transactions and unlimited entries."
-                    )
-                }
-
-                // ── Rollover Budgets (Pro) ─────────────────────────────
-                Section("Rollover Budgets") {
-                    if store.isPro {
-                        Toggle("Enable Rollover Balances", isOn: rolloverBinding)
-                            .tint(AppColors.accent)
-                        Text("Unused Fundamentals and Fun money rolls into next month.")
-                            .font(.caption)
-                            .foregroundStyle(AppColors.textTertiary)
-                    } else {
-                        Text("Rollover balances are available on Pro.")
-                            .foregroundStyle(AppColors.textTertiary)
-                    }
-                }
-
-                // ── Data Export ─────────────────────────────────────────
-                Section("Data Export") {
-                    if store.isPro {
-                        Button("Export Current Month (CSV)") {
-                            exportCurrentMonthCSV()
-                        }
-                        Button("Export All Data (CSV)") {
-                            exportCSV(for: expenses, scope: "all_months")
-                        }
-                        Toggle("Auto Monthly CSV Export", isOn: $autoMonthlyCSVExportEnabled)
-                            .tint(AppColors.accent)
-                        if let exportURL {
-                            ShareLink(item: exportURL) {
-                                Label("Share Last Export", systemImage: "square.and.arrow.up")
-                            }
-                        }
-                    } else {
-                        Text("Exports are available on Pro.")
-                            .foregroundStyle(AppColors.textTertiary)
-                        lockedExportPreview
-                    }
-                }
-
-                Section("Local Backup") {
-                    Button("Create Device Backup (JSON)") {
-                        exportLocalBackupJSON()
-                    }
-                    if let backupURL {
-                        ShareLink(item: backupURL) {
-                            Label("Share Last Backup", systemImage: "square.and.arrow.up")
-                        }
-                    }
-                } footer: {
-                    Text("Creates a raw on-device backup file you can transfer to another phone.")
-                }
-
-                Section("Appearance") {
-                    Picker("Theme", selection: $appThemeMode) {
-                        Text("System Default").tag("system")
-                        Text("Light").tag("light")
-                        Text("Dark").tag("dark")
-                    }
-                    .pickerStyle(.menu)
-                }
-
-                // ── Custom Categories ──────────────────────────────────
-                Section {
-                    if categoryManager.customCategories.isEmpty {
-                        Text("No custom categories yet.")
-                            .foregroundStyle(AppColors.textTertiary)
-                    } else {
-                        ForEach(categoryManager.customCategories) { custom in
-                            VStack(alignment: .leading, spacing: 8) {
-                                TextField(
-                                    "Category name",
-                                    text: customNameBinding(for: custom.id)
-                                )
-                                Picker("Bucket", selection: customBucketBinding(for: custom.id)) {
-                                    ForEach(BudgetBucket.allCases) { bucket in
-                                        Text(bucket.rawValue).tag(bucket)
-                                    }
-                                }
-                                .pickerStyle(.segmented)
-                            }
-                            .padding(.vertical, 4)
-                        }
-                        .onDelete(perform: categoryManager.removeCustomCategories)
-                    }
-
-                    Button {
-                        newCategoryName = ""
-                        newCategoryBucket = .fun
-                        addCategoryError = nil
-                        showAddCategorySheet = true
-                    } label: {
-                        Label("Add Category", systemImage: "plus")
-                    }
-                } header: {
-                    Text("Custom Categories")
-                }
-
-                // ── Pro Status ─────────────────────────────────────────
-                Section("Account") {
-                    HStack {
-                        Text("Plan")
-                        Spacer()
-                        Text(store.isPro ? "Pro (Lifetime)" : "Free")
-                            .foregroundStyle(
-                                store.isPro ? .green : AppColors.textSecondary
-                            )
-                    }
-
-                    if !store.isPro {
-                        Button("Restore Purchases") {
-                            Task { await store.checkEntitlement(force: true) }
-                        }
-                    }
-                }
-
-                // ── Danger Zone ────────────────────────────────────────
-                Section {
-                    Button(role: .destructive) {
-                        deleteConfirmText = ""
-                        showDeleteAllConfirmation = true
-                    } label: {
-                        Label("Delete All Expenses", systemImage: "trash")
-                            .font(.subheadline)
-                    }
-                } footer: {
-                    Text("This action cannot be undone.")
-                }
-
-                // ── About ──────────────────────────────────────────────
-                Section("About") {
-                    LabeledContent("Version", value: "1.0.0")
-                    LabeledContent("AI Model", value: "Qwen 2.5 0.5B")
-                    LabeledContent("Processing", value: "100% On-Device")
-                }
+                incomeSection
+                bucketAllocationSection
+                proSection
+                recurringSection
+                rolloverSection
+                dataExportSection
+                localBackupSection
+                appearanceSection
+                customCategoriesSection
+                accountSection
+                dangerZoneSection
+                aboutSection
             }
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    dismissActiveKeyboard()
+                }
+            )
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -415,6 +107,7 @@ struct SettingsView: View {
                         if draftPercentage(for: .fun) <= 0.0001 {
                             showZeroFunWarning = true
                         } else {
+                            dismissActiveKeyboard()
                             saveAndDismiss()
                         }
                     }
@@ -475,11 +168,20 @@ struct SettingsView: View {
                                 .foregroundStyle(.red)
                         }
                     }
+                    .scrollDismissesKeyboard(.interactively)
+                    .simultaneousGesture(
+                        TapGesture().onEnded {
+                            dismissActiveKeyboard()
+                        }
+                    )
                     .navigationTitle("Recurring Expense")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancel") { showAddRecurringSheet = false }
+                            Button("Cancel") {
+                                dismissActiveKeyboard()
+                                showAddRecurringSheet = false
+                            }
                         }
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Add") { addRecurringExpense() }
@@ -505,11 +207,20 @@ struct SettingsView: View {
                                 .foregroundStyle(.red)
                         }
                     }
+                    .scrollDismissesKeyboard(.interactively)
+                    .simultaneousGesture(
+                        TapGesture().onEnded {
+                            dismissActiveKeyboard()
+                        }
+                    )
                     .navigationTitle("New Category")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancel") { showAddCategorySheet = false }
+                            Button("Cancel") {
+                                dismissActiveKeyboard()
+                                showAddCategorySheet = false
+                            }
                         }
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Add") { addCustomCategory() }
@@ -536,10 +247,410 @@ struct SettingsView: View {
 
     // MARK: - Helpers
 
+    private var incomeSection: some View {
+        Section {
+            Picker("Income Type", selection: incomeInputModeBinding) {
+                ForEach(IncomeInputMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            if incomeInputMode == .monthly {
+                HStack {
+                    Text("$")
+                        .foregroundStyle(AppColors.textTertiary)
+                    TextField("Monthly income", text: $incomeText)
+                        .keyboardType(.decimalPad)
+                        .focused($focusedIncomeField, equals: .monthlyIncome)
+                        .onChange(of: incomeText) {
+                            if let value = Double(incomeText) {
+                                budgetEngine.monthlyIncome = value
+                            }
+                        }
+                    if focusedIncomeField != nil {
+                        Spacer()
+                        Button {
+                            dismissActiveKeyboard()
+                        } label: {
+                            Image(systemName: "keyboard.chevron.compact.down")
+                                .foregroundStyle(AppColors.textTertiary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            } else {
+                HStack {
+                    Text("$")
+                        .foregroundStyle(AppColors.textTertiary)
+                    TextField("Hourly pay", text: $hourlyPayText)
+                        .keyboardType(.decimalPad)
+                        .focused($focusedIncomeField, equals: .hourlyPay)
+                        .onChange(of: hourlyPayText) {
+                            recalculateMonthlyIncomeFromHourlyInputs()
+                        }
+                    if focusedIncomeField != nil {
+                        Spacer()
+                        Button {
+                            dismissActiveKeyboard()
+                        } label: {
+                            Image(systemName: "keyboard.chevron.compact.down")
+                                .foregroundStyle(AppColors.textTertiary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                HStack {
+                    Text("hrs")
+                        .foregroundStyle(AppColors.textTertiary)
+                    TextField("Hours per week", text: $hoursPerWeekText)
+                        .keyboardType(.decimalPad)
+                        .focused($focusedIncomeField, equals: .hoursPerWeek)
+                        .onChange(of: hoursPerWeekText) {
+                            recalculateMonthlyIncomeFromHourlyInputs()
+                        }
+                    if focusedIncomeField != nil {
+                        Spacer()
+                        Button {
+                            dismissActiveKeyboard()
+                        } label: {
+                            Image(systemName: "keyboard.chevron.compact.down")
+                                .foregroundStyle(AppColors.textTertiary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                LabeledContent("Estimated monthly income") {
+                    Text(estimatedMonthlyIncome, format: .currency(code: "USD"))
+                        .fontWeight(.semibold)
+                }
+            }
+        } header: {
+            Text("Monthly Income")
+        } footer: {
+            Text(
+                incomeInputMode == .monthly
+                ? "Base monthly income. Add Income transactions to handle variable month-to-month earnings."
+                : "Hourly estimate uses: hourly pay × hours/week × 52 ÷ 12. Add Income transactions for extra variable earnings."
+            )
+        }
+    }
+
+    private var bucketAllocationSection: some View {
+        Section {
+            Picker("Preset", selection: $selectedAllocationPreset) {
+                ForEach(AllocationPreset.allCases) { preset in
+                    Text(preset.title).tag(preset)
+                }
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: selectedAllocationPreset) {
+                applySelectedPresetIfNeeded()
+            }
+
+            ForEach(BudgetBucket.allCases) { bucket in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        Image(systemName: bucket.icon)
+                            .font(.system(size: 12, weight: .thin))
+                            .foregroundStyle(bucket.color)
+                            .frame(width: 20)
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(bucket.rawValue)
+                                .font(.subheadline.weight(.medium))
+                            Text(bucket.subtitle)
+                                .font(.caption2)
+                                .foregroundStyle(AppColors.textTertiary)
+                        }
+
+                        Spacer()
+
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text("\(Int(draftPercentage(for: bucket) * 100))%")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                    }
+
+                    HStack(spacing: 10) {
+                        Slider(
+                            value: percentageBinding(for: bucket),
+                            in: 0...1,
+                            step: 0.01
+                        )
+                        Text(draftBucketBudgetDisplay(for: bucket))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(AppColors.textSecondary)
+                            .monospacedDigit()
+                            .frame(minWidth: 92, alignment: .trailing)
+                    }
+                }
+            }
+        } header: {
+            Text("Bucket Allocation")
+        } footer: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(
+                    "Total: \(Int(totalDraftPercentage * 100))%. " +
+                    (isAllocationValid
+                        ? "Tap Done to save."
+                        : "Must equal exactly 100% to save.")
+                )
+                .foregroundStyle(isAllocationValid ? AppColors.textTertiary : AppColors.overspend)
+
+                if budgetEngine.monthlyIncome <= 0 {
+                    Text("Enter income above to calculate dollar targets.")
+                        .foregroundStyle(AppColors.textTertiary)
+                }
+            }
+        }
+    }
+
+    private var recurringSection: some View {
+        Section {
+            if store.isPro {
+                if recurringExpenses.isEmpty {
+                    Text("No recurring expenses yet.")
+                        .foregroundStyle(AppColors.textTertiary)
+                } else {
+                    ForEach(recurringExpenses) { recurring in
+                        HStack(spacing: 10) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(recurring.name)
+                                    .font(.subheadline.weight(.medium))
+                                Text(recurringBucketLabel(recurring.budgetBucket))
+                                    .font(.caption2)
+                                    .foregroundStyle(AppColors.textTertiary)
+                            }
+
+                            Spacer()
+
+                            Text(recurring.safeAmount, format: .currency(code: "USD"))
+                                .font(.subheadline.weight(.semibold))
+
+                            Toggle("", isOn: recurringActiveBinding(for: recurring.id))
+                                .labelsHidden()
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    .onDelete(perform: deleteRecurringExpenses)
+                }
+
+                Button {
+                    newRecurringName = ""
+                    newRecurringAmount = ""
+                    newRecurringBucket = .fun
+                    addRecurringError = nil
+                    showAddRecurringSheet = true
+                } label: {
+                    Label("Add Recurring Expense", systemImage: "plus")
+                }
+            } else {
+                Text("Recurring expenses are available on Pro.")
+                    .foregroundStyle(AppColors.textTertiary)
+            }
+        } header: {
+            Text("Recurring Expenses")
+        } footer: {
+            Text(
+                store.isPro
+                ? "These are auto-accounted for every month."
+                : "Upgrade to Pro for recurring transactions and unlimited entries."
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var proSection: some View {
+        if !store.isPro {
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Unlock Premium Features")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Unlimited entries, recurring expenses, rollover budgets, and CSV exports.")
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                    Button {
+                        showPaywall = true
+                    } label: {
+                        Label("Upgrade for \(AppConstants.proPrice)", systemImage: "sparkles")
+                    }
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Puldar Pro")
+            }
+        }
+    }
+
+    private var rolloverSection: some View {
+        Section {
+            if store.isPro {
+                Toggle("Enable Rollover Balances", isOn: rolloverBinding)
+                    .tint(AppColors.accent)
+                Text("Unused Fundamentals and Fun money rolls into next month.")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textTertiary)
+            } else {
+                Text("Rollover balances are available on Pro.")
+                    .foregroundStyle(AppColors.textTertiary)
+            }
+        } header: {
+            Text("Rollover Budgets")
+        }
+    }
+
+    private var dataExportSection: some View {
+        Section {
+            if store.isPro {
+                Button("Export Current Month (CSV)") {
+                    exportCurrentMonthCSV()
+                }
+                Button("Export All Data (CSV)") {
+                    exportCSV(for: expenses, scope: "all_months")
+                }
+                Toggle("Auto Monthly CSV Export", isOn: $autoMonthlyCSVExportEnabled)
+                    .tint(AppColors.accent)
+                if let exportURL {
+                    ShareLink(item: exportURL) {
+                        Label("Share Last Export", systemImage: "square.and.arrow.up")
+                    }
+                }
+            } else {
+                Text("Exports are available on Pro.")
+                    .foregroundStyle(AppColors.textTertiary)
+                lockedExportPreview
+            }
+        } header: {
+            Text("Data Export")
+        }
+    }
+
+    private var localBackupSection: some View {
+        Section {
+            Button("Create Device Backup (JSON)") {
+                exportLocalBackupJSON()
+            }
+            if let backupURL {
+                ShareLink(item: backupURL) {
+                    Label("Share Last Backup", systemImage: "square.and.arrow.up")
+                }
+            }
+        } header: {
+            Text("Local Backup")
+        } footer: {
+            Text("Creates a raw on-device backup file you can transfer to another phone.")
+        }
+    }
+
+    private var appearanceSection: some View {
+        Section {
+            Picker("Theme", selection: $appThemeMode) {
+                Text("System Default").tag("system")
+                Text("Light").tag("light")
+                Text("Dark").tag("dark")
+            }
+            .pickerStyle(.menu)
+        } header: {
+            Text("Appearance")
+        }
+    }
+
+    private var accountSection: some View {
+        Section {
+            HStack {
+                Text("Plan")
+                Spacer()
+                Text(store.isPro ? "Pro (Lifetime)" : "Free")
+                    .foregroundStyle(
+                        store.isPro ? .green : AppColors.textSecondary
+                    )
+            }
+
+            if !store.isPro {
+                Button("Restore Purchases") {
+                    Task { await store.checkEntitlement(force: true) }
+                }
+            }
+        } header: {
+            Text("Account")
+        }
+    }
+
+    private var dangerZoneSection: some View {
+        Section {
+            Button(role: .destructive) {
+                deleteConfirmText = ""
+                showDeleteAllConfirmation = true
+            } label: {
+                Label("Delete All Expenses", systemImage: "trash")
+                    .font(.subheadline)
+            }
+        } footer: {
+            Text("This action cannot be undone.")
+        }
+    }
+
+    private var aboutSection: some View {
+        Section {
+            LabeledContent("Version", value: "1.0.0")
+            LabeledContent("AI Model", value: "Qwen 2.5 0.5B")
+            LabeledContent("Processing", value: "100% On-Device")
+        } header: {
+            Text("About")
+        }
+    }
+
+    private var customCategoriesSection: some View {
+        Section {
+            if categoryManager.customCategories.isEmpty {
+                Text("No custom categories yet.")
+                    .foregroundStyle(AppColors.textTertiary)
+            } else {
+                ForEach(categoryManager.customCategories) { custom in
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextField("Category name", text: customNameBinding(for: custom.id))
+                        Picker("Bucket", selection: customBucketBinding(for: custom.id)) {
+                            ForEach(BudgetBucket.allCases) { bucket in
+                                Text(bucket.rawValue).tag(bucket)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    .padding(.vertical, 4)
+                }
+                .onDelete(perform: categoryManager.removeCustomCategories)
+            }
+
+            Button {
+                newCategoryName = ""
+                newCategoryBucket = .fun
+                addCategoryError = nil
+                showAddCategorySheet = true
+            } label: {
+                Label("Add Category", systemImage: "plus")
+            }
+        } header: {
+            Text("Custom Categories")
+        }
+    }
+
     private func percentageBinding(for bucket: BudgetBucket) -> Binding<Double> {
         Binding(
             get: { draftPercentage(for: bucket) },
             set: { draftPercentages[bucket.rawValue] = min(max($0, 0), 1) }
+        )
+    }
+
+    private func dismissActiveKeyboard() {
+        focusedIncomeField = nil
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
         )
     }
 

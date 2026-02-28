@@ -110,6 +110,10 @@ struct BucketDonutChart: View {
                 onBucketSelected?(nil)
                 return
             }
+            guard angle.isFinite else {
+                onBucketSelected?(nil)
+                return
+            }
             guard let tappedBucket = bucketForSelectedAngle(angle) else { return }
             let nextSelection: BudgetBucket? = (selectedBucket == tappedBucket) ? nil : tappedBucket
             onBucketSelected?(nextSelection)
@@ -141,11 +145,13 @@ struct BucketDonutChart: View {
     }
 
     private func bucketForSelectedAngle(_ angle: Double) -> BudgetBucket? {
+        guard angle.isFinite else { return nil }
         let values = chartData.map { max(sectorWeight(for: $0), 0.01) }
         let total = values.reduce(0, +)
         guard total.isFinite, total > 0 else { return nil }
 
         let normalized = angle.truncatingRemainder(dividingBy: total)
+        guard normalized.isFinite else { return nil }
         var runningTotal: Double = 0
         for (index, value) in values.enumerated() {
             runningTotal += value
@@ -157,22 +163,27 @@ struct BucketDonutChart: View {
     }
 
     private var centerValueView: some View {
-        VStack(spacing: 4) {
+        let valueText = displayMode.centerValue(
+            totalSpent: totalSpent,
+            totalLeft: totalLeft,
+            percentUsed: percentUsed
+        )
+
+        return VStack(spacing: 2) {
             Text(displayMode.centerTitle)
                 .font(.caption2)
                 .foregroundStyle(AppColors.textTertiary)
-            Text(displayMode.centerValue(totalSpent: totalSpent, totalLeft: totalLeft, percentUsed: percentUsed))
-                .font(.system(size: 50, weight: .bold, design: .rounded))
+
+            Text(valueText)
+                .font(.system(size: 38, weight: .bold, design: .rounded))
                 .foregroundStyle(AppColors.textPrimary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.55)
+                .minimumScaleFactor(0.35)
                 .allowsTightening(true)
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .frame(maxWidth: 130)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
         .multilineTextAlignment(.center)
-        .frame(maxWidth: 130)
+        .frame(width: 126, height: 84, alignment: .center)
     }
 
     private var accessibilityLabel: String {

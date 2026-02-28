@@ -345,13 +345,20 @@ struct HistoryView: View {
     @ViewBuilder
     private func summaryCard(_ status: BudgetEngine.BucketStatus) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label(status.bucket.rawValue, systemImage: status.bucket.icon)
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
+            HStack(spacing: 6) {
+                Image(systemName: status.bucket.icon)
+                Text(shortBucketTitle(status.bucket))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .allowsTightening(true)
+            }
+            .font(.caption2.weight(.semibold))
+
             Text(status.spent, format: .currency(code: "USD"))
                 .font(.caption.weight(.semibold))
                 .monospacedDigit()
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
         .foregroundStyle(status.isOverspent ? AppColors.overspend : AppColors.textPrimary)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -360,6 +367,14 @@ struct HistoryView: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(AppColors.secondaryBg)
         )
+    }
+
+    private func shortBucketTitle(_ bucket: BudgetBucket) -> String {
+        switch bucket {
+        case .fundamentals: return "Needs"
+        case .fun: return "Fun"
+        case .future: return "Future"
+        }
     }
 
     private var filtersSheet: some View {
@@ -429,7 +444,8 @@ struct HistoryView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
     }
 
     private var exportSheet: some View {

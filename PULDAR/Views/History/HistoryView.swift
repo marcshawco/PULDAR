@@ -537,6 +537,7 @@ struct HistoryView: View {
         modelContext.delete(expense)
         do {
             try modelContext.save()
+            budgetEngine.markDataChanged()
             HapticManager.warning()
         } catch {
             print("Failed to delete expense from history: \(error)")

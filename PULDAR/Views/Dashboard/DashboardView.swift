@@ -95,14 +95,15 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    dashboardContent(proxy: proxy)
-                    .padding(.vertical)
-                }
+            ScrollView {
+                dashboardContent
+                .padding(.vertical)
             }
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle("PULDAR")
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                inputDock
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -154,22 +155,16 @@ struct DashboardView: View {
                 }
             }
             .task {
-                runStartupMaintenanceIfNeeded()
+                await scheduleStartupMaintenance()
             }
             .onChange(of: expenses.count) {
                 usageTracker.reconcile(with: expenses)
-                if !didRunCategoryConsistencyFixV2 {
-                    migrateCategoryConsistencyIfNeeded()
-                }
-                if !didNormalizeMerchantsV1 {
-                    migrateMerchantCapitalizationIfNeeded()
-                }
             }
         }
     }
 
     @ViewBuilder
-    private func dashboardContent(proxy: ScrollViewProxy) -> some View {
+    private var dashboardContent: some View {
         VStack(spacing: 20) {
             modelStatusBanner
 
@@ -214,20 +209,6 @@ struct DashboardView: View {
             Divider()
                 .padding(.horizontal, 24)
 
-            ExpenseInputView(
-                isProcessing: isProcessing,
-                isLocked: !storeKit.isPro && usageTracker.isAtLimit,
-                onSubmit: submitExpense,
-                onFocusChange: { focused in
-                    handleInputFocusChange(focused, proxy: proxy)
-                }
-            )
-            .id("expense-input-anchor")
-
-            if !storeKit.isPro {
-                usageIndicator
-            }
-
             if let selectedBucketFilter {
                 HStack(spacing: 8) {
                     Text("Showing \(selectedBucketFilter.rawValue)")
@@ -265,7 +246,7 @@ struct DashboardView: View {
                 .padding(.horizontal)
             }
 
-            Spacer(minLength: 40)
+            Spacer(minLength: 140)
         }
     }
 
@@ -314,6 +295,7 @@ struct DashboardView: View {
 
             modelContext.insert(expense)
             try modelContext.save()
+            budgetEngine.markDataChanged()
 
             // Track usage (free tier only)
             if !storeKit.isPro {
@@ -481,11 +463,25 @@ struct DashboardView: View {
         )
     }
 
-    private func handleInputFocusChange(_ focused: Bool, proxy: ScrollViewProxy) {
-        guard focused else { return }
-        withAnimation(.easeInOut(duration: 0.2)) {
-            proxy.scrollTo("expense-input-anchor", anchor: .bottom)
+    private var inputDock: some View {
+        VStack(spacing: 8) {
+            ExpenseInputView(
+                isProcessing: isProcessing,
+                isLocked: !storeKit.isPro && usageTracker.isAtLimit,
+                onSubmit: submitExpense
+            )
+
+            if !storeKit.isPro {
+                usageIndicator
+            }
         }
+        .padding(.top, 2)
+        .padding(.bottom, 8)
+        .background(
+            Rectangle()
+                .fill(AppColors.background)
+                .ignoresSafeArea()
+        )
     }
 
     private func overspentSummaryRow(amount: Double) -> some View {
@@ -679,6 +675,7 @@ struct DashboardView: View {
         modelContext.insert(recurring)
         do {
             try modelContext.save()
+            budgetEngine.markDataChanged()
             HapticManager.success()
         } catch {
             print("Failed to save suggested recurring expense: \(error)")
@@ -690,6 +687,7 @@ struct DashboardView: View {
         modelContext.delete(expense)
         do {
             try modelContext.save()
+            budgetEngine.markDataChanged()
             HapticManager.warning()
         } catch {
             print("Failed to delete expense: \(error)")
@@ -703,6 +701,15 @@ struct DashboardView: View {
         usageTracker.reconcile(with: expenses)
         migrateCategoryConsistencyIfNeeded()
         migrateMerchantCapitalizationIfNeeded()
+    }
+
+    private func scheduleStartupMaintenance() async {
+        guard !didRunStartupMaintenance else { return }
+        // Let first paint and first interactions (keyboard tap) win.
+        try? await Task.sleep(for: .milliseconds(900))
+        await MainActor.run {
+            runStartupMaintenanceIfNeeded()
+        }
     }
 
     private func migrateCategoryConsistencyIfNeeded() {
@@ -729,6 +736,7 @@ struct DashboardView: View {
         if didMutate {
             do {
                 try modelContext.save()
+                budgetEngine.markDataChanged()
             } catch {
                 print("Failed category consistency migration: \(error)")
             }
@@ -753,6 +761,7 @@ struct DashboardView: View {
         if didMutate {
             do {
                 try modelContext.save()
+                budgetEngine.markDataChanged()
             } catch {
                 print("Failed merchant capitalization migration: \(error)")
             }

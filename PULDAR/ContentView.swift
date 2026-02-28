@@ -47,7 +47,9 @@ struct ContentView: View {
         .task {
             guard !didWarmModelThisLaunch else { return }
             didWarmModelThisLaunch = true
-            await llmService.loadModel()
+            Task.detached(priority: .utility) {
+                await llmService.loadModel()
+            }
         }
     }
 

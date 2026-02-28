@@ -1,4 +1,5 @@
 import Foundation
+import QuartzCore
 import MLX
 import MLXLLM
 import MLXLMCommon
@@ -55,6 +56,8 @@ final class LLMService {
     private var modelContainer: ModelContainer?
     private var parseCache: [String: LLMExpenseResult] = [:]
     private let parseCacheKey = "llmParseCache.v1"
+    private var lastLoadProgressUpdate: CFTimeInterval = 0
+    private var lastReportedProgressBucket: Int = -1
 
     private let defaultCategories = ExpenseCategory.allCases.map(\.rawValue)
 
@@ -86,13 +89,7 @@ final class LLMService {
                 Task { @MainActor in
                     let rawFraction = progress.fractionCompleted
                     let fraction = rawFraction.isFinite ? min(max(rawFraction, 0), 1) : 0
-                    // Only show explicit download progress during first install
-                    // and avoid flickering 0%/100% on warm starts.
-                    if !self.hasDownloadedModel, fraction > 0, fraction < 0.995 {
-                        self.loadState = .downloading(progress: fraction)
-                    } else {
-                        self.loadState = .loading
-                    }
+                    self.updateLoadProgress(fraction)
                 }
             }
 
@@ -332,5 +329,34 @@ final class LLMService {
     private func persistParseCache() {
         guard let data = try? JSONEncoder().encode(parseCache) else { return }
         UserDefaults.standard.set(data, forKey: parseCacheKey)
+    }
+
+    private func updateLoadProgress(_ fraction: Double) {
+        // Only show explicit download progress during first install
+        // and avoid flickering 0%/100% on warm starts.
+        guard !hasDownloadedModel else {
+            if loadState != .loading {
+                loadState = .loading
+            }
+            return
+        }
+
+        guard fraction > 0, fraction < 0.995 else {
+            if loadState != .loading {
+                loadState = .loading
+            }
+            return
+        }
+
+        // Throttle UI state churn to keep first-touch interactions responsive.
+        let progressBucket = Int((fraction * 100).rounded(.down) / 2) // 2% steps
+        let now = CACurrentMediaTime()
+        let enoughTimeElapsed = (now - lastLoadProgressUpdate) > 0.12
+        let progressed = progressBucket != lastReportedProgressBucket
+        guard enoughTimeElapsed || progressed else { return }
+
+        lastLoadProgressUpdate = now
+        lastReportedProgressBucket = progressBucket
+        loadState = .downloading(progress: fraction)
     }
 }

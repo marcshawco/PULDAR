@@ -7,6 +7,7 @@ import SwiftData
 /// delegates yellow highlighting down to each row.
 struct ExpenseListView: View {
     @Environment(CategoryManager.self) private var categoryManager
+    @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(\.modelContext) private var modelContext
     let expenses: [Expense]
     let searchText: String
@@ -244,6 +245,7 @@ struct ExpenseListView: View {
 
         do {
             try modelContext.save()
+            budgetEngine.markDataChanged()
             editingExpense = nil
             editError = nil
             HapticManager.success()

@@ -854,6 +854,7 @@ struct SettingsView: View {
                 recurring.isActive = isOn
                 do {
                     try modelContext.save()
+                    budgetEngine.markDataChanged()
                 } catch {
                     print("Failed to update recurring active state: \(error)")
                 }
@@ -1036,6 +1037,7 @@ struct SettingsView: View {
         modelContext.insert(recurring)
         do {
             try modelContext.save()
+            budgetEngine.markDataChanged()
             showAddRecurringSheet = false
         } catch {
             addRecurringError = "Could not save recurring expense."
@@ -1056,6 +1058,7 @@ struct SettingsView: View {
 
         do {
             try modelContext.save()
+            budgetEngine.markDataChanged()
             HapticManager.warning()
         } catch {
             print("Failed to delete recurring expenses: \(error)")
@@ -1068,6 +1071,7 @@ struct SettingsView: View {
         do {
             try modelContext.delete(model: Expense.self)
             try modelContext.delete(model: RecurringExpense.self)
+            budgetEngine.markDataChanged()
             HapticManager.warning()
         } catch {
             print("Failed to delete expenses: \(error)")

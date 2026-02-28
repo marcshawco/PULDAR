@@ -42,6 +42,7 @@ final class BudgetEngine {
     }
 
     private var monthlyStatusCache: [String: [BucketStatus]] = [:]
+    private var dataRevision: UInt64 = 0
 
     init() {
         bucketPercentages = Self.loadBucketPercentages()
@@ -166,11 +167,7 @@ final class BudgetEngine {
         recurringExpenses: [RecurringExpense] = [],
         for month: Date = .now
     ) -> [BucketStatus] {
-        let cacheKey = makeStatusCacheKey(
-            expenses: expenses,
-            recurringExpenses: recurringExpenses,
-            month: month
-        )
+        let cacheKey = makeStatusCacheKey(month: month)
         if let cached = monthlyStatusCache[cacheKey] {
             return cached
         }
@@ -205,6 +202,12 @@ final class BudgetEngine {
         }
         cacheMonthlyStatus(result, for: cacheKey)
         return result
+    }
+
+    /// Bump when expense/recurring data changes to keep cached month snapshots valid.
+    func markDataChanged() {
+        dataRevision &+= 1
+        invalidateMonthlyStatusCache()
     }
 
     /// Base monthly income plus any explicit income transactions in the same month.
@@ -364,28 +367,10 @@ final class BudgetEngine {
     private static let bucketPercentageKey = "bucketPercentages"
     private let maxMonthlyCacheEntries = 36
 
-    private func makeStatusCacheKey(
-        expenses: [Expense],
-        recurringExpenses: [RecurringExpense],
-        month: Date
-    ) -> String {
+    private func makeStatusCacheKey(month: Date) -> String {
         let calendar = Calendar.current
         let monthKey = calendar.dateComponents([.year, .month], from: month)
         let monthStamp = "\(monthKey.year ?? 0)-\(monthKey.month ?? 0)"
-
-        let expenseStamp = expenses.map {
-            let amount = $0.amount.isFinite ? $0.amount : 0
-            return "\($0.id.uuidString)|\($0.bucket)|\($0.category)|\(amount)|\($0.date.timeIntervalSince1970)"
-        }
-        .sorted()
-        .joined(separator: ";")
-
-        let recurringStamp = recurringExpenses.map {
-            "\($0.id.uuidString)|\($0.bucket)|\($0.safeAmount)|\($0.isActive)"
-        }
-        .sorted()
-        .joined(separator: ";")
-
         let percentagesStamp = BudgetBucket.allCases.map { bucket in
             "\(bucket.rawValue):\(percentage(for: bucket))"
         }
@@ -393,11 +378,10 @@ final class BudgetEngine {
 
         return [
             monthStamp,
+            "dataRevision:\(dataRevision)",
             "income:\(monthlyIncome)",
             "rollover:\(rolloverEnabled)",
-            percentagesStamp,
-            expenseStamp,
-            recurringStamp
+            percentagesStamp
         ].joined(separator: "||")
     }
 

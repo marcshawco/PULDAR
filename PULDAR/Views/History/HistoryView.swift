@@ -180,16 +180,14 @@ struct HistoryView: View {
                         }
                     } else {
                         ForEach(groupedExpenses) { group in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(group.title)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(AppColors.textSecondary)
+                            Text(group.title)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AppColors.textSecondary)
+                                .padding(.top, 2)
 
-                                ForEach(group.items) { expense in
-                                    expenseRow(expense, showDate: groupingMode != .day)
-                                }
+                            ForEach(group.items) { expense in
+                                expenseRow(expense, showDate: groupingMode != .day)
                             }
-                            .padding(.vertical, 2)
                         }
                     }
                 }
@@ -344,7 +342,7 @@ struct HistoryView: View {
 
     @ViewBuilder
     private func summaryCard(_ status: BudgetEngine.BucketStatus) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .center, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: status.bucket.icon)
                 Text(shortBucketTitle(status.bucket))
@@ -353,15 +351,17 @@ struct HistoryView: View {
                     .allowsTightening(true)
             }
             .font(.caption2.weight(.semibold))
+            .frame(maxWidth: .infinity, alignment: .center)
 
             Text(status.spent, format: .currency(code: "USD"))
                 .font(.caption.weight(.semibold))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
         .foregroundStyle(status.isOverspent ? AppColors.overspend : AppColors.textPrimary)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
         .padding(8)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)

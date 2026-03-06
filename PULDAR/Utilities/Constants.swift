@@ -26,7 +26,7 @@ enum AppColors {
 // MARK: - App-wide Constants
 
 enum AppConstants {
-    static let freeInputsPerWeek = 10
+    static let freeInputsPerMonth = 10
     static let proPrice = "$4.99"
     static let proProductID = "puldar_pro_lifetime"
     static let modelID = "mlx-community/Qwen2.5-0.5B-Instruct-4bit"

@@ -3,7 +3,7 @@ import StoreKit
 
 /// Premium paywall sheet with playful lock animation.
 ///
-/// Triggered when the user exhausts 10 free weekly inputs.
+/// Triggered when the user exhausts 10 free monthly inputs.
 /// Offers a one-time $4.99 lifetime "Pro" unlock.
 struct PaywallView: View {
     @Environment(StoreKitManager.self) private var store

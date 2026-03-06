@@ -25,6 +25,7 @@ struct DashboardView: View {
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(StoreKitManager.self) private var storeKit
     @Environment(UsageTracker.self) private var usageTracker
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     // MARK: - SwiftData Query
@@ -165,7 +166,14 @@ struct DashboardView: View {
                 }
             }
             .task {
+                await storeKit.checkEntitlement()
+            }
+            .task {
                 await scheduleStartupMaintenance()
+            }
+            .onChange(of: scenePhase) { newPhase in
+                guard newPhase == .active else { return }
+                Task { await storeKit.checkEntitlement() }
             }
             .onChange(of: expenses.count) {
                 usageTracker.reconcile(with: expenses)
@@ -409,7 +417,7 @@ struct DashboardView: View {
 
     private var usageIndicator: some View {
         HStack(spacing: 4) {
-            ForEach(0..<AppConstants.freeInputsPerWeek, id: \.self) { i in
+            ForEach(0..<AppConstants.freeInputsPerMonth, id: \.self) { i in
                 Circle()
                     .fill(
                         i < usageTracker.currentCount
@@ -419,7 +427,7 @@ struct DashboardView: View {
                     .frame(width: 6, height: 6)
             }
 
-            Text("\(usageTracker.remainingFreeInputs) free AI entries left")
+            Text("\(usageTracker.remainingFreeInputs) Monthly Entries Remaining")
                 .font(.caption2)
                 .foregroundStyle(AppColors.textTertiary)
                 .padding(.leading, 4)

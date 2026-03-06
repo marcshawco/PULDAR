@@ -1,8 +1,8 @@
 import Foundation
 
-/// Metered paywall gate — tracks free inputs per week.
+/// Metered paywall gate — tracks free inputs per month.
 ///
-/// The counter resets automatically every **Sunday at midnight** (local time).
+/// The counter resets automatically at the start of each calendar month (local time).
 /// Pro users bypass this entirely via `StoreKitManager.isPro`.
 ///
 /// Uses `UserDefaults` with `didSet` (not `@AppStorage`) so that
@@ -12,21 +12,21 @@ final class UsageTracker {
 
     // MARK: - Persisted Counters
 
-    private var inputCount: Int = UserDefaults.standard.integer(forKey: "weeklyInputCount") {
-        didSet { UserDefaults.standard.set(inputCount, forKey: "weeklyInputCount") }
+    private var inputCount: Int = UserDefaults.standard.integer(forKey: "monthlyInputCount") {
+        didSet { UserDefaults.standard.set(inputCount, forKey: "monthlyInputCount") }
     }
 
-    private var resetTimestamp: Double = UserDefaults.standard.double(forKey: "weekResetTimestamp") {
-        didSet { UserDefaults.standard.set(resetTimestamp, forKey: "weekResetTimestamp") }
+    private var periodKey: String = UserDefaults.standard.string(forKey: "monthlyUsagePeriodKey") ?? "" {
+        didSet { UserDefaults.standard.set(periodKey, forKey: "monthlyUsagePeriodKey") }
     }
 
     // MARK: - Limits
 
-    private let freeLimit = AppConstants.freeInputsPerWeek
+    private let freeLimit = AppConstants.freeInputsPerMonth
 
     // MARK: - Public API
 
-    /// How many free entries remain this week (clamped ≥ 0).
+    /// How many free entries remain this month (clamped ≥ 0).
     var remainingFreeInputs: Int {
         resetIfNeeded()
         return max(freeLimit - inputCount, 0)
@@ -38,7 +38,7 @@ final class UsageTracker {
         return inputCount >= freeLimit
     }
 
-    /// Current usage count this week.
+    /// Current usage count this month.
     var currentCount: Int {
         resetIfNeeded()
         return inputCount
@@ -50,7 +50,7 @@ final class UsageTracker {
         inputCount += 1
     }
 
-    /// Keep usage in sync with persisted records for the current week.
+    /// Keep usage in sync with persisted records for the current month.
     ///
     /// This prevents drift when local defaults survive but SwiftData store
     /// changes (for example after schema updates).
@@ -66,41 +66,32 @@ final class UsageTracker {
     // MARK: - Auto-Reset Logic
 
     private func resetIfNeeded() {
-        let now = Date()
-        let resetDate = Date(timeIntervalSince1970: resetTimestamp)
+        let currentPeriod = Self.currentPeriodKey()
 
-        if resetTimestamp == 0 || now >= resetDate {
+        if periodKey != currentPeriod {
             inputCount = 0
-            resetTimestamp = Self.nextSundayMidnight().timeIntervalSince1970
+            periodKey = currentPeriod
+        }
+
+        // Keep any previous values bounded.
+        if inputCount < 0 {
+            inputCount = 0
         }
     }
 
-    /// Find the next Sunday at 00:00:00 in the user's local calendar.
-    private static func nextSundayMidnight() -> Date {
+    private static func currentPeriodKey(now: Date = Date()) -> String {
         let calendar = Calendar.current
-        let now = Date()
-
-        // Walk forward day-by-day until we hit Sunday.
-        var candidate = calendar.startOfDay(for: now)
-        // Advance at least to tomorrow so "now == Sunday 00:00" still rolls forward.
-        candidate = calendar.date(byAdding: .day, value: 1, to: candidate)!
-
-        while calendar.component(.weekday, from: candidate) != 1 { // 1 == Sunday
-            candidate = calendar.date(byAdding: .day, value: 1, to: candidate)!
-        }
-        return candidate
+        let comps = calendar.dateComponents([.year, .month], from: now)
+        return "\(comps.year ?? 0)-\(comps.month ?? 0)"
     }
 
     private static func currentUsageWindow() -> (start: Date, end: Date) {
         let calendar = Calendar.current
         let now = Date()
-        var start = calendar.startOfDay(for: now)
-
-        while calendar.component(.weekday, from: start) != 1 { // 1 == Sunday
-            start = calendar.date(byAdding: .day, value: -1, to: start)!
-        }
-
-        let end = calendar.date(byAdding: .day, value: 7, to: start)!
+        let start = calendar.date(from: calendar.dateComponents([.year, .month], from: now))
+            ?? calendar.startOfDay(for: now)
+        let end = calendar.date(byAdding: .month, value: 1, to: start)
+            ?? now
         return (start, end)
     }
 }

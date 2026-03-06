@@ -8,6 +8,7 @@ import Charts
 /// - The chart gently expands on first appearance via a spring animation.
 struct BucketDonutChart: View {
     @Environment(BudgetEngine.self) private var budgetEngine
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let statuses: [BudgetEngine.BucketStatus]
     var selectedBucket: BudgetBucket? = nil
     var onBucketSelected: ((BudgetBucket?) -> Void)? = nil
@@ -57,6 +58,20 @@ struct BucketDonutChart: View {
         return min(max(totalSpent / totalBudget, 0), 1)
     }
 
+    private var chartHeight: CGFloat {
+        horizontalSizeClass == .regular ? 300 : 220
+    }
+
+    private var centerTextFrame: CGSize {
+        horizontalSizeClass == .regular
+            ? CGSize(width: 170, height: 108)
+            : CGSize(width: 126, height: 84)
+    }
+
+    private var centerValueFontSize: CGFloat {
+        horizontalSizeClass == .regular ? 46 : 38
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             Picker("Donut Mode", selection: $displayMode) {
@@ -97,7 +112,7 @@ struct BucketDonutChart: View {
                     }
                 }
             }
-            .frame(height: 220)
+            .frame(height: chartHeight)
         }
         .padding(.horizontal)
         .onAppear {
@@ -176,7 +191,7 @@ struct BucketDonutChart: View {
                 .foregroundStyle(AppColors.textTertiary)
 
             Text(valueText)
-                .font(.system(size: 38, weight: .bold, design: .rounded))
+                .font(.system(size: centerValueFontSize, weight: .bold, design: .rounded))
                 .foregroundStyle(AppColors.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.35)
@@ -184,7 +199,7 @@ struct BucketDonutChart: View {
                 .frame(maxWidth: .infinity, alignment: .center)
         }
         .multilineTextAlignment(.center)
-        .frame(width: 126, height: 84, alignment: .center)
+        .frame(width: centerTextFrame.width, height: centerTextFrame.height, alignment: .center)
     }
 
     private var accessibilityLabel: String {

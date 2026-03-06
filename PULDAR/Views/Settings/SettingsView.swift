@@ -21,6 +21,7 @@ struct SettingsView: View {
     @Environment(StoreKitManager.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \Expense.date, order: .reverse)
     private var expenses: [Expense]
     @Query(sort: \RecurringExpense.createdAt, order: .reverse)
@@ -53,6 +54,10 @@ struct SettingsView: View {
     @AppStorage("hoursPerWeek") private var hoursPerWeek: Double = 40
     @AppStorage("autoMonthlyCSVExportEnabled") private var autoMonthlyCSVExportEnabled = false
     @AppStorage("lastAutoMonthlyCSVExportKey") private var lastAutoMonthlyCSVExportKey = ""
+
+    private var contentMaxWidth: CGFloat {
+        horizontalSizeClass == .regular ? 900 : .infinity
+    }
 
     private enum IncomeFocusField: Hashable {
         case monthlyIncome
@@ -92,6 +97,8 @@ struct SettingsView: View {
                 dangerZoneSection
                 aboutSection
             }
+            .frame(maxWidth: contentMaxWidth)
+            .frame(maxWidth: .infinity, alignment: .center)
             .scrollDismissesKeyboard(.interactively)
             .simultaneousGesture(
                 TapGesture().onEnded {

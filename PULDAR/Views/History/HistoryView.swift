@@ -7,6 +7,7 @@ struct HistoryView: View {
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(StoreKitManager.self) private var store
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \Expense.date, order: .reverse) private var expenses: [Expense]
 
     @State private var selectedMonth: Date = Calendar.current.startOfDay(for: .now)
@@ -26,6 +27,10 @@ struct HistoryView: View {
     @FocusState private var focusedField: FocusField?
     @AppStorage("autoMonthlyCSVExportEnabled") private var autoMonthlyCSVExportEnabled = false
     @AppStorage("lastAutoMonthlyCSVExportKey") private var lastAutoMonthlyCSVExportKey = ""
+
+    private var contentMaxWidth: CGFloat {
+        horizontalSizeClass == .regular ? 900 : .infinity
+    }
 
     private var monthOptions: [Date] {
         let calendar = Calendar.current
@@ -192,6 +197,8 @@ struct HistoryView: View {
                     }
                 }
             }
+            .frame(maxWidth: contentMaxWidth)
+            .frame(maxWidth: .infinity, alignment: .center)
             .scrollDismissesKeyboard(.interactively)
             .simultaneousGesture(
                 TapGesture().onEnded {

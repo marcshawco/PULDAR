@@ -25,6 +25,7 @@ struct DashboardView: View {
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(StoreKitManager.self) private var storeKit
     @Environment(UsageTracker.self) private var usageTracker
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     // MARK: - SwiftData Query
 
@@ -91,13 +92,19 @@ struct DashboardView: View {
         storeKit.isPro ? budgetEngine.recurringTotal(recurringExpenses) : 0
     }
 
+    private var dashboardMaxWidth: CGFloat {
+        horizontalSizeClass == .regular ? 900 : .infinity
+    }
+
     // MARK: - Body
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 dashboardContent
-                .padding(.vertical)
+                    .padding(.vertical)
+                    .frame(maxWidth: dashboardMaxWidth)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
             .refreshable {
                 await refreshDashboard()

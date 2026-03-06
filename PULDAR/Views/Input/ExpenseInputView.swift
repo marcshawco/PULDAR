@@ -10,6 +10,7 @@ struct ExpenseInputView: View {
     let isProcessing: Bool
     let isLocked: Bool
     let onSubmit: (String) async -> Bool
+    var onLockedTap: (() -> Void)? = nil
     var onFocusChange: ((Bool) -> Void)? = nil
 
     @State private var inputText = ""
@@ -54,6 +55,12 @@ struct ExpenseInputView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .onTapGesture {
+                if isLocked {
+                    handleLockedInteraction()
+                }
+            }
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(AppColors.secondaryBg)
@@ -102,16 +109,7 @@ struct ExpenseInputView: View {
         guard !rawInput.isEmpty else { return }
 
         if isLocked {
-            Task { @MainActor in
-                let steps: [CGFloat] = [8, -8, 6, -6, 0]
-                for value in steps {
-                    withAnimation(.easeInOut(duration: 0.045)) {
-                        shakeOffset = value
-                    }
-                    try? await Task.sleep(for: .milliseconds(45))
-                }
-            }
-            HapticManager.warning()
+            handleLockedInteraction()
             return
         }
 
@@ -140,5 +138,19 @@ struct ExpenseInputView: View {
         if isLocked { return .gray.opacity(0.5) }
         if showCheckmark { return .green }
         return AppColors.accent
+    }
+
+    private func handleLockedInteraction() {
+        Task { @MainActor in
+            let steps: [CGFloat] = [8, -8, 6, -6, 0]
+            for value in steps {
+                withAnimation(.easeInOut(duration: 0.045)) {
+                    shakeOffset = value
+                }
+                try? await Task.sleep(for: .milliseconds(45))
+            }
+        }
+        HapticManager.warning()
+        onLockedTap?()
     }
 }

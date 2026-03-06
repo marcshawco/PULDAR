@@ -478,7 +478,12 @@ struct DashboardView: View {
             ExpenseInputView(
                 isProcessing: isProcessing,
                 isLocked: !storeKit.isPro && usageTracker.isAtLimit,
-                onSubmit: submitExpense
+                onSubmit: submitExpense,
+                onLockedTap: {
+                    if !storeKit.isPro && usageTracker.isAtLimit {
+                        showPaywall = true
+                    }
+                }
             )
 
             if !storeKit.isPro {

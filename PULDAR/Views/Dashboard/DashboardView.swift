@@ -171,8 +171,8 @@ struct DashboardView: View {
             .task {
                 await scheduleStartupMaintenance()
             }
-            .onChange(of: scenePhase) { newPhase in
-                guard newPhase == .active else { return }
+            .onChange(of: scenePhase) {
+                guard scenePhase == .active else { return }
                 Task { await storeKit.checkEntitlement() }
             }
             .onChange(of: expenses.count) {
@@ -498,11 +498,24 @@ struct DashboardView: View {
                 usageIndicator
             }
         }
-        .padding(.top, 2)
+        .padding(.top, 14)
         .padding(.bottom, 8)
         .background(
-            Rectangle()
-                .fill(AppColors.background)
+            UnevenRoundedRectangle(
+                cornerRadii: .init(
+                    topLeading: 24,
+                    bottomLeading: 0,
+                    bottomTrailing: 0,
+                    topTrailing: 24
+                ),
+                style: .continuous
+            )
+                .fill(AppColors.secondaryBg)
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(height: 1)
+                }
                 .ignoresSafeArea()
         )
     }

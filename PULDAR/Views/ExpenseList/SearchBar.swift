@@ -18,7 +18,17 @@ struct SearchBar: View {
                 .autocorrectionDisabled(true)
                 .focused($isFocused)
 
-            if !text.isEmpty {
+            if isFocused {
+                Button {
+                    isFocused = false
+                } label: {
+                    Image(systemName: "keyboard.chevron.compact.down")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundStyle(AppColors.textTertiary)
+                }
+                .buttonStyle(.plain)
+                .transition(.scale.combined(with: .opacity))
+            } else if !text.isEmpty {
                 Button {
                     withAnimation(.easeOut(duration: 0.2)) { text = "" }
                     isFocused = false

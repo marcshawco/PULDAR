@@ -47,7 +47,7 @@ struct SettingsView: View {
     @State private var selectedAllocationPreset: AllocationPreset = .custom
     @State private var showZeroFunWarning = false
     @State private var showDeleteAllConfirmation = false
-    @State private var deleteConfirmText = ""
+    @State private var showDeleteAllAlert = false
     @AppStorage("appThemeMode") private var appThemeMode = "system"
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
     @AppStorage("hourlyPayRate") private var hourlyPayRate: Double = 0
@@ -239,9 +239,6 @@ struct SettingsView: View {
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
             }
-            .sheet(isPresented: $showDeleteAllConfirmation) {
-                deleteConfirmationSheet
-            }
             .alert("Fun is 0%", isPresented: $showZeroFunWarning) {
                 Button("Keep 0%") {
                     saveAndDismiss()
@@ -249,6 +246,26 @@ struct SettingsView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("Fun is set to 0%. Are you sure you want to continue?")
+            }
+            .confirmationDialog(
+                "Delete all expenses?",
+                isPresented: $showDeleteAllConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete All Expenses", role: .destructive) {
+                    showDeleteAllAlert = true
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes every expense and recurring expense from this device.")
+            }
+            .alert("Delete Everything", isPresented: $showDeleteAllAlert) {
+                Button("Delete", role: .destructive) {
+                    clearAllExpenses()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This action cannot be undone.")
             }
         }
     }
@@ -456,8 +473,11 @@ struct SettingsView: View {
                     Label("Add Recurring Expense", systemImage: "plus")
                 }
             } else {
-                Text("Recurring expenses are available on Pro.")
-                    .foregroundStyle(AppColors.textTertiary)
+                lockedProFeatureButton {
+                    Text("Recurring expenses are available on Pro.")
+                        .foregroundStyle(AppColors.textTertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         } header: {
             Text("Recurring Expenses")
@@ -502,8 +522,11 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(AppColors.textTertiary)
             } else {
-                Text("Rollover balances are available on Pro.")
-                    .foregroundStyle(AppColors.textTertiary)
+                lockedProFeatureButton {
+                    Text("Rollover balances are available on Pro.")
+                        .foregroundStyle(AppColors.textTertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         } header: {
             Text("Rollover Budgets")
@@ -527,9 +550,13 @@ struct SettingsView: View {
                     }
                 }
             } else {
-                Text("Exports are available on Pro.")
-                    .foregroundStyle(AppColors.textTertiary)
-                lockedExportPreview
+                lockedProFeatureButton {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Exports are available on Pro.")
+                            .foregroundStyle(AppColors.textTertiary)
+                        lockedExportPreview
+                    }
+                }
             }
         } header: {
             Text("Data Export")
@@ -571,7 +598,7 @@ struct SettingsView: View {
             HStack {
                 Text("Plan")
                 Spacer()
-                Text(store.isPro ? "Pro (Lifetime)" : "Free")
+                Text(store.isPro ? "Pro" : "Free")
                     .foregroundStyle(
                         store.isPro ? .green : AppColors.textSecondary
                     )
@@ -590,7 +617,6 @@ struct SettingsView: View {
     private var dangerZoneSection: some View {
         Section {
             Button(role: .destructive) {
-                deleteConfirmText = ""
                 showDeleteAllConfirmation = true
             } label: {
                 Label("Delete All Expenses", systemImage: "trash")
@@ -900,6 +926,18 @@ struct SettingsView: View {
         }
     }
 
+    private func lockedProFeatureButton<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        Button {
+            showPaywall = true
+        } label: {
+            content()
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private var lockedExportPreview: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Preview")
@@ -930,41 +968,6 @@ struct SettingsView: View {
                     )
             }
         }
-    }
-
-    private var deleteConfirmationSheet: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text("Type DELETE to permanently remove all expenses.")
-                        .font(.subheadline)
-                    TextField("DELETE", text: $deleteConfirmText)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled(true)
-                }
-
-                Section {
-                    Button(role: .destructive) {
-                        guard deleteConfirmText == "DELETE" else { return }
-                        clearAllExpenses()
-                        showDeleteAllConfirmation = false
-                    } label: {
-                        Text("Delete Everything")
-                    }
-                    .disabled(deleteConfirmText != "DELETE")
-                }
-            }
-            .navigationTitle("Confirm Deletion")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        showDeleteAllConfirmation = false
-                    }
-                }
-            }
-        }
-        .presentationDetents([.medium])
     }
 
     private enum AllocationPreset: String, CaseIterable, Identifiable {

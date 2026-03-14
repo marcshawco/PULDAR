@@ -4,7 +4,7 @@ import StoreKit
 /// Premium paywall sheet with playful lock animation.
 ///
 /// Triggered when the user exhausts 10 free monthly inputs.
-/// Offers a one-time $4.99 lifetime "Pro" unlock.
+/// Offers monthly or yearly Pro subscriptions.
 struct PaywallView: View {
     @Environment(StoreKitManager.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -12,6 +12,7 @@ struct PaywallView: View {
     @State private var lockWobble: Double = 0
     @State private var isUnlocked = false
     @State private var featuresAppeared = false
+    @State private var selectedPlan: StoreKitManager.ProPlan = .yearly
 
     var body: some View {
         VStack(spacing: 28) {
@@ -55,7 +56,7 @@ struct PaywallView: View {
                 featureRow(icon: "arrow.triangle.2.circlepath", text: "Rollover monthly balances")
                 featureRow(icon: "tablecells",       text: "Clean CSV export tools")
                 featureRow(icon: "chart.pie",        text: "Full budget analytics")
-                featureRow(icon: "infinity",         text: "One-time purchase, lifetime access")
+                featureRow(icon: "calendar",         text: "Choose monthly or yearly billing")
                 featureRow(icon: "lock.shield",      text: "100% local & private")
             }
             .padding(.horizontal, 32)
@@ -71,10 +72,17 @@ struct PaywallView: View {
 
             // ── Purchase Button ────────────────────────────────────────
             VStack(spacing: 12) {
-                if let product = store.proProduct {
+                if !store.proProducts.isEmpty {
+                    VStack(spacing: 10) {
+                        ForEach(StoreKitManager.ProPlan.allCases) { plan in
+                            subscriptionOption(plan: plan)
+                        }
+                    }
+                    .padding(.horizontal, 32)
+
                     Button {
                         Task {
-                            await store.purchase()
+                            await store.purchase(plan: selectedPlan)
                             if store.isPro {
                                 withAnimation(.spring(duration: 0.5)) { isUnlocked = true }
                                 try? await Task.sleep(for: .seconds(1.2))
@@ -88,7 +96,7 @@ struct PaywallView: View {
                                     .tint(.white)
                                     .scaleEffect(0.8)
                             }
-                            Text("Unlock for \(product.displayPrice)")
+                            Text(primaryButtonTitle)
                                 .font(.headline)
                         }
                         .frame(maxWidth: .infinity)
@@ -126,10 +134,69 @@ struct PaywallView: View {
         .task {
             await store.loadProducts()
             await store.checkEntitlement()
+            selectedPlan = store.defaultPlan
         }
     }
 
     // MARK: - Subview
+
+    @ViewBuilder
+    private func subscriptionOption(plan: StoreKitManager.ProPlan) -> some View {
+        let isSelected = selectedPlan == plan
+        let product = store.product(for: plan)
+
+        Button {
+            selectedPlan = plan
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(plan.marketingTitle)
+                            .font(.headline)
+                            .foregroundStyle(AppColors.textPrimary)
+                        if let badge = plan.badge {
+                            Text(badge)
+                                .font(.caption2.weight(.semibold))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(AppColors.accent.opacity(0.14))
+                                )
+                                .foregroundStyle(AppColors.accent)
+                        }
+                    }
+
+                    Text(product?.displayPrice ?? plan.marketingPrice)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(isSelected ? AppColors.accent : AppColors.textTertiary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(AppColors.secondaryBg)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(isSelected ? AppColors.accent.opacity(0.55) : Color.clear, lineWidth: 1.2)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var primaryButtonTitle: String {
+        let plan = selectedPlan
+        let price = store.product(for: plan)?.displayPrice ?? plan.marketingPrice
+        return "Start \(plan.marketingTitle) for \(price)"
+    }
 
     private func featureRow(icon: String, text: String) -> some View {
         HStack(spacing: 10) {

@@ -1,37 +1,87 @@
 import Foundation
 import StoreKit
 
-/// StoreKit 2 manager for the **$4.99 lifetime "Pro" unlock**.
+/// StoreKit 2 manager for PULDAR Pro subscriptions.
 ///
-/// - Loads the non-consumable product on launch.
-/// - Checks existing entitlements (handles reinstalls / family sharing).
+/// - Loads monthly and yearly products on launch.
+/// - Checks existing entitlements, including legacy lifetime unlocks.
 /// - Listens for background transaction updates.
 @Observable
 @MainActor
 final class StoreKitManager {
 
+    enum ProPlan: String, CaseIterable, Identifiable {
+        case monthly
+        case yearly
+
+        var id: String { rawValue }
+
+        var productID: String {
+            switch self {
+            case .monthly:
+                return AppConstants.proMonthlyProductID
+            case .yearly:
+                return AppConstants.proYearlyProductID
+            }
+        }
+
+        var marketingTitle: String {
+            switch self {
+            case .monthly:
+                return "Monthly"
+            case .yearly:
+                return "Yearly"
+            }
+        }
+
+        var marketingPrice: String {
+            switch self {
+            case .monthly:
+                return "$2.99/mo"
+            case .yearly:
+                return "$25/yr"
+            }
+        }
+
+        var badge: String? {
+            switch self {
+            case .monthly:
+                return nil
+            case .yearly:
+                return "Best Value"
+            }
+        }
+    }
+
     // MARK: - State
 
-    private(set) var proProduct: Product?
+    private(set) var proProducts: [Product] = []
     private(set) var isPro: Bool = UserDefaults.standard.bool(
-        forKey: "didUnlockProLifetime"
+        forKey: "didUnlockProSubscription"
     )
     private(set) var isLoading: Bool = false
     private(set) var purchaseError: String?
+    private(set) var activeProductID: String?
     private var didLoadProducts = false
     private var didCheckEntitlement = false
 
     // MARK: - Product Catalog
 
-    private static let proProductID = AppConstants.proProductID
+    private static let subscriptionProductIDs = [
+        AppConstants.proMonthlyProductID,
+        AppConstants.proYearlyProductID,
+    ]
+    private static let entitlementProductIDs = Set(
+        subscriptionProductIDs + [AppConstants.legacyProLifetimeProductID]
+    )
 
     // MARK: - Load Products
 
     func loadProducts(force: Bool = false) async {
         guard force || !didLoadProducts else { return }
         do {
-            let products = try await Product.products(for: [Self.proProductID])
-            proProduct = products.first
+            let products = try await Product.products(for: Self.subscriptionProductIDs)
+            proProducts = products.sorted(by: Self.productSort)
             didLoadProducts = true
         } catch {
             purchaseError = error.localizedDescription
@@ -47,10 +97,11 @@ final class StoreKitManager {
         var foundEntitlement = false
         for await result in Transaction.currentEntitlements {
             if case .verified(let txn) = result,
-               txn.productID == Self.proProductID {
+               Self.entitlementProductIDs.contains(txn.productID) {
                 foundEntitlement = true
                 isPro = true
-                UserDefaults.standard.set(true, forKey: "didUnlockProLifetime")
+                activeProductID = txn.productID
+                UserDefaults.standard.set(true, forKey: "didUnlockProSubscription")
                 didCheckEntitlement = true
                 return
             }
@@ -61,15 +112,24 @@ final class StoreKitManager {
         // of truth from StoreKit.
         if force && !foundEntitlement {
             isPro = false
-            UserDefaults.standard.set(false, forKey: "didUnlockProLifetime")
+            activeProductID = nil
+            UserDefaults.standard.set(false, forKey: "didUnlockProSubscription")
         }
         didCheckEntitlement = true
     }
 
     // MARK: - Purchase
 
-    func purchase() async {
-        guard let product = proProduct else { return }
+    func product(for plan: ProPlan) -> Product? {
+        proProducts.first(where: { $0.id == plan.productID })
+    }
+
+    var defaultPlan: ProPlan {
+        product(for: .yearly) == nil ? .monthly : .yearly
+    }
+
+    func purchase(plan: ProPlan) async {
+        guard let product = product(for: plan) else { return }
         isLoading = true
         purchaseError = nil
 
@@ -81,7 +141,8 @@ final class StoreKitManager {
                 if case .verified(let txn) = verification {
                     await txn.finish()
                     isPro = true
-                    UserDefaults.standard.set(true, forKey: "didUnlockProLifetime")
+                    activeProductID = txn.productID
+                    UserDefaults.standard.set(true, forKey: "didUnlockProSubscription")
                     didCheckEntitlement = true
                     HapticManager.success()
                 }
@@ -106,12 +167,33 @@ final class StoreKitManager {
     func listenForTransactions() async {
         for await result in Transaction.updates {
             if case .verified(let txn) = result {
-                if txn.productID == Self.proProductID {
+                if Self.entitlementProductIDs.contains(txn.productID) {
                     isPro = true
-                    UserDefaults.standard.set(true, forKey: "didUnlockProLifetime")
+                    activeProductID = txn.productID
+                    UserDefaults.standard.set(true, forKey: "didUnlockProSubscription")
                 }
                 await txn.finish()
             }
+        }
+    }
+
+    private static func productSort(lhs: Product, rhs: Product) -> Bool {
+        let lhsPriority = sortPriority(for: lhs.id)
+        let rhsPriority = sortPriority(for: rhs.id)
+        if lhsPriority != rhsPriority {
+            return lhsPriority < rhsPriority
+        }
+        return lhs.displayPrice < rhs.displayPrice
+    }
+
+    private static func sortPriority(for productID: String) -> Int {
+        switch productID {
+        case AppConstants.proYearlyProductID:
+            return 0
+        case AppConstants.proMonthlyProductID:
+            return 1
+        default:
+            return 2
         }
     }
 }

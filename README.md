@@ -84,8 +84,8 @@ Most budgeting apps force users to manually fill forms, select categories, and f
 
 PULDAR uses a single, simple unlock:
 
-- **PULDAR Pro (Lifetime): $4.99**
-- Product ID: `puldar_pro_lifetime`
+- **PULDAR Pro: $2.99/month or $25/year**
+- Product IDs: `puldar_pro_monthly`, `puldar_pro_yearly`
 
 Pro includes:
 
@@ -187,7 +187,7 @@ This project intentionally favors responsiveness over minimal app footprint.
 ### StoreKit Testing
 
 - Config file: `PULDAR/Resources/Products.storekit`
-- Expected non-consumable: `puldar_pro_lifetime`
+- Expected subscriptions: `puldar_pro_monthly`, `puldar_pro_yearly`
 
 ---
 

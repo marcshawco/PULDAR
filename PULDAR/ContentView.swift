@@ -51,6 +51,9 @@ struct ContentView: View {
                 await llmService.loadModel()
             }
         }
+        .task {
+            await storeKitManager.listenForTransactions()
+        }
     }
 
     private var preferredColorScheme: ColorScheme? {

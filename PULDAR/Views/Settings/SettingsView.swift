@@ -606,7 +606,7 @@ struct SettingsView: View {
 
             if !store.isPro {
                 Button("Restore Purchases") {
-                    Task { await store.checkEntitlement(force: true) }
+                    Task { await store.restorePurchases() }
                 }
             }
         } header: {

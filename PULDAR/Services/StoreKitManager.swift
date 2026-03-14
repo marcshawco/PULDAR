@@ -94,11 +94,9 @@ final class StoreKitManager {
     func checkEntitlement(force: Bool = false) async {
         guard force || !didCheckEntitlement else { return }
 
-        var foundEntitlement = false
         for await result in Transaction.currentEntitlements {
             if case .verified(let txn) = result,
                Self.entitlementProductIDs.contains(txn.productID) {
-                foundEntitlement = true
                 isPro = true
                 activeProductID = txn.productID
                 UserDefaults.standard.set(true, forKey: "didUnlockProSubscription")
@@ -107,14 +105,9 @@ final class StoreKitManager {
             }
         }
 
-        // Keep cached "pro" state unless the user explicitly requests a forced
-        // refresh (Restore Purchases), which should reflect the current source
-        // of truth from StoreKit.
-        if force && !foundEntitlement {
-            isPro = false
-            activeProductID = nil
-            UserDefaults.standard.set(false, forKey: "didUnlockProSubscription")
-        }
+        isPro = false
+        activeProductID = nil
+        UserDefaults.standard.set(false, forKey: "didUnlockProSubscription")
         didCheckEntitlement = true
     }
 
@@ -161,6 +154,21 @@ final class StoreKitManager {
         isLoading = false
     }
 
+    func restorePurchases() async {
+        isLoading = true
+        purchaseError = nil
+
+        do {
+            try await AppStore.sync()
+            await checkEntitlement(force: true)
+        } catch {
+            purchaseError = error.localizedDescription
+            HapticManager.warning()
+        }
+
+        isLoading = false
+    }
+
     // MARK: - Transaction Listener
 
     /// Runs for the lifetime of the app to catch renewals / refunds / family sharing changes.
@@ -173,6 +181,8 @@ final class StoreKitManager {
                     UserDefaults.standard.set(true, forKey: "didUnlockProSubscription")
                 }
                 await txn.finish()
+            } else {
+                await checkEntitlement(force: true)
             }
         }
     }

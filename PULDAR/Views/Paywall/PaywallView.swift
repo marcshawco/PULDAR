@@ -114,10 +114,22 @@ struct PaywallView: View {
                 }
 
                 Button("Restore Purchases") {
-                    Task { await store.checkEntitlement(force: true) }
+                    Task {
+                        await store.restorePurchases()
+                        if store.isPro {
+                            dismiss()
+                        }
+                    }
                 }
                 .font(.caption)
                 .foregroundStyle(AppColors.textTertiary)
+                .disabled(store.isLoading)
+
+                Text("Subscriptions renew automatically until canceled in App Store settings. Cancel anytime before renewal.")
+                    .font(.caption2)
+                    .foregroundStyle(AppColors.textTertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
 
                 if let error = store.purchaseError {
                     Text(error)

@@ -11,6 +11,7 @@ struct ExpenseInputView: View {
     let isLocked: Bool
     let onSubmit: (String) async -> Bool
     var onLockedTap: (() -> Void)? = nil
+    var onCameraTap: (() -> Void)? = nil
     var onFocusChange: ((Bool) -> Void)? = nil
 
     @State private var inputText = ""
@@ -74,6 +75,26 @@ struct ExpenseInputView: View {
             )
             .offset(x: shakeOffset)
             .animation(.easeOut(duration: 0.2), value: isFocused)
+
+            Button {
+                if isLocked {
+                    handleLockedInteraction()
+                    return
+                }
+                isFocused = false
+                onCameraTap?()
+            } label: {
+                Image(systemName: "camera")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 40, height: 40)
+                    .background(
+                        Circle()
+                            .fill(AppColors.secondaryBg)
+                    )
+                    .foregroundStyle(isLocked ? AppColors.textTertiary : AppColors.accent)
+            }
+            .buttonStyle(.plain)
+            .disabled(isProcessing)
 
             // ── Submit Button ──────────────────────────────────────────
             Button(action: handleSubmit) {

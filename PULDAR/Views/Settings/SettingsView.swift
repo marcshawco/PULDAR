@@ -48,6 +48,8 @@ struct SettingsView: View {
     @State private var showZeroFunWarning = false
     @State private var showDeleteAllConfirmation = false
     @State private var showDeleteAllAlert = false
+    @State private var showBudgetAllocationInfo = false
+    @State private var selectedBudgetInfoBucket: BudgetBucket?
     @AppStorage("appThemeMode") private var appThemeMode = "system"
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
     @AppStorage("hourlyPayRate") private var hourlyPayRate: Double = 0
@@ -267,6 +269,21 @@ struct SettingsView: View {
             } message: {
                 Text("This action cannot be undone.")
             }
+            .alert("Budget Allocation", isPresented: $showBudgetAllocationInfo) {
+                Button("Got it", role: .cancel) {}
+            } message: {
+                Text("Your budget allocation decides how much of your monthly income goes to Fundamentals, Fun, and Future. Setting clear percentages helps you spend with intention and stay on track.")
+            }
+            .alert(
+                selectedBudgetInfoBucket?.rawValue ?? "",
+                isPresented: selectedBudgetInfoBinding
+            ) {
+                Button("Got it", role: .cancel) {
+                    selectedBudgetInfoBucket = nil
+                }
+            } message: {
+                Text(selectedBudgetInfoBucket?.infoExplanation ?? "")
+            }
         }
     }
 
@@ -384,8 +401,18 @@ struct SettingsView: View {
                             .frame(width: 20)
 
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(bucket.rawValue)
-                                .font(.subheadline.weight(.medium))
+                            HStack(spacing: 4) {
+                                Text(bucket.rawValue)
+                                    .font(.subheadline.weight(.medium))
+                                Button {
+                                    selectedBudgetInfoBucket = bucket
+                                } label: {
+                                    Image(systemName: "info.circle")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(AppColors.textTertiary)
+                                }
+                                .buttonStyle(.plain)
+                            }
                             Text(bucket.subtitle)
                                 .font(.caption2)
                                 .foregroundStyle(AppColors.textTertiary)
@@ -414,7 +441,18 @@ struct SettingsView: View {
                 }
             }
         } header: {
-            Text("Bucket Allocation")
+            HStack(spacing: 6) {
+                Text("Budget Allocation")
+                Button {
+                    showBudgetAllocationInfo = true
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(AppColors.textTertiary)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+            }
         } footer: {
             VStack(alignment: .leading, spacing: 2) {
                 Text(
@@ -735,6 +773,17 @@ struct SettingsView: View {
         BudgetBucket.allCases.reduce(0) { $0 + draftPercentage(for: $1) }
     }
 
+    private var selectedBudgetInfoBinding: Binding<Bool> {
+        Binding(
+            get: { selectedBudgetInfoBucket != nil },
+            set: { isPresented in
+                if !isPresented {
+                    selectedBudgetInfoBucket = nil
+                }
+            }
+        )
+    }
+
     private var isAllocationValid: Bool {
         Int(round(totalDraftPercentage * 100)) == 100
     }
@@ -946,7 +995,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("date,merchant,amount,category,bucket")
                 Text("2026-02-27,Whole Foods,45.00,Groceries,Fundamentals")
-                Text("2026-02-26,Bitcoin,200.00,Investments,Future You")
+                Text("2026-02-26,Bitcoin,200.00,Investments,Future")
                 Text("2026-02-25,Hulu,9.99,Subscriptions,Fun")
             }
             .font(.caption2.monospaced())

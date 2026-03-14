@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 
 /// Root coordinator that owns all service objects and injects them
 /// into the environment for the entire view hierarchy.
@@ -22,6 +23,16 @@ struct ContentView: View {
     @State private var usageTracker = UsageTracker()
     @State private var didWarmModelThisLaunch = false
     @AppStorage("appThemeMode") private var appThemeMode = "system"
+
+    init() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor.secondarySystemBackground
+        appearance.shadowColor = UIColor.separator.withAlphaComponent(0.18)
+
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
 
     // MARK: - Body
 

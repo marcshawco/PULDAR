@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import VisionKit
 
 /// The main screen — orchestrates the entire expense-tracking flow.
 ///
@@ -48,6 +49,7 @@ struct DashboardView: View {
     @State private var overspentBannerMessage: String?
     @State private var showOverspentBanner = false
     @State private var recurringSuggestion: RecurringSuggestion?
+    @State private var showReceiptScanner = false
     @AppStorage("didCompleteModelOnboarding") private var didCompleteModelOnboarding = false
     @AppStorage("didRunCategoryConsistencyFixV2") private var didRunCategoryConsistencyFixV2 = false
     @AppStorage("didNormalizeMerchantsV1") private var didNormalizeMerchantsV1 = false
@@ -137,6 +139,21 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView()
+            }
+            .sheet(isPresented: $showReceiptScanner) {
+                ReceiptScannerView { result in
+                    showReceiptScanner = false
+
+                    switch result {
+                    case .success(let scannedText):
+                        Task {
+                            _ = await submitExpense(scannedText)
+                        }
+                    case .failure(let error):
+                        if error is CancellationError { return }
+                        presentTransientError(error.localizedDescription)
+                    }
+                }
             }
             .alert(
                 "Make this recurring?",
@@ -491,6 +508,16 @@ struct DashboardView: View {
                     if !storeKit.isPro && usageTracker.isAtLimit {
                         showPaywall = true
                     }
+                },
+                onCameraTap: {
+                    if !VNDocumentCameraViewController.isSupported {
+                        presentTransientError(
+                            ReceiptScannerError.unavailable.localizedDescription
+                                ?? "Receipt scanning isn’t available right now."
+                        )
+                        return
+                    }
+                    showReceiptScanner = true
                 }
             )
 
@@ -669,6 +696,16 @@ struct DashboardView: View {
     private func safeWidth(_ value: CGFloat) -> CGFloat {
         guard value.isFinite else { return 0 }
         return max(value, 0)
+    }
+
+    private func presentTransientError(_ message: String) {
+        errorMessage = message
+        showError = true
+
+        Task {
+            try? await Task.sleep(for: .seconds(5))
+            withAnimation { showError = false }
+        }
     }
 
     private func recurringSuggestionCandidate(for newExpense: Expense) -> RecurringSuggestion? {

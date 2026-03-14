@@ -588,7 +588,7 @@ struct HistoryView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("date,merchant,amount,category,bucket")
                 Text("2026-02-27,Whole Foods,45.00,Groceries,Fundamentals")
-                Text("2026-02-26,Bitcoin,200.00,Investments,Future You")
+                Text("2026-02-26,Bitcoin,200.00,Investments,Future")
                 Text("2026-02-25,Hulu,9.99,Subscriptions,Fun")
             }
             .font(.caption2.monospaced())

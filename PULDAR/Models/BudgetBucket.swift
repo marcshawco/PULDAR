@@ -4,7 +4,7 @@ import SwiftUI
 enum BudgetBucket: String, Codable, CaseIterable, Identifiable {
     case fundamentals = "Fundamentals"
     case fun          = "Fun"
-    case future       = "Future You"
+    case future       = "Future"
 
     var id: String { rawValue }
 
@@ -23,6 +23,17 @@ enum BudgetBucket: String, Codable, CaseIterable, Identifiable {
         case .fundamentals: return "Needs"
         case .fun:          return "Wants"
         case .future:       return "Savings & Debt"
+        }
+    }
+
+    var infoExplanation: String {
+        switch self {
+        case .fundamentals:
+            return "Fundamentals covers your core needs and essential bills. Think rent, groceries, utilities, insurance, gas, and phone service."
+        case .fun:
+            return "Fun is for flexible lifestyle spending and wants. Think dining out, shopping, subscriptions, travel, coffee, hobbies, and entertainment."
+        case .future:
+            return "Future is money you set aside to strengthen your future finances. Think savings, investing, retirement, extra debt payments, emergency funds, and education."
         }
     }
 

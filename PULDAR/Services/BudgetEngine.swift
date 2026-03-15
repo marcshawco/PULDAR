@@ -11,24 +11,38 @@ import SwiftUI
 @Observable
 @MainActor
 final class BudgetEngine {
+    private enum SyncKey {
+        static let monthlyIncome = "monthlyIncome"
+        static let rolloverEnabled = "rolloverEnabled"
+        static let bucketPercentages = "bucketPercentages"
+    }
+
+    private let cloudStore = NSUbiquitousKeyValueStore.default
+    private let defaults = UserDefaults.standard
+    private var cloudObserver: NSObjectProtocol?
+    private var isApplyingRemoteSync = false
+    private var pendingCloudSyncTask: Task<Void, Never>?
+    private var dirtySyncKeys: Set<String> = []
 
     // MARK: - Persisted Income
 
-    var monthlyIncome: Double = UserDefaults.standard.double(forKey: "monthlyIncome") {
+    var monthlyIncome: Double = UserDefaults.standard.double(forKey: SyncKey.monthlyIncome) {
         didSet {
             let sanitized = monthlyIncome.isFinite ? max(monthlyIncome, 0) : 0
             if sanitized != monthlyIncome {
                 monthlyIncome = sanitized
                 return
             }
-            UserDefaults.standard.set(monthlyIncome, forKey: "monthlyIncome")
+            defaults.set(monthlyIncome, forKey: SyncKey.monthlyIncome)
+            scheduleCloudSync(for: SyncKey.monthlyIncome)
             invalidateMonthlyStatusCache()
         }
     }
 
-    var rolloverEnabled: Bool = UserDefaults.standard.bool(forKey: "rolloverEnabled") {
+    var rolloverEnabled: Bool = UserDefaults.standard.bool(forKey: SyncKey.rolloverEnabled) {
         didSet {
-            UserDefaults.standard.set(rolloverEnabled, forKey: "rolloverEnabled")
+            defaults.set(rolloverEnabled, forKey: SyncKey.rolloverEnabled)
+            scheduleCloudSync(for: SyncKey.rolloverEnabled)
             invalidateMonthlyStatusCache()
         }
     }
@@ -37,6 +51,7 @@ final class BudgetEngine {
     var bucketPercentages: [String: Double] {
         didSet {
             Self.saveBucketPercentages(bucketPercentages)
+            scheduleCloudSync(for: SyncKey.bucketPercentages)
             invalidateMonthlyStatusCache()
         }
     }
@@ -46,6 +61,15 @@ final class BudgetEngine {
 
     init() {
         bucketPercentages = Self.loadBucketPercentages()
+        configureCloudSync()
+        syncFromCloud()
+    }
+
+    deinit {
+        pendingCloudSyncTask?.cancel()
+        if let cloudObserver {
+            NotificationCenter.default.removeObserver(cloudObserver)
+        }
     }
 
     // MARK: - Bucket Status
@@ -397,6 +421,106 @@ final class BudgetEngine {
 
     private func invalidateMonthlyStatusCache() {
         monthlyStatusCache.removeAll(keepingCapacity: true)
+    }
+
+    private func configureCloudSync() {
+        cloudObserver = NotificationCenter.default.addObserver(
+            forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: cloudStore,
+            queue: .main
+        ) { [weak self] _ in
+            self?.syncFromCloud()
+        }
+        cloudStore.synchronize()
+    }
+
+    private func syncFromCloud() {
+        applyRemoteDoubleIfNewer(for: SyncKey.monthlyIncome) { [weak self] value in
+            self?.monthlyIncome = value
+        }
+        applyRemoteBoolIfNewer(for: SyncKey.rolloverEnabled) { [weak self] value in
+            self?.rolloverEnabled = value
+        }
+        applyRemotePercentagesIfNewer()
+    }
+
+    private func scheduleCloudSync(for key: String) {
+        guard !isApplyingRemoteSync else { return }
+        dirtySyncKeys.insert(key)
+        pendingCloudSyncTask?.cancel()
+        pendingCloudSyncTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(350))
+            await self?.flushPendingCloudSync()
+        }
+    }
+
+    private func flushPendingCloudSync() {
+        guard !isApplyingRemoteSync else { return }
+        let keysToFlush = dirtySyncKeys
+        guard !keysToFlush.isEmpty else { return }
+
+        let timestamp = Date().timeIntervalSince1970
+
+        for key in keysToFlush {
+            switch key {
+            case SyncKey.monthlyIncome:
+                cloudStore.set(monthlyIncome, forKey: key)
+            case SyncKey.rolloverEnabled:
+                cloudStore.set(rolloverEnabled, forKey: key)
+            case SyncKey.bucketPercentages:
+                guard let data = try? JSONEncoder().encode(bucketPercentages) else { continue }
+                cloudStore.set(data, forKey: key)
+            default:
+                continue
+            }
+
+            cloudStore.set(timestamp, forKey: timestampKey(for: key))
+            defaults.set(timestamp, forKey: timestampKey(for: key))
+        }
+
+        dirtySyncKeys.subtract(keysToFlush)
+        cloudStore.synchronize()
+    }
+
+    private func applyRemoteDoubleIfNewer(for key: String, apply: (Double) -> Void) {
+        let remoteTimestamp = cloudStore.double(forKey: timestampKey(for: key))
+        let localTimestamp = defaults.double(forKey: timestampKey(for: key))
+        guard remoteTimestamp > localTimestamp else { return }
+
+        isApplyingRemoteSync = true
+        apply(cloudStore.double(forKey: key))
+        defaults.set(remoteTimestamp, forKey: timestampKey(for: key))
+        isApplyingRemoteSync = false
+    }
+
+    private func applyRemoteBoolIfNewer(for key: String, apply: (Bool) -> Void) {
+        let remoteTimestamp = cloudStore.double(forKey: timestampKey(for: key))
+        let localTimestamp = defaults.double(forKey: timestampKey(for: key))
+        guard remoteTimestamp > localTimestamp else { return }
+
+        isApplyingRemoteSync = true
+        apply(cloudStore.bool(forKey: key))
+        defaults.set(remoteTimestamp, forKey: timestampKey(for: key))
+        isApplyingRemoteSync = false
+    }
+
+    private func applyRemotePercentagesIfNewer() {
+        let remoteTimestamp = cloudStore.double(forKey: timestampKey(for: SyncKey.bucketPercentages))
+        let localTimestamp = defaults.double(forKey: timestampKey(for: SyncKey.bucketPercentages))
+        guard remoteTimestamp > localTimestamp else { return }
+        guard let data = cloudStore.data(forKey: SyncKey.bucketPercentages),
+              let dictionary = try? JSONDecoder().decode([String: Double].self, from: data) else {
+            return
+        }
+
+        isApplyingRemoteSync = true
+        bucketPercentages = dictionary
+        defaults.set(remoteTimestamp, forKey: timestampKey(for: SyncKey.bucketPercentages))
+        isApplyingRemoteSync = false
+    }
+
+    private func timestampKey(for key: String) -> String {
+        "\(key).modifiedAt"
     }
 
     private static func loadBucketPercentages() -> [String: Double] {

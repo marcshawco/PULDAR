@@ -958,6 +958,7 @@ struct SettingsView: View {
                 }
                 guard let recurring = recurringExpenses.first(where: { $0.id == id }) else { return }
                 recurring.isActive = isOn
+                recurring.touchUpdatedAt()
                 do {
                     try modelContext.save()
                     budgetEngine.markDataChanged()

@@ -17,6 +17,7 @@ final class Expense {
     var isOverspent: Bool = false
     var date: Date
     var notes: String             // Original user input preserved
+    var updatedAt: Date?
 
     init(
         merchant: String,
@@ -25,7 +26,8 @@ final class Expense {
         bucket: BudgetBucket,
         isOverspent: Bool = false,
         date: Date = .now,
-        notes: String = ""
+        notes: String = "",
+        updatedAt: Date? = nil
     ) {
         self.id       = UUID()
         self.merchant = merchant
@@ -35,6 +37,7 @@ final class Expense {
         self.isOverspent = isOverspent
         self.date     = date
         self.notes    = notes
+        self.updatedAt = updatedAt
     }
 
     // MARK: - Typed Accessors
@@ -49,5 +52,9 @@ final class Expense {
 
     var normalizedMerchant: String {
         merchant.normalizedMerchantName()
+    }
+
+    func touchUpdatedAt() {
+        updatedAt = .now
     }
 }

@@ -14,13 +14,15 @@ final class RecurringExpense {
     var bucket: String
     var isActive: Bool
     var createdAt: Date
+    var updatedAt: Date?
 
     init(
         name: String,
         amount: Double,
         bucket: BudgetBucket,
         isActive: Bool = true,
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        updatedAt: Date? = nil
     ) {
         self.id = UUID()
         self.name = name
@@ -28,6 +30,7 @@ final class RecurringExpense {
         self.bucket = bucket.rawValue
         self.isActive = isActive
         self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 
     var budgetBucket: BudgetBucket {
@@ -37,5 +40,9 @@ final class RecurringExpense {
     var safeAmount: Double {
         guard amount.isFinite else { return 0 }
         return max(amount, 0)
+    }
+
+    func touchUpdatedAt() {
+        updatedAt = .now
     }
 }

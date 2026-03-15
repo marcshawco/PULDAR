@@ -6,6 +6,16 @@
 	<array>
 		<string>group.marcshaw.PULDAR</string>
 	</array>
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.marcshaw.PULDAR</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudKit</string>
+	</array>
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>$(TeamIdentifierPrefix)marcshaw.PULDAR</string>
 	<key>com.apple.developer.kernel.increased-memory-limit</key>
 	<true/>
 </dict>

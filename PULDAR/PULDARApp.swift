@@ -15,23 +15,30 @@ struct PULDARApp: App {
             Expense.self,
             RecurringExpense.self
         ])
-        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
-            return try ModelContainer(for: schema, configurations: [configuration])
+            return try makeModelContainer(schema: schema, cloudSyncEnabled: true)
         } catch {
             if shouldRecoverByResetStore(from: error) {
                 // Recover from known migration-validation failure (e.g. required field introduced).
                 clearDefaultStoreFiles()
 
                 do {
-                    return try ModelContainer(for: schema, configurations: [configuration])
+                    return try makeModelContainer(schema: schema, cloudSyncEnabled: true)
                 } catch {
-                    fatalError("Failed to create ModelContainer after store reset: \(error)")
+                    do {
+                        return try makeModelContainer(schema: schema, cloudSyncEnabled: false)
+                    } catch {
+                        fatalError("Failed to create ModelContainer after store reset: \(error)")
+                    }
                 }
             }
 
-            fatalError("Failed to create ModelContainer: \(error)")
+            do {
+                return try makeModelContainer(schema: schema, cloudSyncEnabled: false)
+            } catch {
+                fatalError("Failed to create ModelContainer: \(error)")
+            }
         }
     }()
 
@@ -75,5 +82,23 @@ struct PULDARApp: App {
         }
 
         return false
+    }
+
+    private static func makeModelContainer(
+        schema: Schema,
+        cloudSyncEnabled: Bool
+    ) throws -> ModelContainer {
+        let configuration: ModelConfiguration
+        if cloudSyncEnabled {
+            configuration = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false,
+                cloudKitDatabase: .automatic
+            )
+        } else {
+            configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        }
+
+        return try ModelContainer(for: schema, configurations: [configuration])
     }
 }

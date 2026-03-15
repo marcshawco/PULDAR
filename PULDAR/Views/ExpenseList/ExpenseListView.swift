@@ -242,6 +242,7 @@ struct ExpenseListView: View {
         expense.category = editCategory
         expense.bucket = editBucket.rawValue
         expense.date = editDate
+        expense.touchUpdatedAt()
 
         do {
             try modelContext.save()

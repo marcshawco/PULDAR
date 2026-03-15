@@ -5,6 +5,11 @@ import SwiftUI
 @Observable
 @MainActor
 final class CategoryManager {
+    private enum SyncKey {
+        static let renamedCategories = "renamedCategories"
+        static let customCategories = "customCategories"
+    }
+
     struct CustomCategory: Identifiable, Codable, Hashable {
         var id: UUID
         var key: String
@@ -22,6 +27,13 @@ final class CategoryManager {
         let bucket: BudgetBucket
     }
 
+    private let cloudStore = NSUbiquitousKeyValueStore.default
+    private let defaults = UserDefaults.standard
+    private var cloudObserver: NSObjectProtocol?
+    private var isApplyingRemoteSync = false
+    private var pendingCloudSyncTask: Task<Void, Never>?
+    private var dirtySyncKeys: Set<String> = []
+
     var renamedCategories: [String: String] {
         didSet { persistRenamedCategories() }
     }
@@ -33,6 +45,15 @@ final class CategoryManager {
     init() {
         renamedCategories = Self.loadRenamedCategories()
         customCategories = Self.loadCustomCategories()
+        configureCloudSync()
+        syncFromCloud()
+    }
+
+    deinit {
+        pendingCloudSyncTask?.cancel()
+        if let cloudObserver {
+            NotificationCenter.default.removeObserver(cloudObserver)
+        }
     }
 
     var canonicalCategoryKeys: [String] {
@@ -219,8 +240,8 @@ final class CategoryManager {
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
     }
 
-    private static let renamedCategoriesKey = "renamedCategories"
-    private static let customCategoriesKey = "customCategories"
+    private static let renamedCategoriesKey = SyncKey.renamedCategories
+    private static let customCategoriesKey = SyncKey.customCategories
 
     private static func loadRenamedCategories() -> [String: String] {
         if let data = UserDefaults.standard.data(forKey: renamedCategoriesKey),
@@ -240,13 +261,89 @@ final class CategoryManager {
 
     private func persistRenamedCategories() {
         if let data = try? JSONEncoder().encode(renamedCategories) {
-            UserDefaults.standard.set(data, forKey: Self.renamedCategoriesKey)
+            defaults.set(data, forKey: Self.renamedCategoriesKey)
+            scheduleCloudSync(for: SyncKey.renamedCategories)
         }
     }
 
     private func persistCustomCategories() {
         if let data = try? JSONEncoder().encode(customCategories) {
-            UserDefaults.standard.set(data, forKey: Self.customCategoriesKey)
+            defaults.set(data, forKey: Self.customCategoriesKey)
+            scheduleCloudSync(for: SyncKey.customCategories)
         }
+    }
+
+    private func configureCloudSync() {
+        cloudObserver = NotificationCenter.default.addObserver(
+            forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: cloudStore,
+            queue: .main
+        ) { [weak self] _ in
+            self?.syncFromCloud()
+        }
+        cloudStore.synchronize()
+    }
+
+    private func syncFromCloud() {
+        applyRemoteDataIfNewer(for: SyncKey.renamedCategories) { [weak self] data in
+            guard let decoded = try? JSONDecoder().decode([String: String].self, from: data) else { return }
+            self?.renamedCategories = decoded
+        }
+        applyRemoteDataIfNewer(for: SyncKey.customCategories) { [weak self] data in
+            guard let decoded = try? JSONDecoder().decode([CustomCategory].self, from: data) else { return }
+            self?.customCategories = decoded
+        }
+    }
+
+    private func scheduleCloudSync(for key: String) {
+        guard !isApplyingRemoteSync else { return }
+        dirtySyncKeys.insert(key)
+        pendingCloudSyncTask?.cancel()
+        pendingCloudSyncTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(350))
+            await self?.flushPendingCloudSync()
+        }
+    }
+
+    private func flushPendingCloudSync() {
+        guard !isApplyingRemoteSync else { return }
+        let keysToFlush = dirtySyncKeys
+        guard !keysToFlush.isEmpty else { return }
+
+        let timestamp = Date().timeIntervalSince1970
+        for key in keysToFlush {
+            switch key {
+            case SyncKey.renamedCategories:
+                guard let data = try? JSONEncoder().encode(renamedCategories) else { continue }
+                cloudStore.set(data, forKey: key)
+            case SyncKey.customCategories:
+                guard let data = try? JSONEncoder().encode(customCategories) else { continue }
+                cloudStore.set(data, forKey: key)
+            default:
+                continue
+            }
+
+            cloudStore.set(timestamp, forKey: timestampKey(for: key))
+            defaults.set(timestamp, forKey: timestampKey(for: key))
+        }
+
+        dirtySyncKeys.subtract(keysToFlush)
+        cloudStore.synchronize()
+    }
+
+    private func applyRemoteDataIfNewer(for key: String, apply: (Data) -> Void) {
+        let remoteTimestamp = cloudStore.double(forKey: timestampKey(for: key))
+        let localTimestamp = defaults.double(forKey: timestampKey(for: key))
+        guard remoteTimestamp > localTimestamp else { return }
+        guard let data = cloudStore.data(forKey: key) else { return }
+
+        isApplyingRemoteSync = true
+        apply(data)
+        defaults.set(remoteTimestamp, forKey: timestampKey(for: key))
+        isApplyingRemoteSync = false
+    }
+
+    private func timestampKey(for key: String) -> String {
+        "\(key).modifiedAt"
     }
 }

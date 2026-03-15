@@ -812,11 +812,13 @@ struct DashboardView: View {
 
             if expense.category != resolved.storageKey {
                 expense.category = resolved.storageKey
+                expense.touchUpdatedAt()
                 didMutate = true
             }
 
             if expense.bucket != resolved.bucket.rawValue {
                 expense.bucket = resolved.bucket.rawValue
+                expense.touchUpdatedAt()
                 didMutate = true
             }
         }
@@ -842,6 +844,7 @@ struct DashboardView: View {
             let normalized = expense.merchant.normalizedMerchantName()
             if normalized != expense.merchant {
                 expense.merchant = normalized
+                expense.touchUpdatedAt()
                 didMutate = true
             }
         }

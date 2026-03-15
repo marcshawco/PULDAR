@@ -471,8 +471,14 @@ struct HistoryView: View {
                         Button("Export Selected Month (CSV)") {
                             exportCSV(for: filteredExpenses, scope: monthLabel(selectedMonth))
                         }
+                        Button("Export Selected Month (JSON)") {
+                            exportJSON(for: filteredExpenses, scope: monthLabel(selectedMonth))
+                        }
                         Button("Export All Data (CSV)") {
                             exportCSV(for: expenses, scope: "all_months")
+                        }
+                        Button("Export All Data (JSON)") {
+                            exportJSON(for: expenses, scope: "all_months")
                         }
                         Toggle("Auto Monthly CSV Export", isOn: $autoMonthlyCSVExportEnabled)
                             .tint(AppColors.accent)
@@ -538,6 +544,41 @@ struct HistoryView: View {
     private func csvEscape(_ value: String) -> String {
         let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
         return "\"\(escaped)\""
+    }
+
+    private func exportJSON(for items: [Expense], scope: String) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+
+        let payload = items.sorted(by: { $0.date > $1.date }).map { expense in
+            ExportExpense(
+                id: expense.id,
+                date: expense.date,
+                merchant: expense.merchant,
+                amount: expense.amount,
+                category: categoryManager.displayName(forStoredCategory: expense.category),
+                bucket: expense.bucket,
+                isOverspent: expense.isOverspent,
+                notes: expense.notes
+            )
+        }
+
+        let safeScope = scope.replacingOccurrences(
+            of: "[^a-zA-Z0-9_]+",
+            with: "_",
+            options: .regularExpression
+        )
+        let filename = "puldar_\(safeScope.lowercased()).json"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+
+        do {
+            let data = try encoder.encode(payload)
+            try data.write(to: url, options: .atomic)
+            exportURL = url
+        } catch {
+            print("Failed to export JSON: \(error)")
+        }
     }
 
     private func deleteExpense(_ expense: Expense) {
@@ -616,6 +657,17 @@ struct HistoryView: View {
         let title: String
         let items: [Expense]
         var id: String { title }
+    }
+
+    private struct ExportExpense: Codable {
+        let id: UUID
+        let date: Date
+        let merchant: String
+        let amount: Double
+        let category: String
+        let bucket: String
+        let isOverspent: Bool
+        let notes: String
     }
 
     private enum GroupingMode: String, CaseIterable, Identifiable {

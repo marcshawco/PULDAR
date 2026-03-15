@@ -596,8 +596,18 @@ struct SettingsView: View {
                 Button("Export Current Month (CSV)") {
                     exportCurrentMonthCSV()
                 }
+                Button("Export Current Month (JSON)") {
+                    exportCurrentMonthJSON()
+                }
                 Button("Export All Data (CSV)") {
                     exportCSV(for: expenses, scope: "all_months")
+                }
+                Button("Export All Data (JSON)") {
+                    exportJSON(
+                        expenses: expenses,
+                        recurring: recurringExpenses,
+                        scope: "all_data"
+                    )
                 }
                 Toggle("Auto Monthly CSV Export", isOn: $autoMonthlyCSVExportEnabled)
                     .tint(AppColors.accent)
@@ -622,8 +632,8 @@ struct SettingsView: View {
 
     private var localBackupSection: some View {
         Section {
-            Button("Create Device Backup (JSON)") {
-                exportLocalBackupJSON()
+            Button("Create Full Device Backup (JSON)") {
+                exportFullBackupJSON()
             }
             if let backupURL {
                 ShareLink(item: backupURL) {
@@ -879,6 +889,21 @@ struct SettingsView: View {
         exportCSV(for: currentMonthExpenses, scope: monthLabel(currentMonth))
     }
 
+    private func exportCurrentMonthJSON() {
+        let calendar = Calendar.current
+        let currentMonth = calendar.date(
+            from: calendar.dateComponents([.year, .month], from: .now)
+        ) ?? .now
+        let currentMonthExpenses = expenses.filter {
+            calendar.isDate($0.date, equalTo: currentMonth, toGranularity: .month)
+        }
+        exportJSON(
+            expenses: currentMonthExpenses,
+            recurring: [],
+            scope: monthLabel(currentMonth)
+        )
+    }
+
     private func exportCSV(for items: [Expense], scope: String) {
         let formatter = ISO8601DateFormatter()
         var csv = "date,merchant,amount,category,bucket,isOverspent,notes\n"
@@ -915,6 +940,41 @@ struct SettingsView: View {
     private func csvEscape(_ value: String) -> String {
         let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
         return "\"\(escaped)\""
+    }
+
+    private func exportJSON(
+        expenses: [Expense],
+        recurring: [RecurringExpense],
+        scope: String
+    ) {
+        let payload = DataExportPayload(
+            createdAt: .now,
+            scope: scope,
+            monthlyIncome: budgetEngine.monthlyIncome,
+            percentages: currentPercentagesSnapshot(),
+            expenses: expenses.map(Self.makeLocalBackupExpense),
+            recurring: recurring.map(Self.makeLocalBackupRecurring)
+        )
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+
+        let safeScope = scope.replacingOccurrences(
+            of: "[^a-zA-Z0-9_]+",
+            with: "_",
+            options: .regularExpression
+        )
+        let filename = "puldar_\(safeScope.lowercased()).json"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+
+        do {
+            let data = try encoder.encode(payload)
+            try data.write(to: url, options: .atomic)
+            exportURL = url
+        } catch {
+            print("Failed to export JSON in settings: \(error)")
+        }
     }
 
     private func runAutoMonthlyExportIfNeeded() {
@@ -1162,33 +1222,14 @@ struct SettingsView: View {
         }
     }
 
-    private func exportLocalBackupJSON() {
-        let payload = LocalBackupPayload(
+    private func exportFullBackupJSON() {
+        let payload = DataExportPayload(
             createdAt: .now,
+            scope: "full_device_backup",
             monthlyIncome: budgetEngine.monthlyIncome,
             percentages: currentPercentagesSnapshot(),
-            expenses: expenses.map {
-                LocalBackupExpense(
-                    id: $0.id,
-                    date: $0.date,
-                    merchant: $0.merchant,
-                    amount: $0.amount,
-                    category: $0.category,
-                    bucket: $0.bucket,
-                    isOverspent: $0.isOverspent,
-                    notes: $0.notes
-                )
-            },
-            recurring: recurringExpenses.map {
-                LocalBackupRecurring(
-                    id: $0.id,
-                    name: $0.name,
-                    amount: $0.amount,
-                    bucket: $0.bucket,
-                    isActive: $0.isActive,
-                    createdAt: $0.createdAt
-                )
-            }
+            expenses: expenses.map(Self.makeLocalBackupExpense),
+            recurring: recurringExpenses.map(Self.makeLocalBackupRecurring)
         )
 
         let encoder = JSONEncoder()
@@ -1207,8 +1248,33 @@ struct SettingsView: View {
         }
     }
 
-    private struct LocalBackupPayload: Codable {
+    private static func makeLocalBackupExpense(_ expense: Expense) -> LocalBackupExpense {
+        LocalBackupExpense(
+            id: expense.id,
+            date: expense.date,
+            merchant: expense.merchant,
+            amount: expense.amount,
+            category: expense.category,
+            bucket: expense.bucket,
+            isOverspent: expense.isOverspent,
+            notes: expense.notes
+        )
+    }
+
+    private static func makeLocalBackupRecurring(_ recurring: RecurringExpense) -> LocalBackupRecurring {
+        LocalBackupRecurring(
+            id: recurring.id,
+            name: recurring.name,
+            amount: recurring.amount,
+            bucket: recurring.bucket,
+            isActive: recurring.isActive,
+            createdAt: recurring.createdAt
+        )
+    }
+
+    private struct DataExportPayload: Codable {
         let createdAt: Date
+        let scope: String
         let monthlyIncome: Double
         let percentages: [String: Double]
         let expenses: [LocalBackupExpense]

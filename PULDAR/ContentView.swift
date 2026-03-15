@@ -22,6 +22,7 @@ struct ContentView: View {
     @State private var storeKitManager = StoreKitManager()
     @State private var usageTracker = UsageTracker()
     @State private var didWarmModelThisLaunch = false
+    @AppStorage("didCompleteAppOnboarding") private var didCompleteAppOnboarding = false
     @AppStorage("appThemeMode") private var appThemeMode = "system"
 
     init() {
@@ -60,7 +61,8 @@ struct ContentView: View {
                 .accessibilityHidden(true)
         }
         .preferredColorScheme(preferredColorScheme)
-        .task {
+        .task(id: didCompleteAppOnboarding) {
+            guard didCompleteAppOnboarding else { return }
             guard !didWarmModelThisLaunch else { return }
             didWarmModelThisLaunch = true
             Task.detached(priority: .utility) {
@@ -69,6 +71,18 @@ struct ContentView: View {
         }
         .task {
             await storeKitManager.listenForTransactions()
+        }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { !didCompleteAppOnboarding },
+                set: { if !$0 { didCompleteAppOnboarding = true } }
+            )
+        ) {
+            AppOnboardingView {
+                didCompleteAppOnboarding = true
+            }
+            .environment(llmService)
+            .environment(networkMonitor)
         }
     }
 

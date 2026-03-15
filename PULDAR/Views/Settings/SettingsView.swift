@@ -51,6 +51,7 @@ struct SettingsView: View {
     @State private var showBudgetAllocationInfo = false
     @State private var selectedBudgetInfoBucket: BudgetBucket?
     @AppStorage("appThemeMode") private var appThemeMode = "system"
+    @AppStorage("didCompleteAppOnboarding") private var didCompleteAppOnboarding = false
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
     @AppStorage("hourlyPayRate") private var hourlyPayRate: Double = 0
     @AppStorage("hoursPerWeek") private var hoursPerWeek: Double = 40
@@ -688,6 +689,11 @@ struct SettingsView: View {
             LabeledContent("Version", value: "1.0.0")
             LabeledContent("AI Model", value: "Qwen 2.5 0.5B")
             LabeledContent("Processing", value: "100% On-Device")
+
+            Button("View Onboarding Again") {
+                didCompleteAppOnboarding = false
+                dismiss()
+            }
         } header: {
             Text("About")
         }

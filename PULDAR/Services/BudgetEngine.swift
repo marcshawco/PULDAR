@@ -35,6 +35,13 @@ final class BudgetEngine {
             }
             defaults.set(monthlyIncome, forKey: SyncKey.monthlyIncome)
             scheduleCloudSync(for: SyncKey.monthlyIncome)
+            DiagnosticLogger.shared.record(
+                category: "budget.settings",
+                message: "Monthly income updated",
+                metadata: [
+                    "monthlyIncome": String(format: "%.2f", monthlyIncome)
+                ]
+            )
             invalidateMonthlyStatusCache()
         }
     }
@@ -43,6 +50,11 @@ final class BudgetEngine {
         didSet {
             defaults.set(rolloverEnabled, forKey: SyncKey.rolloverEnabled)
             scheduleCloudSync(for: SyncKey.rolloverEnabled)
+            DiagnosticLogger.shared.record(
+                category: "budget.settings",
+                message: "Rollover setting updated",
+                metadata: ["enabled": rolloverEnabled ? "true" : "false"]
+            )
             invalidateMonthlyStatusCache()
         }
     }
@@ -52,6 +64,11 @@ final class BudgetEngine {
         didSet {
             Self.saveBucketPercentages(bucketPercentages)
             scheduleCloudSync(for: SyncKey.bucketPercentages)
+            DiagnosticLogger.shared.record(
+                category: "budget.settings",
+                message: "Budget allocation updated",
+                metadata: bucketPercentages.mapValues { String(format: "%.2f", $0) }
+            )
             invalidateMonthlyStatusCache()
         }
     }

@@ -83,8 +83,19 @@ final class StoreKitManager {
             let products = try await Product.products(for: Self.subscriptionProductIDs)
             proProducts = products.sorted(by: Self.productSort)
             didLoadProducts = true
+            DiagnosticLogger.shared.record(
+                category: "storekit.products",
+                message: "Loaded subscription products",
+                metadata: ["count": "\(proProducts.count)"]
+            )
         } catch {
             purchaseError = Self.userVisibleErrorMessage(for: error)
+            DiagnosticLogger.shared.record(
+                level: .warning,
+                category: "storekit.products",
+                message: "Failed to load subscription products",
+                metadata: ["error": error.localizedDescription]
+            )
         }
     }
 
@@ -101,6 +112,11 @@ final class StoreKitManager {
                 activeProductID = txn.productID
                 UserDefaults.standard.set(true, forKey: "didUnlockProSubscription")
                 didCheckEntitlement = true
+                DiagnosticLogger.shared.record(
+                    category: "storekit.entitlement",
+                    message: "Active entitlement detected",
+                    metadata: ["productID": txn.productID]
+                )
                 return
             }
         }
@@ -109,6 +125,10 @@ final class StoreKitManager {
         activeProductID = nil
         UserDefaults.standard.set(false, forKey: "didUnlockProSubscription")
         didCheckEntitlement = true
+        DiagnosticLogger.shared.record(
+            category: "storekit.entitlement",
+            message: "No active entitlement found"
+        )
     }
 
     // MARK: - Purchase
@@ -137,17 +157,41 @@ final class StoreKitManager {
                     activeProductID = txn.productID
                     UserDefaults.standard.set(true, forKey: "didUnlockProSubscription")
                     didCheckEntitlement = true
+                    DiagnosticLogger.shared.record(
+                        category: "storekit.purchase",
+                        message: "Subscription purchase succeeded",
+                        metadata: ["productID": txn.productID]
+                    )
                     HapticManager.success()
                 }
             case .userCancelled:
+                DiagnosticLogger.shared.record(
+                    category: "storekit.purchase",
+                    message: "Subscription purchase cancelled by user",
+                    metadata: ["plan": plan.rawValue]
+                )
                 break
             case .pending:
+                DiagnosticLogger.shared.record(
+                    category: "storekit.purchase",
+                    message: "Subscription purchase pending",
+                    metadata: ["plan": plan.rawValue]
+                )
                 break
             @unknown default:
                 break
             }
         } catch {
             purchaseError = Self.userVisibleErrorMessage(for: error)
+            DiagnosticLogger.shared.record(
+                level: .warning,
+                category: "storekit.purchase",
+                message: "Subscription purchase failed",
+                metadata: [
+                    "plan": plan.rawValue,
+                    "error": error.localizedDescription
+                ]
+            )
             HapticManager.warning()
         }
 
@@ -161,8 +205,18 @@ final class StoreKitManager {
         do {
             try await AppStore.sync()
             await checkEntitlement(force: true)
+            DiagnosticLogger.shared.record(
+                category: "storekit.restore",
+                message: "Restore purchases completed"
+            )
         } catch {
             purchaseError = Self.userVisibleErrorMessage(for: error)
+            DiagnosticLogger.shared.record(
+                level: .warning,
+                category: "storekit.restore",
+                message: "Restore purchases failed",
+                metadata: ["error": error.localizedDescription]
+            )
             HapticManager.warning()
         }
 
@@ -179,9 +233,19 @@ final class StoreKitManager {
                     isPro = true
                     activeProductID = txn.productID
                     UserDefaults.standard.set(true, forKey: "didUnlockProSubscription")
+                    DiagnosticLogger.shared.record(
+                        category: "storekit.transactions",
+                        message: "Background transaction update received",
+                        metadata: ["productID": txn.productID]
+                    )
                 }
                 await txn.finish()
             } else {
+                DiagnosticLogger.shared.record(
+                    level: .warning,
+                    category: "storekit.transactions",
+                    message: "Transaction listener received unverified update"
+                )
                 await checkEntitlement(force: true)
             }
         }

@@ -21,6 +21,7 @@ struct ContentView: View {
     @State private var networkMonitor = NetworkMonitor()
     @State private var storeKitManager = StoreKitManager()
     @State private var usageTracker = UsageTracker()
+    @State private var diagnosticLogger = DiagnosticLogger.shared
     @State private var didWarmModelThisLaunch = false
     @AppStorage("didCompleteAppOnboarding") private var didCompleteAppOnboarding = false
     @AppStorage("appThemeMode") private var appThemeMode = "system"
@@ -55,6 +56,7 @@ struct ContentView: View {
         .environment(networkMonitor)
         .environment(storeKitManager)
         .environment(usageTracker)
+        .environment(diagnosticLogger)
         .overlay {
             WidgetSnapshotSyncView()
                 .allowsHitTesting(false)
@@ -71,6 +73,12 @@ struct ContentView: View {
         }
         .task {
             await storeKitManager.listenForTransactions()
+        }
+        .task {
+            diagnosticLogger.record(
+                category: "app.lifecycle",
+                message: "App launched"
+            )
         }
         .fullScreenCover(
             isPresented: Binding(

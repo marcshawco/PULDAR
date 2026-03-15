@@ -26,6 +26,7 @@ struct DashboardView: View {
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(StoreKitManager.self) private var storeKit
     @Environment(UsageTracker.self) private var usageTracker
+    @Environment(DiagnosticLogger.self) private var diagnosticLogger
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -292,10 +293,20 @@ struct DashboardView: View {
         if !storeKit.isPro && usageTracker.isAtLimit {
             showPaywall = true
             HapticManager.warning()
+            diagnosticLogger.record(
+                level: .warning,
+                category: "expense.submit",
+                message: "Blocked expense submission at free limit"
+            )
             return false
         }
 
         guard !rawInput.isEmpty else { return false }
+        diagnosticLogger.record(
+            category: "expense.submit",
+            message: "Started expense parsing",
+            metadata: ["inputLength": "\(rawInput.count)"]
+        )
         isProcessing = true
         showError = false
         errorMessage = nil
@@ -331,6 +342,16 @@ struct DashboardView: View {
             modelContext.insert(expense)
             try modelContext.save()
             budgetEngine.markDataChanged()
+            diagnosticLogger.record(
+                category: "expense.submit",
+                message: "Saved expense",
+                metadata: [
+                    "amount": String(format: "%.2f", signedAmount),
+                    "category": storageCategory,
+                    "budget": storageBucket.rawValue,
+                    "isIncome": isIncomeTransaction ? "true" : "false"
+                ]
+            )
 
             // Track usage (free tier only)
             if !storeKit.isPro {
@@ -352,6 +373,12 @@ struct DashboardView: View {
         } catch {
             errorMessage = error.localizedDescription
             showError = true
+            diagnosticLogger.record(
+                level: .error,
+                category: "expense.submit",
+                message: "Failed to save expense",
+                metadata: ["error": error.localizedDescription]
+            )
             HapticManager.warning()
             isProcessing = false
 
@@ -749,8 +776,23 @@ struct DashboardView: View {
             try modelContext.save()
             budgetEngine.markDataChanged()
             HapticManager.success()
+            diagnosticLogger.record(
+                category: "recurring.suggestion",
+                message: "Accepted recurring suggestion",
+                metadata: [
+                    "name": suggestion.name,
+                    "amount": String(format: "%.2f", suggestion.amount),
+                    "budget": suggestion.bucket.rawValue
+                ]
+            )
         } catch {
             print("Failed to save suggested recurring expense: \(error)")
+            diagnosticLogger.record(
+                level: .error,
+                category: "recurring.suggestion",
+                message: "Failed to save recurring suggestion",
+                metadata: ["error": error.localizedDescription]
+            )
         }
         recurringSuggestion = nil
     }
@@ -761,8 +803,23 @@ struct DashboardView: View {
             try modelContext.save()
             budgetEngine.markDataChanged()
             HapticManager.warning()
+            diagnosticLogger.record(
+                category: "expense.delete",
+                message: "Deleted expense",
+                metadata: [
+                    "amount": String(format: "%.2f", expense.amount),
+                    "category": expense.category,
+                    "budget": expense.bucket
+                ]
+            )
         } catch {
             print("Failed to delete expense: \(error)")
+            diagnosticLogger.record(
+                level: .error,
+                category: "expense.delete",
+                message: "Failed to delete expense",
+                metadata: ["error": error.localizedDescription]
+            )
         }
     }
 
@@ -829,6 +886,12 @@ struct DashboardView: View {
                 budgetEngine.markDataChanged()
             } catch {
                 print("Failed category consistency migration: \(error)")
+                diagnosticLogger.record(
+                    level: .error,
+                    category: "maintenance.category",
+                    message: "Failed category consistency migration",
+                    metadata: ["error": error.localizedDescription]
+                )
             }
         }
 
@@ -855,6 +918,12 @@ struct DashboardView: View {
                 budgetEngine.markDataChanged()
             } catch {
                 print("Failed merchant capitalization migration: \(error)")
+                diagnosticLogger.record(
+                    level: .error,
+                    category: "maintenance.merchant",
+                    message: "Failed merchant normalization migration",
+                    metadata: ["error": error.localizedDescription]
+                )
             }
         }
 

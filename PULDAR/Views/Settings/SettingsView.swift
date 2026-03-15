@@ -18,6 +18,7 @@ struct SettingsView: View {
 
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(CategoryManager.self) private var categoryManager
+    @Environment(DiagnosticLogger.self) private var diagnosticLogger
     @Environment(StoreKitManager.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -44,6 +45,7 @@ struct SettingsView: View {
     @State private var showPaywall = false
     @State private var exportURL: URL?
     @State private var backupURL: URL?
+    @State private var diagnosticURL: URL?
     @State private var selectedAllocationPreset: AllocationPreset = .custom
     @State private var showZeroFunWarning = false
     @State private var showDeleteAllConfirmation = false
@@ -98,6 +100,7 @@ struct SettingsView: View {
                 widgetsSection
                 customCategoriesSection
                 accountSection
+                diagnosticsSection
                 dangerZoneSection
                 aboutSection
             }
@@ -681,6 +684,41 @@ struct SettingsView: View {
         }
     }
 
+    private var diagnosticsSection: some View {
+        Section {
+            Toggle(
+                "Enable Local Diagnostic Logs",
+                isOn: Binding(
+                    get: { diagnosticLogger.isEnabled },
+                    set: { diagnosticLogger.setEnabled($0) }
+                )
+            )
+            .tint(AppColors.accent)
+
+            Button("Export Diagnostic Logs") {
+                exportDiagnosticLogs()
+            }
+            .disabled(!diagnosticLogger.isEnabled && diagnosticLogger.entries.isEmpty)
+
+            if let diagnosticURL {
+                ShareLink(item: diagnosticURL) {
+                    Label("Share Diagnostic File", systemImage: "envelope")
+                }
+            }
+
+            if !diagnosticLogger.entries.isEmpty {
+                Button("Clear Local Diagnostic Logs", role: .destructive) {
+                    diagnosticLogger.clear()
+                    diagnosticURL = nil
+                }
+            }
+        } header: {
+            Text("Diagnostics")
+        } footer: {
+            Text("Optional. Logs stay on this device and only include app events like budget changes, exports, purchases, and errors. Nothing is sent anywhere unless the user exports and shares the file.")
+        }
+    }
+
     private var dangerZoneSection: some View {
         Section {
             Button(role: .destructive) {
@@ -932,8 +970,19 @@ struct SettingsView: View {
         do {
             try csv.write(to: url, atomically: true, encoding: .utf8)
             exportURL = url
+            diagnosticLogger.record(
+                category: "export.csv",
+                message: "Exported CSV from settings",
+                metadata: ["scope": scope, "rows": "\(items.count)"]
+            )
         } catch {
             print("Failed to export CSV in settings: \(error)")
+            diagnosticLogger.record(
+                level: .error,
+                category: "export.csv",
+                message: "Failed CSV export from settings",
+                metadata: ["error": error.localizedDescription]
+            )
         }
     }
 
@@ -972,8 +1021,78 @@ struct SettingsView: View {
             let data = try encoder.encode(payload)
             try data.write(to: url, options: .atomic)
             exportURL = url
+            diagnosticLogger.record(
+                category: "export.json",
+                message: "Exported JSON from settings",
+                metadata: [
+                    "scope": scope,
+                    "expenses": "\(expenses.count)",
+                    "recurring": "\(recurring.count)"
+                ]
+            )
         } catch {
             print("Failed to export JSON in settings: \(error)")
+            diagnosticLogger.record(
+                level: .error,
+                category: "export.json",
+                message: "Failed JSON export from settings",
+                metadata: ["error": error.localizedDescription]
+            )
+        }
+    }
+
+    private func exportDiagnosticLogs() {
+        let calendar = Calendar.current
+        let currentMonth = calendar.date(
+            from: calendar.dateComponents([.year, .month], from: .now)
+        ) ?? .now
+
+        let state = DiagnosticLogger.SupportState(
+            monthlyIncome: budgetEngine.monthlyIncome,
+            rolloverEnabled: budgetEngine.rolloverEnabled,
+            percentages: currentPercentagesSnapshot(),
+            expenseCount: expenses.count,
+            recurringExpenseCount: recurringExpenses.count,
+            filteredMonth: monthLabel(currentMonth),
+            monthSpent: budgetEngine.totalSpent(
+                expenses: expenses,
+                recurringExpenses: recurringExpenses,
+                for: currentMonth
+            ),
+            monthCapacity: budgetEngine.monthSpendCapacity(
+                expenses: expenses,
+                recurringExpenses: recurringExpenses,
+                for: currentMonth
+            ),
+            buckets: budgetEngine.calculateStatus(
+                expenses: expenses,
+                recurringExpenses: recurringExpenses,
+                for: currentMonth
+            ).map {
+                DiagnosticLogger.SupportState.BucketState(
+                    name: $0.bucket.rawValue,
+                    budgeted: $0.budgeted,
+                    spent: $0.spent,
+                    remaining: $0.remaining,
+                    isOverspent: $0.isOverspent
+                )
+            }
+        )
+
+        do {
+            diagnosticURL = try diagnosticLogger.export(state: state)
+            diagnosticLogger.record(
+                category: "diagnostics.export",
+                message: "Exported diagnostic log bundle",
+                metadata: ["entries": "\(diagnosticLogger.entries.count)"]
+            )
+        } catch {
+            diagnosticLogger.record(
+                level: .error,
+                category: "diagnostics.export",
+                message: "Failed to export diagnostic log bundle",
+                metadata: ["error": error.localizedDescription]
+            )
         }
     }
 
@@ -1022,8 +1141,22 @@ struct SettingsView: View {
                 do {
                     try modelContext.save()
                     budgetEngine.markDataChanged()
+                    diagnosticLogger.record(
+                        category: "recurring.toggle",
+                        message: "Updated recurring expense activity",
+                        metadata: [
+                            "name": recurring.name,
+                            "isActive": isOn ? "true" : "false"
+                        ]
+                    )
                 } catch {
                     print("Failed to update recurring active state: \(error)")
+                    diagnosticLogger.record(
+                        level: .error,
+                        category: "recurring.toggle",
+                        message: "Failed to update recurring expense activity",
+                        metadata: ["error": error.localizedDescription]
+                    )
                 }
             }
         )
@@ -1049,6 +1182,11 @@ struct SettingsView: View {
 
     private func saveAndDismiss() {
         budgetEngine.setPercentages(draftPercentages)
+        diagnosticLogger.record(
+            category: "budget.settings",
+            message: "Saved settings changes",
+            metadata: currentPercentagesSnapshot().mapValues { String(format: "%.2f", $0) }
+        )
         if focusedIncomeField != nil {
             focusedIncomeField = nil
             Task { @MainActor in
@@ -1183,9 +1321,24 @@ struct SettingsView: View {
             try modelContext.save()
             budgetEngine.markDataChanged()
             showAddRecurringSheet = false
+            diagnosticLogger.record(
+                category: "recurring.create",
+                message: "Created recurring expense",
+                metadata: [
+                    "name": trimmedName,
+                    "amount": String(format: "%.2f", amount),
+                    "budget": newRecurringBucket.rawValue
+                ]
+            )
         } catch {
             addRecurringError = "Could not save recurring expense."
             print("Failed to save recurring expense: \(error)")
+            diagnosticLogger.record(
+                level: .error,
+                category: "recurring.create",
+                message: "Failed to create recurring expense",
+                metadata: ["error": error.localizedDescription]
+            )
         }
     }
 
@@ -1204,8 +1357,19 @@ struct SettingsView: View {
             try modelContext.save()
             budgetEngine.markDataChanged()
             HapticManager.warning()
+            diagnosticLogger.record(
+                category: "recurring.delete",
+                message: "Deleted recurring expenses",
+                metadata: ["count": "\(offsets.count)"]
+            )
         } catch {
             print("Failed to delete recurring expenses: \(error)")
+            diagnosticLogger.record(
+                level: .error,
+                category: "recurring.delete",
+                message: "Failed to delete recurring expenses",
+                metadata: ["error": error.localizedDescription]
+            )
         }
     }
 
@@ -1217,8 +1381,18 @@ struct SettingsView: View {
             try modelContext.delete(model: RecurringExpense.self)
             budgetEngine.markDataChanged()
             HapticManager.warning()
+            diagnosticLogger.record(
+                category: "danger.clear_all",
+                message: "Cleared all expenses and recurring expenses"
+            )
         } catch {
             print("Failed to delete expenses: \(error)")
+            diagnosticLogger.record(
+                level: .error,
+                category: "danger.clear_all",
+                message: "Failed to clear all expenses",
+                metadata: ["error": error.localizedDescription]
+            )
         }
     }
 
@@ -1243,8 +1417,22 @@ struct SettingsView: View {
             let data = try encoder.encode(payload)
             try data.write(to: url, options: .atomic)
             backupURL = url
+            diagnosticLogger.record(
+                category: "backup.json",
+                message: "Created full device backup",
+                metadata: [
+                    "expenses": "\(expenses.count)",
+                    "recurring": "\(recurringExpenses.count)"
+                ]
+            )
         } catch {
             print("Failed to create local backup: \(error)")
+            diagnosticLogger.record(
+                level: .error,
+                category: "backup.json",
+                message: "Failed to create full device backup",
+                metadata: ["error": error.localizedDescription]
+            )
         }
     }
 

@@ -8,6 +8,7 @@ import SwiftData
 struct ExpenseListView: View {
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(BudgetEngine.self) private var budgetEngine
+    @Environment(DiagnosticLogger.self) private var diagnosticLogger
     @Environment(\.modelContext) private var modelContext
     let expenses: [Expense]
     let searchText: String
@@ -247,11 +248,26 @@ struct ExpenseListView: View {
         do {
             try modelContext.save()
             budgetEngine.markDataChanged()
+            diagnosticLogger.record(
+                category: "expense.edit",
+                message: "Edited expense",
+                metadata: [
+                    "amount": String(format: "%.2f", expense.amount),
+                    "category": expense.category,
+                    "budget": expense.bucket
+                ]
+            )
             editingExpense = nil
             editError = nil
             HapticManager.success()
         } catch {
             editError = "Could not save changes."
+            diagnosticLogger.record(
+                level: .error,
+                category: "expense.edit",
+                message: "Failed to edit expense",
+                metadata: ["error": error.localizedDescription]
+            )
         }
     }
 

@@ -6,6 +6,7 @@ struct HistoryView: View {
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(StoreKitManager.self) private var store
+    @Environment(DiagnosticLogger.self) private var diagnosticLogger
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \Expense.date, order: .reverse) private var expenses: [Expense]
@@ -536,8 +537,22 @@ struct HistoryView: View {
         do {
             try csv.write(to: url, atomically: true, encoding: .utf8)
             exportURL = url
+            diagnosticLogger.record(
+                category: "export.csv",
+                message: "Exported CSV from history",
+                metadata: [
+                    "scope": scope,
+                    "rows": "\(items.count)"
+                ]
+            )
         } catch {
             print("Failed to export CSV: \(error)")
+            diagnosticLogger.record(
+                level: .error,
+                category: "export.csv",
+                message: "Failed CSV export from history",
+                metadata: ["error": error.localizedDescription]
+            )
         }
     }
 
@@ -576,8 +591,22 @@ struct HistoryView: View {
             let data = try encoder.encode(payload)
             try data.write(to: url, options: .atomic)
             exportURL = url
+            diagnosticLogger.record(
+                category: "export.json",
+                message: "Exported JSON from history",
+                metadata: [
+                    "scope": scope,
+                    "rows": "\(items.count)"
+                ]
+            )
         } catch {
             print("Failed to export JSON: \(error)")
+            diagnosticLogger.record(
+                level: .error,
+                category: "export.json",
+                message: "Failed JSON export from history",
+                metadata: ["error": error.localizedDescription]
+            )
         }
     }
 
@@ -587,8 +616,23 @@ struct HistoryView: View {
             try modelContext.save()
             budgetEngine.markDataChanged()
             HapticManager.warning()
+            diagnosticLogger.record(
+                category: "expense.delete",
+                message: "Deleted expense from history",
+                metadata: [
+                    "amount": String(format: "%.2f", expense.amount),
+                    "category": expense.category,
+                    "budget": expense.bucket
+                ]
+            )
         } catch {
             print("Failed to delete expense from history: \(error)")
+            diagnosticLogger.record(
+                level: .error,
+                category: "expense.delete",
+                message: "Failed to delete expense from history",
+                metadata: ["error": error.localizedDescription]
+            )
         }
     }
 

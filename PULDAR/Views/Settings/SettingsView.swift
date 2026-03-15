@@ -737,6 +737,7 @@ struct SettingsView: View {
             LabeledContent("Version", value: "1.0.0")
             LabeledContent("AI Model", value: "Qwen 2.5 0.5B")
             LabeledContent("Processing", value: "100% On-Device")
+            LabeledContent("AI Use", value: "Expense Parsing Only")
 
             Button("View Onboarding Again") {
                 didCompleteAppOnboarding = false
@@ -744,6 +745,8 @@ struct SettingsView: View {
             }
         } header: {
             Text("About")
+        } footer: {
+            Text("PULDAR is not financial advice. Its on-device AI is only used to parse receipts and plain-English expense entries, then categorize them. It does not provide investment tips, debt strategies, or financial recommendations.")
         }
     }
 

@@ -19,6 +19,11 @@ import Tokenizers
 @Observable
 @MainActor
 final class LLMService {
+    private struct ReceiptHints {
+        let likelyMerchant: String?
+        let likelyTotal: Double?
+        let merchantCandidates: [String]
+    }
 
     // MARK: - Load State
 
@@ -55,7 +60,7 @@ final class LLMService {
 
     private var modelContainer: ModelContainer?
     private var parseCache: [String: LLMExpenseResult] = [:]
-    private let parseCacheKey = "llmParseCache.v1"
+    private let parseCacheKey = "llmParseCache.v2"
     private var lastLoadProgressUpdate: CFTimeInterval = 0
     private var lastReportedProgressBucket: Int = -1
 
@@ -117,8 +122,9 @@ final class LLMService {
         let categories = (allowedCategories?.isEmpty == false)
             ? (allowedCategories ?? defaultCategories)
             : defaultCategories
+        let isReceiptScan = input.localizedCaseInsensitiveContains("Receipt scan")
         let cacheKey = makeParseCacheKey(input: input, categories: categories)
-        if let cached = parseCache[cacheKey] {
+        if !isReceiptScan, let cached = parseCache[cacheKey] {
             return cached
         }
         let systemPrompt = makeSystemPrompt(categories: categories)
@@ -167,14 +173,22 @@ final class LLMService {
         }
 
         let parsed = try extractJSON(from: responseText)
-        cacheParsedExpense(parsed, for: cacheKey)
-        return parsed
+        let refined = refineParsedExpense(parsed, originalInput: input)
+        cacheParsedExpense(refined, for: cacheKey)
+        return refined
     }
 
     private func makeSystemPrompt(categories: [String]) -> String {
         """
         You are an expense parser. Given a natural language expense description, \
         extract the merchant name, dollar amount, and spending category.
+
+        If the input is a receipt scan:
+        - Prefer the establishment name near the top of the receipt.
+        - Prefer a provided "Likely merchant" hint over raw OCR lines.
+        - Prefer a provided "Likely total" hint over individual line items.
+        - The final amount should usually be the receipt total near the bottom, not subtotal, tax, tip alone, item prices, or card digits.
+        - Ignore payment network names, processor text, terminal text, and generic words like RECEIPT or THANK YOU when choosing the merchant.
 
         Respond ONLY with a single JSON object — no markdown, no commentary:
         {"merchant": "Store Name", "amount": 12.50, "category": "groceries", "transactionType": "expense"}
@@ -219,6 +233,141 @@ final class LLMService {
             // If JSON decode fails, try the regex fallback.
             return try regexFallback(from: text)
         }
+    }
+
+    private func refineParsedExpense(_ parsed: LLMExpenseResult, originalInput: String) -> LLMExpenseResult {
+        guard let hints = receiptHints(from: originalInput) else {
+            return parsed
+        }
+
+        let refinedMerchant = refinedMerchantName(
+            parsedMerchant: parsed.merchant,
+            hints: hints
+        )
+        let refinedAmount = refinedAmountValue(
+            parsedAmount: parsed.amount,
+            hints: hints
+        )
+
+        return LLMExpenseResult(
+            merchant: refinedMerchant,
+            amount: refinedAmount,
+            category: parsed.category,
+            transactionType: parsed.transactionType
+        )
+    }
+
+    private func receiptHints(from input: String) -> ReceiptHints? {
+        guard input.localizedCaseInsensitiveContains("Receipt scan") else {
+            return nil
+        }
+
+        let likelyMerchant = captureLineValue(prefix: "Likely merchant:", in: input)
+        let likelyTotal = captureAmount(prefix: "Likely total:", in: input)
+        let merchantCandidates = captureLineValue(prefix: "Merchant candidates:", in: input)?
+            .components(separatedBy: "|")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty } ?? []
+
+        return ReceiptHints(
+            likelyMerchant: likelyMerchant,
+            likelyTotal: likelyTotal,
+            merchantCandidates: merchantCandidates
+        )
+    }
+
+    private func captureLineValue(prefix: String, in input: String) -> String? {
+        guard let line = input
+            .components(separatedBy: .newlines)
+            .first(where: { $0.hasPrefix(prefix) }) else {
+            return nil
+        }
+
+        let value = line
+            .dropFirst(prefix.count)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return value.isEmpty ? nil : value
+    }
+
+    private func captureAmount(prefix: String, in input: String) -> Double? {
+        guard let lineValue = captureLineValue(prefix: prefix, in: input) else {
+            return nil
+        }
+
+        let cleaned = lineValue
+            .replacingOccurrences(of: "$", with: "")
+            .replacingOccurrences(of: ",", with: "")
+        return Double(cleaned)
+    }
+
+    private func refinedMerchantName(parsedMerchant: String, hints: ReceiptHints) -> String {
+        let normalizedParsed = parsedMerchant.normalizedMerchantName()
+        let normalizedHint = hints.likelyMerchant?.normalizedMerchantName()
+        let normalizedCandidates = hints.merchantCandidates.map { $0.normalizedMerchantName() }
+
+        if isWeakReceiptMerchant(normalizedParsed),
+           let normalizedHint,
+           !normalizedHint.isEmpty {
+            return normalizedHint
+        }
+
+        if let normalizedHint,
+           !normalizedHint.isEmpty,
+           !normalizedParsed.isEmpty {
+            if merchantNamesAppearEquivalent(normalizedParsed, normalizedHint) {
+                return normalizedHint
+            }
+
+            if !normalizedCandidates.isEmpty,
+               !normalizedCandidates.contains(where: { merchantNamesAppearEquivalent(normalizedParsed, $0) }) {
+                return normalizedHint
+            }
+        }
+
+        return normalizedParsed
+    }
+
+    private func refinedAmountValue(parsedAmount: Double, hints: ReceiptHints) -> Double {
+        guard let likelyTotal = hints.likelyTotal, likelyTotal > 0 else {
+            return parsedAmount
+        }
+
+        let unsignedParsed = abs(parsedAmount)
+        let tolerance = max(0.05, likelyTotal * 0.015)
+        guard abs(unsignedParsed - likelyTotal) > tolerance else {
+            return parsedAmount
+        }
+
+        return parsedAmount < 0 ? -likelyTotal : likelyTotal
+    }
+
+    private func isWeakReceiptMerchant(_ merchant: String) -> Bool {
+        let normalized = merchant
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        if normalized.isEmpty || normalized == "unknown" {
+            return true
+        }
+
+        let weakTerms = [
+            "receipt", "customer copy", "merchant copy", "approved", "declined",
+            "visa", "mastercard", "amex", "terminal", "transaction"
+        ]
+        return weakTerms.contains { normalized.contains($0) }
+    }
+
+    private func merchantNamesAppearEquivalent(_ lhs: String, _ rhs: String) -> Bool {
+        let normalizedLHS = canonicalMerchantKey(lhs)
+        let normalizedRHS = canonicalMerchantKey(rhs)
+        return !normalizedLHS.isEmpty && normalizedLHS == normalizedRHS
+    }
+
+    private func canonicalMerchantKey(_ merchant: String) -> String {
+        merchant
+            .lowercased()
+            .replacingOccurrences(of: "[^a-z0-9]", with: "", options: .regularExpression)
     }
 
     /// Last-resort parser using regex to extract merchant, amount, category,

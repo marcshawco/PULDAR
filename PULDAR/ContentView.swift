@@ -54,6 +54,11 @@ struct ContentView: View {
         .environment(networkMonitor)
         .environment(storeKitManager)
         .environment(usageTracker)
+        .overlay {
+            WidgetSnapshotSyncView()
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
         .preferredColorScheme(preferredColorScheme)
         .task {
             guard !didWarmModelThisLaunch else { return }

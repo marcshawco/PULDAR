@@ -94,6 +94,7 @@ struct SettingsView: View {
                 dataExportSection
                 localBackupSection
                 appearanceSection
+                widgetsSection
                 customCategoriesSection
                 accountSection
                 dangerZoneSection
@@ -525,6 +526,23 @@ struct SettingsView: View {
                 ? "These are auto-accounted for every month."
                 : "Upgrade to Pro for recurring transactions and unlimited entries."
             )
+        }
+    }
+
+    private var widgetsSection: some View {
+        Section("Widgets") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Home Screen Snapshot")
+                    .font(.headline)
+
+                Text("Add the PULDAR widget to your Home Screen to see your remaining Fundamentals, Fun, and Future balances at a glance.")
+                    .foregroundStyle(AppColors.textSecondary)
+
+                Text("On your Home Screen, press and hold, tap Edit, then Add Widget and choose PULDAR.")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textTertiary)
+            }
+            .padding(.vertical, 4)
         }
     }
 

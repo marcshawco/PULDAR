@@ -513,7 +513,6 @@ struct DashboardView: View {
                     if !VNDocumentCameraViewController.isSupported {
                         presentTransientError(
                             ReceiptScannerError.unavailable.localizedDescription
-                                ?? "Receipt scanning isn’t available right now."
                         )
                         return
                     }

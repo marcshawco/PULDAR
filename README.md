@@ -84,7 +84,7 @@ Most budgeting apps force users to manually fill forms, select categories, and f
 
 PULDAR uses a single, simple unlock:
 
-- **PULDAR Pro: $2.99/month or $25/year**
+- **PULDAR Pro: $4.99/month or $49.99/year**
 - Product IDs: `puldar_pro_monthly`, `puldar_pro_yearly`
 
 Pro includes:

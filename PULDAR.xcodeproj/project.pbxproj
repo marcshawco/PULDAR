@@ -10,16 +10,47 @@
 		905C2C592F4F3781002A4368 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = A1E2F3042F4B14A0005F8971 /* MLX */; };
 		905C2C5A2F4F3781002A4368 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = A1E2F3052F4B14A0005F8971 /* MLXLLM */; };
 		905C2C5B2F4F3781002A4368 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = A1E2F3062F4B14A0005F8971 /* MLXLMCommon */; };
+		B10000012F5A000100000001 /* PULDARWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B10000022F5A000100000001 /* PULDARWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B10000032F5A000100000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 90DFF91E2F4B13B1005F8971 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B10000072F5A000100000001;
+			remoteInfo = PULDARWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B10000042F5A000100000001 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B10000012F5A000100000001 /* PULDARWidgets.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		90DFF9262F4B13B1005F8971 /* PULDAR.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PULDAR.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000022F5A000100000001 /* PULDARWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PULDARWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		90DFF9282F4B13B1005F8971 /* PULDAR */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = PULDAR;
+			sourceTree = "<group>";
+		};
+		B10000052F5A000100000001 /* PULDARWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PULDARWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -35,6 +66,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B10000062F5A000100000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -42,6 +80,7 @@
 			isa = PBXGroup;
 			children = (
 				90DFF9282F4B13B1005F8971 /* PULDAR */,
+				B10000052F5A000100000001 /* PULDARWidgets */,
 				90DFF9272F4B13B1005F8971 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -50,6 +89,7 @@
 			isa = PBXGroup;
 			children = (
 				90DFF9262F4B13B1005F8971 /* PULDAR.app */,
+				B10000022F5A000100000001 /* PULDARWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -64,10 +104,12 @@
 				90DFF9222F4B13B1005F8971 /* Sources */,
 				90DFF9232F4B13B1005F8971 /* Frameworks */,
 				90DFF9242F4B13B1005F8971 /* Resources */,
+				B10000042F5A000100000001 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				B10000082F5A000100000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				90DFF9282F4B13B1005F8971 /* PULDAR */,
@@ -82,6 +124,28 @@
 			productReference = 90DFF9262F4B13B1005F8971 /* PULDAR.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B10000072F5A000100000001 /* PULDARWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B100000D2F5A000100000001 /* Build configuration list for PBXNativeTarget "PULDARWidgets" */;
+			buildPhases = (
+				B10000092F5A000100000001 /* Sources */,
+				B10000062F5A000100000001 /* Frameworks */,
+				B100000A2F5A000100000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B10000052F5A000100000001 /* PULDARWidgets */,
+			);
+			name = PULDARWidgets;
+			packageProductDependencies = (
+			);
+			productName = PULDARWidgets;
+			productReference = B10000022F5A000100000001 /* PULDARWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -93,6 +157,9 @@
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					90DFF9252F4B13B1005F8971 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					B10000072F5A000100000001 = {
 						CreatedOnToolsVersion = 26.2;
 					};
 				};
@@ -116,12 +183,20 @@
 			projectRoot = "";
 			targets = (
 				90DFF9252F4B13B1005F8971 /* PULDAR */,
+				B10000072F5A000100000001 /* PULDARWidgets */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		90DFF9242F4B13B1005F8971 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B100000A2F5A000100000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -138,7 +213,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B10000092F5A000100000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B10000082F5A000100000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B10000072F5A000100000001 /* PULDARWidgets */;
+			targetProxy = B10000032F5A000100000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		90DFF92F2F4B13B2005F8971 /* Debug */ = {
@@ -336,6 +426,56 @@
 			};
 			name = Release;
 		};
+		B100000B2F5A000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = PULDARWidgets/PULDARWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3LZ2R96K44;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PULDARWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = marcshaw.PULDAR.PULDARWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B100000C2F5A000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = PULDARWidgets/PULDARWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3LZ2R96K44;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PULDARWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = marcshaw.PULDAR.PULDARWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -353,6 +493,15 @@
 			buildConfigurations = (
 				90DFF9322F4B13B2005F8971 /* Debug */,
 				90DFF9332F4B13B2005F8971 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B100000D2F5A000100000001 /* Build configuration list for PBXNativeTarget "PULDARWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B100000B2F5A000100000001 /* Debug */,
+				B100000C2F5A000100000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

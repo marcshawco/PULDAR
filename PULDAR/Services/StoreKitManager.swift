@@ -37,9 +37,9 @@ final class StoreKitManager {
         var marketingPrice: String {
             switch self {
             case .monthly:
-                return "$2.99/mo"
+                return "$4.99/mo"
             case .yearly:
-                return "$25/yr"
+                return "$49.99/yr"
             }
         }
 
@@ -48,7 +48,7 @@ final class StoreKitManager {
             case .monthly:
                 return nil
             case .yearly:
-                return "Best Value"
+                return "Save 17%"
             }
         }
     }
@@ -84,7 +84,7 @@ final class StoreKitManager {
             proProducts = products.sorted(by: Self.productSort)
             didLoadProducts = true
         } catch {
-            purchaseError = error.localizedDescription
+            purchaseError = Self.userVisibleErrorMessage(for: error)
         }
     }
 
@@ -147,7 +147,7 @@ final class StoreKitManager {
                 break
             }
         } catch {
-            purchaseError = error.localizedDescription
+            purchaseError = Self.userVisibleErrorMessage(for: error)
             HapticManager.warning()
         }
 
@@ -162,7 +162,7 @@ final class StoreKitManager {
             try await AppStore.sync()
             await checkEntitlement(force: true)
         } catch {
-            purchaseError = error.localizedDescription
+            purchaseError = Self.userVisibleErrorMessage(for: error)
             HapticManager.warning()
         }
 
@@ -205,5 +205,13 @@ final class StoreKitManager {
         default:
             return 2
         }
+    }
+
+    private static func userVisibleErrorMessage(for error: Error) -> String? {
+        let nsError = error as NSError
+        guard !(nsError.domain == "ASDErrorDomain" && nsError.code == 509) else {
+            return nil
+        }
+        return error.localizedDescription
     }
 }

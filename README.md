@@ -81,6 +81,21 @@ PULDAR is built around three jobs:
   - `JSON`
 - full device backup in JSON
 
+### Apple Wallet Import Readiness
+
+- FinanceKit-ready scaffolding for Apple Wallet account import
+- explicit eligibility gating for:
+  - supported iPhone / iOS
+  - FinanceKit framework availability
+  - Apple-granted entitlement
+- import provenance stored on expenses:
+  - source
+  - external transaction ID
+  - external account ID
+  - imported timestamp
+- duplicate protection for repeated imports
+- graceful fallback to manual entry, receipt scan, and export/import flows when FinanceKit is unavailable
+
 ### Local Support Tooling
 
 - optional on-device diagnostic logs
@@ -173,6 +188,17 @@ Current sync-related surfaces include:
 - custom categories
 - renamed categories
 
+### Apple Wallet Import Fallback
+
+When FinanceKit is unavailable or not yet approved for the app bundle, PULDAR falls back cleanly to:
+
+- manual text entry
+- receipt scanning
+- CSV export/import workflows
+- JSON export/backup workflows
+
+This keeps the core product usable without forcing a third-party bank aggregator.
+
 ---
 
 ## Diagnostics and Support
@@ -211,6 +237,7 @@ without collecting user data by default.
 - `LLMService` — model lifecycle, prompting, parse extraction, parse cache
 - `BudgetEngine` — financial math, allocation, rollover, cached month state
 - `CategoryManager` — canonical/custom category mapping
+- `FinanceKitManager` — Apple Wallet import gating, import preview, deduplication scaffolding, fallback messaging
 - `StoreKitManager` — subscriptions, restore, entitlement listening
 - `UsageTracker` — free-tier usage tracking
 - `DiagnosticLogger` — optional local support logging
@@ -237,6 +264,7 @@ without collecting user data by default.
 - **Subscriptions:** StoreKit 2
 - **Widgets:** WidgetKit
 - **Receipt OCR / scan:** Vision + VisionKit
+- **Apple Wallet import:** FinanceKit-ready scaffolding
 - **Cloud sync:** CloudKit + NSUbiquitousKeyValueStore
 - **On-device AI:** MLX, MLXLLM, MLXLMCommon, Tokenizers
 - **Model:** `mlx-community/Qwen2.5-0.5B-Instruct-4bit`
@@ -274,6 +302,16 @@ To test cross-device sync on real devices, make sure:
 - CloudKit is enabled in signing/capabilities
 - the correct iCloud container is provisioned for the app
 
+### FinanceKit / Apple Wallet Import
+
+PULDAR now includes the product and data-model groundwork for Apple Wallet transaction import, but live account authorization still depends on Apple approving the FinanceKit entitlement for the production bundle.
+
+Until that entitlement is active, the app will:
+
+- show Apple Wallet sync status in Settings
+- explain why live connection is unavailable
+- preserve manual entry, receipt scanning, and export/import fallbacks
+
 ---
 
 ## Known Development Notes
@@ -291,6 +329,8 @@ These are usually simulator/debugger environment messages rather than app logic 
 - onboarding → paywall → freemium fallback
 - monthly and yearly subscription purchase flow
 - restore purchases
+- Apple Wallet eligibility and fallback messaging
+- FinanceKit import deduplication once entitlement access is granted
 - widget rendering and refresh timing
 - receipt scanning on real receipts
 - multi-device iCloud sync behavior
@@ -306,5 +346,6 @@ Near-term priorities:
 - keep expense capture fast and trustworthy
 - keep budgeting understandable at a glance
 - improve multi-device reliability
+- prepare Apple Wallet import without compromising privacy or fallback usability
 - make support feasible without compromising privacy
 - strengthen the daily-use loop with widgets and smooth capture UX

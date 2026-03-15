@@ -148,7 +148,7 @@ struct DashboardView: View {
                     switch result {
                     case .success(let scannedText):
                         Task {
-                            _ = await submitExpense(scannedText)
+                            _ = await submitExpense(scannedText, source: .receiptScan)
                         }
                     case .failure(let error):
                         if error is CancellationError { return }
@@ -288,7 +288,10 @@ struct DashboardView: View {
 
     // MARK: - Submit Logic
 
-    private func submitExpense(_ rawInput: String) async -> Bool {
+    private func submitExpense(
+        _ rawInput: String,
+        source: Expense.SourceKind = .manual
+    ) async -> Bool {
         // Gate: paywall check
         if !storeKit.isPro && usageTracker.isAtLimit {
             showPaywall = true
@@ -331,7 +334,9 @@ struct DashboardView: View {
                 category: storageCategory,
                 bucket: storageBucket,
                 isOverspent: isExpenseOverspent(amount: signedAmount),
-                notes: rawInput
+                notes: rawInput,
+                source: source,
+                importedAt: source == .appleWalletSync ? .now : nil
             )
 
             let crossedIntoOverspent = didCrossIntoOverspent(
@@ -349,7 +354,8 @@ struct DashboardView: View {
                     "amount": String(format: "%.2f", signedAmount),
                     "category": storageCategory,
                     "budget": storageBucket.rawValue,
-                    "isIncome": isIncomeTransaction ? "true" : "false"
+                    "isIncome": isIncomeTransaction ? "true" : "false",
+                    "source": source.rawValue
                 ]
             )
 

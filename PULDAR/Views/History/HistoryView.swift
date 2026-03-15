@@ -575,7 +575,11 @@ struct HistoryView: View {
                 category: categoryManager.displayName(forStoredCategory: expense.category),
                 bucket: expense.bucket,
                 isOverspent: expense.isOverspent,
-                notes: expense.notes
+                notes: expense.notes,
+                source: expense.sourceKind.rawValue,
+                externalTransactionID: expense.externalTransactionID,
+                externalAccountID: expense.externalAccountID,
+                importedAt: expense.importedAt
             )
         }
 
@@ -712,6 +716,10 @@ struct HistoryView: View {
         let bucket: String
         let isOverspent: Bool
         let notes: String
+        let source: String
+        let externalTransactionID: String?
+        let externalAccountID: String?
+        let importedAt: Date?
     }
 
     private enum GroupingMode: String, CaseIterable, Identifiable {

@@ -19,6 +19,7 @@ struct SettingsView: View {
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(DiagnosticLogger.self) private var diagnosticLogger
+    @Environment(FinanceKitManager.self) private var financeKitManager
     @Environment(StoreKitManager.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -52,6 +53,7 @@ struct SettingsView: View {
     @State private var showDeleteAllAlert = false
     @State private var showBudgetAllocationInfo = false
     @State private var selectedBudgetInfoBucket: BudgetBucket?
+    @State private var financeKitNotice: FinanceKitManager.Notice?
     @AppStorage("appThemeMode") private var appThemeMode = "system"
     @AppStorage("didCompleteAppOnboarding") private var didCompleteAppOnboarding = false
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
@@ -98,6 +100,7 @@ struct SettingsView: View {
                 localBackupSection
                 appearanceSection
                 widgetsSection
+                appleWalletSyncSection
                 customCategoriesSection
                 accountSection
                 diagnosticsSection
@@ -131,6 +134,7 @@ struct SettingsView: View {
                 }
             }
             .onAppear {
+                financeKitManager.refreshAvailability()
                 if !store.isPro, budgetEngine.rolloverEnabled {
                     budgetEngine.rolloverEnabled = false
                 }
@@ -288,6 +292,13 @@ struct SettingsView: View {
                 }
             } message: {
                 Text(selectedBudgetInfoBucket?.infoExplanation ?? "")
+            }
+            .alert(item: $financeKitNotice) { notice in
+                Alert(
+                    title: Text(notice.title),
+                    message: Text(notice.message),
+                    dismissButton: .default(Text("OK"))
+                )
             }
         }
     }
@@ -547,6 +558,38 @@ struct SettingsView: View {
                     .foregroundStyle(AppColors.textTertiary)
             }
             .padding(.vertical, 4)
+        }
+    }
+
+    private var appleWalletSyncSection: some View {
+        Section("Apple Wallet Sync") {
+            VStack(alignment: .leading, spacing: 8) {
+                LabeledContent("Status", value: financeKitManager.statusTitle)
+
+                Text(financeKitManager.detailText)
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+
+                if let lastSyncError = financeKitManager.lastSyncError {
+                    Text(lastSyncError)
+                        .font(.caption)
+                        .foregroundStyle(AppColors.overspend)
+                }
+
+                if financeKitManager.lastImportedCount > 0 {
+                    Text("Last Apple Wallet import added \(financeKitManager.lastImportedCount) transaction(s).")
+                        .font(.caption2)
+                        .foregroundStyle(AppColors.textTertiary)
+                }
+
+                Button(financeKitManager.primaryActionTitle) {
+                    financeKitManager.refreshAvailability()
+                    financeKitNotice = financeKitManager.primaryActionNotice()
+                }
+            }
+            .padding(.vertical, 4)
+        } footer: {
+            Text("When available, this will import Apple Card, Apple Cash, and Savings activity without using third-party aggregators. If it is unavailable, PULDAR falls back to manual entry, receipt scanning, and CSV/JSON portability.")
         }
     }
 
@@ -1448,7 +1491,11 @@ struct SettingsView: View {
             category: expense.category,
             bucket: expense.bucket,
             isOverspent: expense.isOverspent,
-            notes: expense.notes
+            notes: expense.notes,
+            source: expense.sourceKind.rawValue,
+            externalTransactionID: expense.externalTransactionID,
+            externalAccountID: expense.externalAccountID,
+            importedAt: expense.importedAt
         )
     }
 
@@ -1481,6 +1528,10 @@ struct SettingsView: View {
         let bucket: String
         let isOverspent: Bool
         let notes: String
+        let source: String
+        let externalTransactionID: String?
+        let externalAccountID: String?
+        let importedAt: Date?
     }
 
     private struct LocalBackupRecurring: Codable {

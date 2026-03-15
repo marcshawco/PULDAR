@@ -8,6 +8,12 @@ import SwiftData
 /// via computed properties.
 @Model
 final class Expense {
+    enum SourceKind: String, Codable, CaseIterable {
+        case manual
+        case receiptScan
+        case appleWalletSync
+    }
+
     @Attribute(.unique)
     var id: UUID
     var merchant: String
@@ -17,6 +23,10 @@ final class Expense {
     var isOverspent: Bool = false
     var date: Date
     var notes: String             // Original user input preserved
+    var source: String?
+    var externalTransactionID: String?
+    var externalAccountID: String?
+    var importedAt: Date?
     var updatedAt: Date?
 
     init(
@@ -27,6 +37,10 @@ final class Expense {
         isOverspent: Bool = false,
         date: Date = .now,
         notes: String = "",
+        source: SourceKind = .manual,
+        externalTransactionID: String? = nil,
+        externalAccountID: String? = nil,
+        importedAt: Date? = nil,
         updatedAt: Date? = nil
     ) {
         self.id       = UUID()
@@ -37,6 +51,10 @@ final class Expense {
         self.isOverspent = isOverspent
         self.date     = date
         self.notes    = notes
+        self.source = source.rawValue
+        self.externalTransactionID = externalTransactionID
+        self.externalAccountID = externalAccountID
+        self.importedAt = importedAt
         self.updatedAt = updatedAt
     }
 
@@ -52,6 +70,10 @@ final class Expense {
 
     var normalizedMerchant: String {
         merchant.normalizedMerchantName()
+    }
+
+    var sourceKind: SourceKind {
+        SourceKind(rawValue: source ?? "") ?? .manual
     }
 
     func touchUpdatedAt() {

@@ -1,172 +1,244 @@
 # PULDAR
 
-> **Local-first AI budgeting for people who want speed, clarity, and control.**
+> **Offline-first budgeting for people who want speed, privacy, and daily clarity.**
 
-PULDAR is an iOS app that turns natural-language money input into structured, categorized transactions in seconds, fully on-device.
+PULDAR is a native iOS budgeting app that turns plain-English expense entry and receipt scans into structured transactions on-device. It combines fast capture, simple budget allocation, local-first storage, and optional privacy-friendly support tooling.
 
 Examples:
 
 - `spent 45 at whole foods`
-- `grandma gave me 50 for lunch`
-- `i put 200 into bitcoin`
+- `mom sent me 200`
+- `paid 176 for insurance`
 
-No cloud parsing. No latency-heavy round-trips. No waiting.
+No form-heavy flow. No required backend. No cloud AI parsing.
 
 ---
 
-## Why PULDAR
+## What PULDAR Does
 
-Most budgeting apps force users to manually fill forms, select categories, and fight slow UX. PULDAR removes that friction with:
+PULDAR is built around three jobs:
 
-- **Natural input** instead of form-first data entry
-- **On-device AI** for private, low-latency parsing
-- **Opinionated bucket budgeting** that is easy to understand at a glance
-- **Fast feedback loops** for daily spending decisions
+1. **Capture spending quickly**
+   - plain-English input
+   - receipt scanning with Apple camera/document scanning + OCR
+   - merchant/category cleanup on-device
+
+2. **Keep budgets understandable**
+   - three budget groups:
+     - **Fundamentals** for needs
+     - **Fun** for wants
+     - **Future** for savings and debt
+   - allocation presets:
+     - `50/30/20`
+     - `60/20/20`
+     - `Custom`
+
+3. **Keep users engaged daily**
+   - dashboard with bucket balances
+   - Home Screen widgets for remaining balances
+   - history filters and exports
 
 ---
 
 ## Product Highlights
 
-### AI Expense Capture (On-Device)
+### On-Device AI Capture
 
-- Parses merchant, amount, category, and transaction type from plain English
-- Handles credits/reductions (refunds, reimbursements, gifts)
-- Includes prompt guardrails for known misclassification patterns (e.g. investments)
+- parses merchant, amount, category, and transaction type from natural text
+- supports receipt scanning with Vision/VisionKit OCR
+- improves merchant and total extraction for real receipts
+- keeps parsing local to the device
 
-### Budgeting That Stays Understandable
+### Clear Budgeting Model
 
-- Three core buckets:
-  - **Fundamentals** (Needs)
-  - **Fun** (Wants)
-  - **Future You** (Savings / Debt)
-- Presets and custom allocation:
-  - `50/30/20`
-  - `60/20/20`
-  - `Custom`
-- Enforced **100% total allocation** before save
-- Overspend visibility with direct “Over by $X” signaling
+- three-budget system:
+  - **Fundamentals**
+  - **Fun**
+  - **Future**
+- monthly income setup:
+  - direct monthly income
+  - hourly pay + hours/week estimate
+- enforced `100%` allocation before saving
+- rollover budgeting for Pro users
+- overspend and remaining-state visibility
 
-### Dashboard Built for Decisions
+### Daily Utility
 
-- Donut chart modes: `Spent`, `Remaining`, `Breakdown`
-- Center KPI emphasis (percent used)
-- Per-bucket spend/remaining rows
-- Monthly “Remaining This Month” summary
-- Free AI usage indicator for clear plan limits
+- donut chart views for:
+  - `Spent`
+  - `Remaining`
+  - `Breakdown`
+- bucket progress rows
+- monthly remaining summary
+- Home Screen widget support for glanceable balances
 
-### History That Scales
+### History and Data Portability
 
-- Month selector
-- Advanced filter/sort sheet:
-  - Category
-  - Date range
-  - Amount range
-  - Merchant search
-  - Group by day/category/merchant
-  - Sort by newest/largest/A-Z
-- Inline transaction management with swipe-to-delete
+- month-based history view
+- category, merchant, date, amount, grouping, and sort filters
+- export support in both:
+  - `CSV`
+  - `JSON`
+- full device backup in JSON
 
-### Settings and Personalization
+### Local Support Tooling
 
-- Income modes:
-  - Monthly
-  - Hourly + hours/week (auto monthly estimate)
-- Theme controls:
-  - System
-  - Light
-  - Dark
-- Custom categories and bucket mapping
-- Safe destructive controls (delete-all with confirmation)
+- optional on-device diagnostic logs
+- disabled by default
+- user can export logs manually when support is needed
+- no automatic upload
 
 ---
 
-## Pro Strategy
+## Pricing Model
 
-PULDAR uses a single, simple unlock:
+PULDAR uses a trial-first subscription model:
 
-- **PULDAR Pro: $4.99/month or $49.99/year**
-- Product IDs: `puldar_pro_monthly`, `puldar_pro_yearly`
+- **14-day free trial**
+- **$4.99/month**
+- **$49.99/year**
 
-Pro includes:
+Product IDs:
 
-- Recurring expenses
-- Rollover budgets
-- Export and backup features
-- Expanded high-usage workflows
+- `puldar_pro_monthly`
+- `puldar_pro_yearly`
 
-Free includes local model download and metered AI entries.
+Users who decline the trial still get a restricted freemium experience.
+
+### Pro Includes
+
+- unlimited entries
+- recurring expenses
+- rollover budgets
+- full export workflows
+- higher-usage budgeting workflows
+
+### Free Includes
+
+- onboarding
+- on-device model download
+- limited AI-powered entries
+- manual budgeting flow
+- restricted but usable core experience
 
 ---
 
-## Privacy & Data Principles
+## Privacy and AI Boundary
 
-PULDAR is built with a local-first architecture:
+PULDAR is intentionally local-first:
 
-- LLM parsing is performed **on device**
-- Budget math is performed **in app**, not by AI
-- Transactions are stored locally with SwiftData
-- Lightweight state and feature flags use UserDefaults
-- No required backend to use core budgeting features
+- transaction parsing happens **on-device**
+- budget math happens in app code, **not** in the AI
+- core data is stored locally with SwiftData
+- lightweight state is stored with UserDefaults / iCloud key-value sync where appropriate
+
+### Important Disclaimer
+
+PULDAR is **not financial advice**.
+
+Its AI is used strictly for:
+
+- parsing receipt text
+- parsing plain-English expense input
+- categorizing transactions
+
+It is **not** used to provide:
+
+- investment recommendations
+- debt payoff strategies
+- portfolio advice
+- financial planning advice
+
+This boundary is intentional for both product clarity and legal safety.
 
 ---
 
-## Performance Engineering
+## Sync and Multi-Device Behavior
 
-PULDAR is optimized for “instant-feel” interaction.
+PULDAR is designed to stay local-first while still supporting multi-device use:
 
-Implemented optimizations:
+- SwiftData data attempts to sync through CloudKit when available
+- local fallback is used if CloudKit is unavailable
+- budget settings and category customizations sync through iCloud key-value storage
+- conflict handling uses timestamp-based last-write-wins for synced settings
+- sync writes are debounced for efficiency
 
-1. **Persistent LLM parse cache**
-   - Repeated inputs can return instantly
-2. **Monthly budget status cache**
-   - Avoids recomputing the same month snapshot
-3. **Startup model warm-up**
-   - Prepares model at launch to reduce first-use delay
-4. **Higher MLX cache budget**
-   - Improves generation smoothness under active use
+Current sync-related surfaces include:
 
-This project intentionally favors responsiveness over minimal app footprint.
+- expenses
+- recurring expenses
+- monthly income
+- rollover preference
+- budget allocation percentages
+- custom categories
+- renamed categories
+
+---
+
+## Diagnostics and Support
+
+Because PULDAR does not rely on a central user database, support tooling is built into the app:
+
+- optional local diagnostic logging
+- exportable diagnostics bundle
+- current budget state included in diagnostics export
+- user-controlled sharing flow
+
+This helps investigate issues like:
+
+- incorrect budget math
+- unexpected subscription state
+- export failures
+- recurring expense issues
+
+without collecting user data by default.
 
 ---
 
 ## Technical Architecture
 
-### App Layer
+### Main Views
 
-- `ContentView` — root tab shell and service injection
-- `DashboardView` — capture, budget state, and recent transactions
-- `HistoryView` — analysis, filters, sorting, and entry management
-- `SettingsView` — income/allocation/preferences/paywall access
+- `ContentView` — root shell, dependency injection, onboarding presentation
+- `DashboardView` — capture flow, budget state, recent transactions
+- `HistoryView` — filtering, grouping, exporting, deletion
+- `SettingsView` — income, allocation, diagnostics, export, personalization
+- `PaywallView` — trial-first subscription UI
+- `AppOnboardingView` — first-run onboarding
 
-### Domain Services
+### Core Services
 
-- `LLMService` — model lifecycle, prompting, generation, parse extraction, parse cache
-- `BudgetEngine` — all financial math, allocation, overspend/remaining, monthly cache
-- `CategoryManager` — built-in and custom category mapping
-- `StoreKitManager` — product load, purchase, entitlement restore/listening
-- `UsageTracker` — free-tier usage limits and weekly window logic
+- `LLMService` — model lifecycle, prompting, parse extraction, parse cache
+- `BudgetEngine` — financial math, allocation, rollover, cached month state
+- `CategoryManager` — canonical/custom category mapping
+- `StoreKitManager` — subscriptions, restore, entitlement listening
+- `UsageTracker` — free-tier usage tracking
+- `DiagnosticLogger` — optional local support logging
+- `WidgetBudgetSnapshotStore` — widget snapshot publishing
 
 ### Persistence
 
-- SwiftData models:
+- SwiftData:
   - `Expense`
   - `RecurringExpense`
-- UserDefaults:
-  - entitlement flags
-  - usage counters
-  - bucket percentages
-  - theme mode
-  - export/backup flags
-  - model download state
+- UserDefaults / iCloud KVS:
+  - usage state
+  - theme
+  - allocation settings
+  - diagnostics preference
+  - category settings
 
 ---
 
-## Stack
+## Apple Frameworks and Stack
 
-- **Language/UI:** Swift, SwiftUI
+- **UI:** SwiftUI
 - **Persistence:** SwiftData
-- **Monetization:** StoreKit 2
-- **On-Device AI:** MLX, MLXLLM, MLXLMCommon, Tokenizers
+- **Subscriptions:** StoreKit 2
+- **Widgets:** WidgetKit
+- **Receipt OCR / scan:** Vision + VisionKit
+- **Cloud sync:** CloudKit + NSUbiquitousKeyValueStore
+- **On-device AI:** MLX, MLXLLM, MLXLMCommon, Tokenizers
 - **Model:** `mlx-community/Qwen2.5-0.5B-Instruct-4bit`
 
 ---
@@ -176,71 +248,63 @@ This project intentionally favors responsiveness over minimal app footprint.
 ### Requirements
 
 - macOS with full Xcode installed
-- iOS simulator/device target (iOS 18+ recommended)
+- iOS target with modern SwiftUI / SwiftData support
+- iOS 18+ recommended for the current app experience
 
 ### Run
 
-1. Open `PULDAR.xcodeproj`
-2. Select scheme: `PULDAR`
+1. Open [PULDAR.xcodeproj](/Users/astral/Documents/PROJECTS/XCODE/PULDAR/PULDAR.xcodeproj)
+2. Select the `PULDAR` scheme
 3. Build and run
 
 ### StoreKit Testing
 
-- Config file: `PULDAR/Resources/Products.storekit`
-- Expected subscriptions: `puldar_pro_monthly`, `puldar_pro_yearly`
+- local config: `PULDAR/Resources/Products.storekit`
+- expected products:
+  - `puldar_pro_monthly`
+  - `puldar_pro_yearly`
+
+Note: actual introductory trial behavior still needs to be configured in App Store Connect / Xcode StoreKit configuration, not just in app copy.
+
+### iCloud / CloudKit
+
+To test cross-device sync on real devices, make sure:
+
+- the bundle has the correct iCloud capability
+- CloudKit is enabled in signing/capabilities
+- the correct iCloud container is provisioned for the app
 
 ---
 
-## Debug Log Triage
+## Known Development Notes
 
-### Usually Simulator/Debug Noise
+### Usually Harmless During Local Debugging
 
 - `ASDErrorDomain Code=509 "No active account"`
 - `App is being debugged, do not track this hang`
-- `RTIInputSystemClient ... valid sessionID`
-- `UIInputViewSetPlacementInvisible ...`
-- `Snapshotting a view ... UIKeyboardImpl`
+- `Message from debugger: killed`
 
-### Must Investigate
+These are usually simulator/debugger environment messages rather than app logic failures.
 
-- CoreGraphics `NaN` / non-finite value warnings
-- repeated AutoLayout conflicts from app-owned views
-- persistence or migration load failures
+### Areas Worth Validating Before Release
 
----
-
-## Quality Checklist
-
-Before release, verify:
-
-- First-launch model flow and warm-start behavior
-- Keyboard entry/dismiss UX on every input surface
-- Free-tier usage counting and reset windows
-- Pro purchase + restore flow
-- Overspend/remaining correctness across buckets
-- Swipe-to-delete on Home and History
-- Hourly income estimate math
-- Filter/sort/group consistency in History
-- Export/backup gating and unlocked flow
+- onboarding → paywall → freemium fallback
+- monthly and yearly subscription purchase flow
+- restore purchases
+- widget rendering and refresh timing
+- receipt scanning on real receipts
+- multi-device iCloud sync behavior
+- CSV / JSON export output
+- diagnostic export flow
 
 ---
 
-## Product Direction
+## Current Product Direction
 
-Near-term focus:
+Near-term priorities:
 
-- Keep interactions fluid under heavy transaction history
-- Improve AI recategorization/edit ergonomics
-- Strengthen backup/restore flows for device migration
-- Continue reducing input-to-commit latency
-
----
-
-## Repo Status
-
-This codebase is actively iterated with strong emphasis on:
-
-- Performance
-- Clarity of financial state
-- Reliable local-first behavior
-- High polish iOS UX
+- keep expense capture fast and trustworthy
+- keep budgeting understandable at a glance
+- improve multi-device reliability
+- make support feasible without compromising privacy
+- strengthen the daily-use loop with widgets and smooth capture UX

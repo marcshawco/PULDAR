@@ -46,9 +46,9 @@ final class StoreKitManager {
         var badge: String? {
             switch self {
             case .monthly:
-                return nil
+                return "14 Days Free"
             case .yearly:
-                return "Save 17%"
+                return "14 Days Free + Save 17%"
             }
         }
     }

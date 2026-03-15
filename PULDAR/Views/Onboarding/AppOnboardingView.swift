@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct AppOnboardingView: View {
+    @Environment(StoreKitManager.self) private var store
+
     private struct OnboardingPage: Identifiable {
         let id = UUID()
         let title: String
@@ -14,6 +16,7 @@ struct AppOnboardingView: View {
     let onCompleted: () -> Void
 
     @State private var currentPage = 0
+    @State private var showTrialOffer = false
 
     private let pages: [OnboardingPage] = [
         .init(
@@ -64,6 +67,18 @@ struct AppOnboardingView: View {
                 "Open the app only when you need detail"
             ]
         ),
+        .init(
+            title: "Try Pro First",
+            subtitle: "Start with 14 days free, then decide what fits.",
+            detail: "We’ll offer the trial immediately so high-intent users can unlock the full experience right away. If you pass for now, you will still get a restricted freemium version to keep building conviction.",
+            symbol: "gift.fill",
+            accent: AppColors.accent,
+            highlights: [
+                "14 full days of Pro access",
+                "Yearly saves money vs monthly",
+                "Skip now and keep using free"
+            ]
+        ),
     ]
 
     var body: some View {
@@ -99,6 +114,13 @@ struct AppOnboardingView: View {
                 .padding(.vertical, 24)
             }
             .interactiveDismissDisabled(true)
+            .sheet(isPresented: $showTrialOffer) {
+                PaywallView(context: .onboardingTrial) {
+                    showTrialOffer = false
+                    onCompleted()
+                }
+                .environment(store)
+            }
         }
     }
 
@@ -190,11 +212,11 @@ struct AppOnboardingView: View {
 
             if currentPage == pages.count - 1 {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Next up: local AI setup")
+                    Text("Next up: trial or freemium")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(AppColors.textPrimary)
 
-                    Text("After this intro, we’ll download the one-time on-device AI model so your entries and receipt scans stay private.")
+                    Text("We’ll present the 14-day trial right away. If you skip it, you will still land in the limited free version and can upgrade later.")
                         .font(.footnote)
                         .foregroundStyle(AppColors.textSecondary)
                 }
@@ -232,9 +254,9 @@ struct AppOnboardingView: View {
                 )
             }
 
-            Button(currentPage == pages.count - 1 ? "Continue to Setup" : "Continue") {
+            Button(currentPage == pages.count - 1 ? "See Trial Options" : "Continue") {
                 if currentPage == pages.count - 1 {
-                    onCompleted()
+                    showTrialOffer = true
                 } else {
                     currentPage += 1
                 }

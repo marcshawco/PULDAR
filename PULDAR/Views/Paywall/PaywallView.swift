@@ -6,13 +6,26 @@ import StoreKit
 /// Triggered when the user exhausts 10 free monthly inputs.
 /// Offers monthly or yearly Pro subscriptions.
 struct PaywallView: View {
+    enum Context {
+        case standard
+        case onboardingTrial
+    }
+
     @Environment(StoreKitManager.self) private var store
     @Environment(\.dismiss) private var dismiss
+
+    let context: Context
+    var onFinished: (() -> Void)? = nil
 
     @State private var lockWobble: Double = 0
     @State private var isUnlocked = false
     @State private var featuresAppeared = false
     @State private var selectedPlan: StoreKitManager.ProPlan = .yearly
+
+    init(context: Context = .standard, onFinished: (() -> Void)? = nil) {
+        self.context = context
+        self.onFinished = onFinished
+    }
 
     var body: some View {
         VStack(spacing: 28) {
@@ -41,12 +54,17 @@ struct PaywallView: View {
 
             // ── Headline ───────────────────────────────────────────────
             VStack(spacing: 6) {
-                Text("PULDAR Pro")
+                Text(context == .onboardingTrial ? "Start Your 14-Day Trial" : "PULDAR Pro")
                     .font(.title2.bold())
 
-                Text("Unlimited AI expense tracking")
+                Text(
+                    context == .onboardingTrial
+                    ? "Get full access right away, or continue with the restricted free version and upgrade later."
+                    : "Unlimited AI expense tracking"
+                )
                     .font(.subheadline)
                     .foregroundStyle(AppColors.textSecondary)
+                    .multilineTextAlignment(.center)
             }
 
             // ── Feature List ───────────────────────────────────────────
@@ -58,6 +76,9 @@ struct PaywallView: View {
                 featureRow(icon: "chart.pie",        text: "Full budget analytics")
                 featureRow(icon: "calendar",         text: "Choose monthly or yearly billing")
                 featureRow(icon: "lock.shield",      text: "100% local & private")
+                if context == .onboardingTrial {
+                    featureRow(icon: "gift", text: "14 days free before billing begins")
+                }
             }
             .padding(.horizontal, 32)
             .opacity(featuresAppeared ? 1 : 0)
@@ -86,7 +107,7 @@ struct PaywallView: View {
                             if store.isPro {
                                 withAnimation(.spring(duration: 0.5)) { isUnlocked = true }
                                 try? await Task.sleep(for: .seconds(1.2))
-                                dismiss()
+                                finishFlow()
                             }
                         }
                     } label: {
@@ -117,7 +138,7 @@ struct PaywallView: View {
                     Task {
                         await store.restorePurchases()
                         if store.isPro {
-                            dismiss()
+                            finishFlow()
                         }
                     }
                 }
@@ -125,11 +146,24 @@ struct PaywallView: View {
                 .foregroundStyle(AppColors.textTertiary)
                 .disabled(store.isLoading)
 
-                Text("Subscriptions renew automatically until canceled in App Store settings. Cancel anytime before renewal.")
+                Text(
+                    context == .onboardingTrial
+                    ? "Free for 14 days, then \(selectedPlan == .yearly ? "$49.99/year" : "$4.99/month"). Cancel anytime in App Store settings before renewal. If you skip, you can still use the limited free version."
+                    : "Subscriptions renew automatically until canceled in App Store settings. Cancel anytime before renewal."
+                )
                     .font(.caption2)
                     .foregroundStyle(AppColors.textTertiary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
+
+                if context == .onboardingTrial {
+                    Button("Continue with Limited Free Version") {
+                        finishFlow()
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppColors.textSecondary)
+                    .disabled(store.isLoading)
+                }
 
                 if let error = store.purchaseError {
                     Text(error)
@@ -142,7 +176,7 @@ struct PaywallView: View {
 
             Spacer().frame(height: 20)
         }
-        .interactiveDismissDisabled(store.isLoading)
+        .interactiveDismissDisabled(context == .onboardingTrial || store.isLoading)
         .task {
             await store.loadProducts()
             await store.checkEntitlement()
@@ -205,6 +239,10 @@ struct PaywallView: View {
     }
 
     private var primaryButtonTitle: String {
+        if context == .onboardingTrial {
+            return "Start 14-Day Free Trial"
+        }
+
         let plan = selectedPlan
         let price = store.product(for: plan)?.displayPrice ?? plan.marketingPrice
         return "Start \(plan.marketingTitle) for \(price)"
@@ -220,6 +258,14 @@ struct PaywallView: View {
             Text(text)
                 .font(.subheadline)
                 .foregroundStyle(AppColors.textPrimary)
+        }
+    }
+
+    private func finishFlow() {
+        if let onFinished {
+            onFinished()
+        } else {
+            dismiss()
         }
     }
 }

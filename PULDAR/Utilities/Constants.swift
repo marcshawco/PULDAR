@@ -27,7 +27,7 @@ enum AppColors {
 
 enum AppConstants {
     static let freeInputsPerMonth = 10
-    static let proPrice = "$4.99/mo or $49.99/yr"
+    static let proPrice = "14-day trial, then $4.99/mo or $49.99/yr"
     static let proMonthlyProductID = "puldar_pro_monthly"
     static let proYearlyProductID = "puldar_pro_yearly"
     static let legacyProLifetimeProductID = "puldar_pro_lifetime"

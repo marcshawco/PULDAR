@@ -554,13 +554,13 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Unlock Premium Features")
                         .font(.subheadline.weight(.semibold))
-                    Text("Unlimited entries, recurring expenses, rollover budgets, and CSV exports.")
+                    Text("Start with a 14-day trial, then unlock unlimited entries, recurring expenses, rollover budgets, and CSV exports.")
                         .font(.caption)
                         .foregroundStyle(AppColors.textSecondary)
                     Button {
                         showPaywall = true
                     } label: {
-                        Label("Upgrade for \(AppConstants.proPrice)", systemImage: "sparkles")
+                        Label("Start trial: \(AppConstants.proPrice)", systemImage: "sparkles")
                     }
                 }
                 .padding(.vertical, 4)

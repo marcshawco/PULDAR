@@ -19,13 +19,14 @@ struct ExpenseInputView: View {
     @State private var showCheckmark = false
     @State private var shakeOffset: CGFloat = 0
     @FocusState private var isFocused: Bool
+    @ScaledMetric(relativeTo: .body) private var actionButtonSize = 40
 
     var body: some View {
         HStack(spacing: 10) {
             // ── Text Field ─────────────────────────────────────────────
             HStack(spacing: 8) {
                 Image(systemName: "text.cursor")
-                    .font(.system(size: 14, weight: .ultraLight))
+                    .font(.caption.weight(.light))
                     .foregroundStyle(AppColors.textTertiary)
 
                 TextField(
@@ -49,7 +50,7 @@ struct ExpenseInputView: View {
                         isFocused = false
                     } label: {
                         Image(systemName: "keyboard.chevron.compact.down")
-                            .font(.system(size: 14, weight: .regular))
+                            .font(.caption.weight(.regular))
                             .foregroundStyle(AppColors.textTertiary)
                     }
                     .buttonStyle(.plain)
@@ -86,8 +87,8 @@ struct ExpenseInputView: View {
                 onCameraTap?()
             } label: {
                 Image(systemName: "camera")
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 40, height: 40)
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: actionButtonSize, height: actionButtonSize)
                     .background(
                         Circle()
                             .fill(AppColors.secondaryBg)
@@ -106,11 +107,11 @@ struct ExpenseInputView: View {
                             .scaleEffect(0.8)
                     } else {
                         Image(systemName: showCheckmark ? "checkmark" : "arrow.up")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.subheadline.weight(.semibold))
                             .contentTransition(.symbolEffect(.replace))
                     }
                 }
-                .frame(width: 40, height: 40)
+                .frame(width: actionButtonSize, height: actionButtonSize)
                 .background(
                     Circle()
                         .fill(buttonColor)

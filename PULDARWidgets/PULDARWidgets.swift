@@ -152,10 +152,13 @@ private struct PULDARBudgetWidgetEntryView: View {
                         Text(bucket.name)
                             .font(.caption2.weight(.medium))
                             .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                         Spacer(minLength: 4)
                         Text(displayAmount(for: bucket, currencyCode: snapshot.currencyCode))
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(bucket.isOverspent && selectedMode == .remaining ? .red : .primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                 }
             }
@@ -190,9 +193,13 @@ private struct PULDARBudgetWidgetEntryView: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(bucket.name)
                                 .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
                             Text(bucket.subtitle)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
                         }
 
                         Spacer()
@@ -201,9 +208,13 @@ private struct PULDARBudgetWidgetEntryView: View {
                             Text(displayAmount(for: bucket, currencyCode: snapshot.currencyCode))
                                 .font(.subheadline.weight(.bold))
                                 .foregroundStyle(bucket.isOverspent && selectedMode == .remaining ? .red : .primary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
                             Text(secondaryLabel(for: bucket, currencyCode: snapshot.currencyCode))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
                         }
                     }
                 }
@@ -318,11 +329,15 @@ private struct PULDARQuickAddWidgetView: View {
                 Text("Quick Add")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
                 Text("Open PULDAR and start typing an expense right away.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.leading)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.85)
 
                 if let snapshot = entry.snapshot {
                     Text("\(snapshot.totalRemaining.formatted(.currency(code: snapshot.currencyCode))) left")
@@ -403,31 +418,21 @@ private struct PULDARQuickAddWidgetView: View {
             Spacer(minLength: 0)
 
             HStack(spacing: 8) {
-                quickActionCard(
+                quickAddLink(
+                    url: "puldar://quick-add",
                     title: "Type",
-                    subtitle: nil,
+                    subtitle: "",
                     systemImage: "text.cursor"
                 )
-                .widgetAccentable()
-                .overlay {
-                    Link(destination: URL(string: "puldar://quick-add")!) {
-                        Color.clear
-                    }
-                }
 
-                quickActionCard(
+                quickAddLink(
+                    url: "puldar://scan-receipt",
                     title: "Scan",
-                    subtitle: nil,
+                    subtitle: "",
                     systemImage: "camera"
                 )
-                .widgetAccentable()
-                .overlay {
-                    Link(destination: URL(string: "puldar://scan-receipt")!) {
-                        Color.clear
-                    }
-                }
             }
-            .frame(width: 150)
+            .frame(maxWidth: 150)
         }
     }
 
@@ -440,7 +445,7 @@ private struct PULDARQuickAddWidgetView: View {
         Link(destination: URL(string: url)!) {
             quickActionCard(
                 title: title,
-                subtitle: subtitle,
+                subtitle: subtitle.isEmpty ? nil : subtitle,
                 systemImage: systemImage
             )
         }

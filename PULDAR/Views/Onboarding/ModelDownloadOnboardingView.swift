@@ -23,51 +23,57 @@ struct ModelDownloadOnboardingView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Down Local AI")
-                    .font(.largeTitle.bold())
+            GeometryReader { proxy in
+                let compact = proxy.size.height < 760 || proxy.size.width < 390
 
-                Text("PULDAR runs AI fully on-device. We download a one-time model so your expense text never leaves your phone.")
-                    .font(.body)
-                    .foregroundStyle(AppColors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity, alignment: .center)
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: compact ? 16 : 20) {
+                        Text("Down Local AI")
+                            .font(compact ? .title2.bold() : .largeTitle.bold())
 
-                VStack(alignment: .leading, spacing: 10) {
-                    infoRow(icon: "lock.shield", text: "Private: processing stays local")
-                    infoRow(icon: "icloud.and.arrow.down", text: "One-time download (~400 MB)")
-                    infoRow(icon: "wifi", text: networkMonitor.connectionLabel)
-                }
-                .padding(14)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(AppColors.secondaryBg)
-                )
-                .frame(maxWidth: .infinity, alignment: .center)
+                        Text("PULDAR runs AI fully on-device. We download a one-time model so your expense text never leaves your phone.")
+                            .font(compact ? .callout : .body)
+                            .foregroundStyle(AppColors.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, alignment: .center)
 
-                modelStatus
-
-                Spacer()
-
-                Button(action: startDownloadTapped) {
-                    Text(primaryButtonTitle)
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        VStack(alignment: .leading, spacing: compact ? 8 : 10) {
+                            infoRow(icon: "lock.shield", text: "Private: processing stays local", compact: compact)
+                            infoRow(icon: "icloud.and.arrow.down", text: "One-time download (~400 MB)", compact: compact)
+                            infoRow(icon: "wifi", text: networkMonitor.connectionLabel, compact: compact)
+                        }
+                        .padding(compact ? 12 : 14)
                         .background(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(buttonColor)
+                                .fill(AppColors.secondaryBg)
                         )
-                        .foregroundStyle(.white)
-                }
-                .disabled(primaryButtonDisabled)
+                        .frame(maxWidth: .infinity, alignment: .center)
 
-                Text("If you continue on cellular data, charges may apply.")
-                    .font(.caption)
-                    .foregroundStyle(AppColors.textTertiary)
-                    .frame(maxWidth: .infinity, alignment: .center)
+                        modelStatus
+
+                        Spacer(minLength: compact ? 12 : 20)
+
+                        Button(action: startDownloadTapped) {
+                            Text(primaryButtonTitle)
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, compact ? 12 : 14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(buttonColor)
+                                )
+                                .foregroundStyle(.white)
+                        }
+                        .disabled(primaryButtonDisabled)
+
+                        Text("If you continue on cellular data, charges may apply.")
+                            .font(.caption)
+                            .foregroundStyle(AppColors.textTertiary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                    .padding(compact ? 16 : 20)
+                }
             }
-            .padding(20)
             .interactiveDismissDisabled(true)
             .confirmationDialog(
                 "You are not on Wi-Fi",
@@ -141,13 +147,14 @@ struct ModelDownloadOnboardingView: View {
         primaryButtonDisabled ? Color.gray.opacity(0.6) : AppColors.accent
     }
 
-    private func infoRow(icon: String, text: String) -> some View {
+    private func infoRow(icon: String, text: String, compact: Bool) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .regular))
+                .font(.system(size: compact ? 13 : 14, weight: .regular))
                 .frame(width: 18)
             Text(text)
-                .font(.subheadline)
+                .font(compact ? .footnote : .subheadline)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(AppColors.textPrimary)
     }

@@ -27,9 +27,11 @@ struct DashboardView: View {
     @Environment(AppPreferences.self) private var appPreferences
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(CategoryManager.self) private var categoryManager
+    @Environment(NetworkMonitor.self) private var networkMonitor
     @Environment(StoreKitManager.self) private var storeKit
     @Environment(UsageTracker.self) private var usageTracker
     @Environment(DiagnosticLogger.self) private var diagnosticLogger
+    @Environment(FinanceKitManager.self) private var financeKitManager
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
@@ -138,12 +140,21 @@ struct DashboardView: View {
                     didCompleteModelOnboarding = true
                     showModelOnboarding = false
                 }
+                .environment(llmService)
+                .environment(networkMonitor)
             }
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
+                    .environment(storeKit)
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView()
+                    .environment(budgetEngine)
+                    .environment(appPreferences)
+                    .environment(categoryManager)
+                    .environment(diagnosticLogger)
+                    .environment(financeKitManager)
+                    .environment(storeKit)
             }
             .sheet(isPresented: $showReceiptScanner) {
                 ReceiptScannerView(currencyCode: appPreferences.currencyCode) { result in

@@ -335,42 +335,118 @@ private struct PULDARQuickAddWidgetView: View {
     }
 
     private var mediumQuickAdd: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        ViewThatFits(in: .vertical) {
+            mediumQuickAddExpanded
+            mediumQuickAddCompact
+        }
+        .padding(14)
+    }
+
+    private var mediumQuickAddExpanded: some View {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Quick Add")
                 .font(.headline.weight(.semibold))
+                .lineLimit(1)
 
             Text("Jump straight into typing or scan a receipt in the app.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
 
             HStack(spacing: 10) {
-                Link(destination: URL(string: "puldar://quick-add")!) {
-                    quickActionCard(
-                        title: "Type Expense",
-                        subtitle: "Focus the composer",
-                        systemImage: "text.cursor"
-                    )
-                }
+                quickAddLink(
+                    url: "puldar://quick-add",
+                    title: "Type Expense",
+                    subtitle: "Focus composer",
+                    systemImage: "text.cursor"
+                )
 
-                Link(destination: URL(string: "puldar://scan-receipt")!) {
-                    quickActionCard(
-                        title: "Scan Receipt",
-                        subtitle: "Open the camera flow",
-                        systemImage: "camera"
-                    )
-                }
+                quickAddLink(
+                    url: "puldar://scan-receipt",
+                    title: "Scan Receipt",
+                    subtitle: "Open camera",
+                    systemImage: "camera"
+                )
             }
 
             if let snapshot = entry.snapshot {
                 Text("\(snapshot.totalRemaining.formatted(.currency(code: snapshot.currencyCode))) left this month")
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
         }
-        .padding(16)
     }
 
-    private func quickActionCard(title: String, subtitle: String, systemImage: String) -> some View {
+    private var mediumQuickAddCompact: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Quick Add")
+                    .font(.headline.weight(.semibold))
+                    .lineLimit(1)
+
+                Text("Type or scan in one tap.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                if let snapshot = entry.snapshot {
+                    Text("\(snapshot.totalRemaining.formatted(.currency(code: snapshot.currencyCode))) left")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: 8) {
+                quickActionCard(
+                    title: "Type",
+                    subtitle: nil,
+                    systemImage: "text.cursor"
+                )
+                .widgetAccentable()
+                .overlay {
+                    Link(destination: URL(string: "puldar://quick-add")!) {
+                        Color.clear
+                    }
+                }
+
+                quickActionCard(
+                    title: "Scan",
+                    subtitle: nil,
+                    systemImage: "camera"
+                )
+                .widgetAccentable()
+                .overlay {
+                    Link(destination: URL(string: "puldar://scan-receipt")!) {
+                        Color.clear
+                    }
+                }
+            }
+            .frame(width: 150)
+        }
+    }
+
+    private func quickAddLink(
+        url: String,
+        title: String,
+        subtitle: String,
+        systemImage: String
+    ) -> some View {
+        Link(destination: URL(string: url)!) {
+            quickActionCard(
+                title: title,
+                subtitle: subtitle,
+                systemImage: systemImage
+            )
+        }
+    }
+
+    private func quickActionCard(title: String, subtitle: String?, systemImage: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: systemImage)
                 .font(.body.weight(.semibold))
@@ -378,9 +454,14 @@ private struct PULDARQuickAddWidgetView: View {
             Text(title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
-            Text(subtitle)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)

@@ -14,15 +14,14 @@ final class Expense {
         case appleWalletSync
     }
 
-    @Attribute(.unique)
-    var id: UUID
-    var merchant: String
-    var amount: Double
-    var category: String          // Raw LLM category  →  ExpenseCategory
-    var bucket: String            // BudgetBucket.rawValue
+    var id: UUID = UUID()
+    var merchant: String = ""
+    var amount: Double = 0
+    var category: String = ExpenseCategory.other.rawValue          // Raw LLM category  →  ExpenseCategory
+    var bucket: String = BudgetBucket.fun.rawValue                 // BudgetBucket.rawValue
     var isOverspent: Bool = false
-    var date: Date
-    var notes: String             // Original user input preserved
+    var date: Date = Date()
+    var notes: String = ""        // Original user input preserved
     var source: String?
     var externalTransactionID: String?
     var externalAccountID: String?

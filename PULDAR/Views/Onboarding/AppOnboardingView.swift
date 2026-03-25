@@ -83,35 +83,43 @@ struct AppOnboardingView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                LinearGradient(
-                    colors: [
-                        AppColors.background,
-                        AppColors.secondaryBg,
-                        AppColors.background
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+            GeometryReader { proxy in
+                let isCompactHeight = proxy.size.height < 760
+                let headerSpacing: CGFloat = isCompactHeight ? 2 : 4
+                let verticalSpacing: CGFloat = isCompactHeight ? 16 : 24
+                let horizontalPadding: CGFloat = isCompactHeight ? 16 : 20
+                let verticalPadding: CGFloat = isCompactHeight ? 16 : 24
 
-                VStack(spacing: 24) {
-                    header
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            AppColors.background,
+                            AppColors.secondaryBg,
+                            AppColors.background
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
 
-                    TabView(selection: $currentPage) {
-                        ForEach(Array(pages.enumerated()), id: \.offset) { index, page in
-                            pageCard(page)
-                                .tag(index)
+                    VStack(spacing: verticalSpacing) {
+                        header(spacing: headerSpacing, compact: isCompactHeight)
+
+                        TabView(selection: $currentPage) {
+                            ForEach(Array(pages.enumerated()), id: \.offset) { index, page in
+                                pageCard(page, compact: isCompactHeight)
+                                    .tag(index)
+                            }
                         }
+                        .tabViewStyle(.page(indexDisplayMode: .never))
+
+                        pageIndicator
+
+                        ctaRow(compact: isCompactHeight)
                     }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
-
-                    pageIndicator
-
-                    ctaRow
+                    .padding(.horizontal, horizontalPadding)
+                    .padding(.vertical, verticalPadding)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 24)
             }
             .interactiveDismissDisabled(true)
             .sheet(isPresented: $showTrialOffer) {
@@ -124,14 +132,14 @@ struct AppOnboardingView: View {
         }
     }
 
-    private var header: some View {
+    private func header(spacing: CGFloat, compact: Bool) -> some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: spacing) {
                 Text("Welcome to PULDAR")
-                    .font(.largeTitle.bold())
+                    .font(compact ? .largeTitle.weight(.bold) : .largeTitle.bold())
 
                 Text("A calmer way to track spending.")
-                    .font(.subheadline)
+                    .font(compact ? .footnote : .subheadline)
                     .foregroundStyle(AppColors.textSecondary)
             }
 
@@ -139,70 +147,82 @@ struct AppOnboardingView: View {
         }
     }
 
-    private func pageCard(_ page: OnboardingPage) -> some View {
-        VStack(alignment: .leading, spacing: 22) {
-            ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 30, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                page.accent.opacity(0.18),
-                                AppColors.secondaryBg
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(height: 260)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 30, style: .continuous)
-                            .stroke(page.accent.opacity(0.18), lineWidth: 1)
-                    )
+    private func pageCard(_ page: OnboardingPage, compact: Bool) -> some View {
+        let cardSpacing: CGFloat = compact ? 16 : 22
+        let cardPadding: CGFloat = compact ? 18 : 24
+        let heroSpacing: CGFloat = compact ? 14 : 18
+        let textSpacing: CGFloat = compact ? 8 : 10
+        let highlightSpacing: CGFloat = compact ? 8 : 12
+        let highlightVerticalPadding: CGFloat = compact ? 10 : 12
+        let iconSize: CGFloat = compact ? 34 : 42
 
-                Circle()
-                    .fill(page.accent.opacity(0.12))
-                    .frame(width: 120, height: 120)
-                    .offset(x: 22, y: -14)
+        return VStack(alignment: .leading, spacing: cardSpacing) {
+            VStack(alignment: .leading, spacing: heroSpacing) {
+                Image(systemName: page.symbol)
+                    .font(.system(size: iconSize, weight: .light))
+                    .foregroundStyle(page.accent)
 
-                VStack(alignment: .leading, spacing: 18) {
-                    Image(systemName: page.symbol)
-                        .font(.system(size: 44, weight: .light))
-                        .foregroundStyle(page.accent)
+                VStack(alignment: .leading, spacing: textSpacing) {
+                    Text(page.title)
+                        .font(compact ? .title3.weight(.bold) : .title2.weight(.bold))
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(page.title)
-                            .font(.title2.weight(.bold))
-                            .fixedSize(horizontal: false, vertical: true)
+                    Text(page.subtitle)
+                        .font(compact ? .subheadline.weight(.medium) : .headline.weight(.medium))
+                        .foregroundStyle(AppColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                        Text(page.subtitle)
-                            .font(.headline.weight(.medium))
-                            .foregroundStyle(AppColors.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text(page.detail)
-                            .font(.body)
-                            .foregroundStyle(AppColors.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    Text(page.detail)
+                        .font(compact ? .callout : .body)
+                        .foregroundStyle(AppColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(24)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(cardPadding)
+            .background {
+                ZStack(alignment: .topTrailing) {
+                    RoundedRectangle(cornerRadius: 30, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    page.accent.opacity(0.18),
+                                    AppColors.secondaryBg
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    Circle()
+                        .fill(page.accent.opacity(0.12))
+                        .frame(width: 120, height: 120)
+                        .offset(x: 22, y: -14)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 30, style: .continuous)
+                        .stroke(page.accent.opacity(0.18), lineWidth: 1)
+                }
             }
 
-            VStack(spacing: 12) {
+            VStack(spacing: highlightSpacing) {
                 ForEach(page.highlights, id: \.self) { item in
                     HStack(spacing: 12) {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.system(size: compact ? 14 : 16, weight: .semibold))
                             .foregroundStyle(page.accent)
 
                         Text(item)
-                            .font(.subheadline.weight(.medium))
+                            .font(compact ? .footnote.weight(.medium) : .subheadline.weight(.medium))
                             .foregroundStyle(AppColors.textPrimary)
-
-                        Spacer()
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.9)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, highlightVerticalPadding)
                     .background(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(AppColors.secondaryBg)
@@ -213,11 +233,11 @@ struct AppOnboardingView: View {
             if currentPage == pages.count - 1 {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Next up: trial or freemium")
-                        .font(.footnote.weight(.semibold))
+                        .font((compact ? Font.caption : .footnote).weight(.semibold))
                         .foregroundStyle(AppColors.textPrimary)
 
                     Text("We’ll present the 14-day trial right away. If you skip it, you will still land in the limited free version and can upgrade later.")
-                        .font(.footnote)
+                        .font(compact ? .caption : .footnote)
                         .foregroundStyle(AppColors.textSecondary)
                 }
                 .padding(.top, 4)
@@ -225,7 +245,7 @@ struct AppOnboardingView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, compact ? 0 : 8)
     }
 
     private var pageIndicator: some View {
@@ -239,7 +259,7 @@ struct AppOnboardingView: View {
         .animation(.spring(duration: 0.3), value: currentPage)
     }
 
-    private var ctaRow: some View {
+    private func ctaRow(compact: Bool) -> some View {
         HStack(spacing: 12) {
             if currentPage > 0 {
                 Button("Back") {
@@ -247,7 +267,7 @@ struct AppOnboardingView: View {
                 }
                 .font(.headline)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 15)
+                .padding(.vertical, compact ? 13 : 15)
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(AppColors.secondaryBg)
@@ -263,7 +283,7 @@ struct AppOnboardingView: View {
             }
             .font(.headline)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 15)
+            .padding(.vertical, compact ? 13 : 15)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(AppColors.accent)

@@ -45,12 +45,21 @@ final class AppPreferences {
 
         var code: String { rawValue.uppercased() }
 
+        var symbol: String {
+            switch self {
+            case .usd: return "$"
+            case .eur: return "€"
+            case .gbp: return "£"
+            case .cad: return "C$"
+            }
+        }
+
         var title: String {
             switch self {
-            case .usd: return "US Dollar (USD)"
-            case .eur: return "Euro (EUR)"
-            case .gbp: return "British Pound (GBP)"
-            case .cad: return "Canadian Dollar (CAD)"
+            case .usd: return "$ USD"
+            case .eur: return "€ EUR"
+            case .gbp: return "£ GBP"
+            case .cad: return "C$ CAD"
             }
         }
     }

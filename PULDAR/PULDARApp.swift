@@ -17,17 +17,17 @@ struct PULDARApp: App {
         ])
 
         do {
-            return try makeModelContainer(schema: schema, cloudSyncEnabled: true)
+            return try makeCloudModelContainer(schema: schema)
         } catch {
+            // Recover from known migration-validation failures by resetting the stores.
             if shouldRecoverByResetStore(from: error) {
-                // Recover from known migration-validation failure (e.g. required field introduced).
-                clearDefaultStoreFiles()
+                clearKnownStoreFiles()
 
                 do {
-                    return try makeModelContainer(schema: schema, cloudSyncEnabled: true)
+                    return try makeCloudModelContainer(schema: schema)
                 } catch {
                     do {
-                        return try makeModelContainer(schema: schema, cloudSyncEnabled: false)
+                        return try makeLocalModelContainer(schema: schema)
                     } catch {
                         fatalError("Failed to create ModelContainer after store reset: \(error)")
                     }
@@ -35,7 +35,7 @@ struct PULDARApp: App {
             }
 
             do {
-                return try makeModelContainer(schema: schema, cloudSyncEnabled: false)
+                return try makeLocalModelContainer(schema: schema)
             } catch {
                 fatalError("Failed to create ModelContainer: \(error)")
             }
@@ -49,55 +49,95 @@ struct PULDARApp: App {
         .modelContainer(Self.sharedModelContainer)
     }
 
-    private static func clearDefaultStoreFiles() {
+    private static func clearKnownStoreFiles() {
+        let fm = FileManager.default
+        for url in knownStoreURLs() where fm.fileExists(atPath: url.path) {
+            try? fm.removeItem(at: url)
+        }
+    }
+
+    private static func knownStoreURLs() -> [URL] {
+        let urls = [localStoreURL(), cloudStoreURL()]
+
+        return urls.flatMap { url in
+            [
+                url,
+                url.appendingPathExtension("shm"),
+                url.appendingPathExtension("wal"),
+            ]
+        }
+    }
+
+    private static func localStoreURL() -> URL {
         let fm = FileManager.default
         guard let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            return
+            preconditionFailure("Application Support directory is unavailable.")
         }
 
-        let knownNames = [
-            "default.store",
-            "default.store-shm",
-            "default.store-wal",
-        ]
-
-        for name in knownNames {
-            let url = appSupport.appendingPathComponent(name)
-            if fm.fileExists(atPath: url.path) {
-                try? fm.removeItem(at: url)
-            }
+        let directory = appSupport.appendingPathComponent("PULDAR", isDirectory: true)
+        if !fm.fileExists(atPath: directory.path) {
+            try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
         }
+
+        return directory.appendingPathComponent("local.store")
+    }
+
+    private static func cloudStoreURL() -> URL {
+        let fm = FileManager.default
+        guard let appGroupRoot = fm.containerURL(
+            forSecurityApplicationGroupIdentifier: "group.marcshaw.PULDAR"
+        ) else {
+            preconditionFailure("App Group container is unavailable.")
+        }
+
+        let directory = appGroupRoot
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("Application Support", isDirectory: true)
+
+        if !fm.fileExists(atPath: directory.path) {
+            try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+
+        return directory.appendingPathComponent("PULDARCloudStore.store")
     }
 
     private static func shouldRecoverByResetStore(from error: Error) -> Bool {
         let nsError = error as NSError
-        if nsError.domain == NSCocoaErrorDomain, nsError.code == 134110 {
+        if nsError.domain == NSCocoaErrorDomain, [134110, 134060].contains(nsError.code) {
             return true
         }
 
         if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError,
            underlying.domain == NSCocoaErrorDomain,
-           underlying.code == 134110 {
+           [134110, 134060].contains(underlying.code) {
             return true
         }
 
         return false
     }
 
-    private static func makeModelContainer(
-        schema: Schema,
-        cloudSyncEnabled: Bool
-    ) throws -> ModelContainer {
-        let configuration: ModelConfiguration
-        if cloudSyncEnabled {
-            configuration = ModelConfiguration(
-                schema: schema,
-                isStoredInMemoryOnly: false,
-                cloudKitDatabase: .automatic
-            )
-        } else {
-            configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        }
+    private static func makeCloudModelContainer(schema: Schema) throws -> ModelContainer {
+        _ = cloudStoreURL()
+
+        let configuration = ModelConfiguration(
+            "PULDARCloudStore",
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            allowsSave: true,
+            groupContainer: .identifier("group.marcshaw.PULDAR"),
+            cloudKitDatabase: .automatic
+        )
+
+        return try ModelContainer(for: schema, configurations: [configuration])
+    }
+
+    private static func makeLocalModelContainer(schema: Schema) throws -> ModelContainer {
+        let configuration = ModelConfiguration(
+            "PULDARLocalStore",
+            schema: schema,
+            url: localStoreURL(),
+            cloudKitDatabase: .none
+        )
 
         return try ModelContainer(for: schema, configurations: [configuration])
     }

@@ -7,13 +7,12 @@ import SwiftData
 /// "available left" reflects fixed commitments at the start of each month.
 @Model
 final class RecurringExpense {
-    @Attribute(.unique)
-    var id: UUID
-    var name: String
-    var amount: Double
-    var bucket: String
-    var isActive: Bool
-    var createdAt: Date
+    var id: UUID = UUID()
+    var name: String = ""
+    var amount: Double = 0
+    var bucket: String = BudgetBucket.fun.rawValue
+    var isActive: Bool = true
+    var createdAt: Date = Date()
     var updatedAt: Date?
 
     init(

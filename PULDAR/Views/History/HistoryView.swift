@@ -240,6 +240,7 @@ struct HistoryView: View {
             }
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
+                    .environment(store)
             }
             .sheet(isPresented: $showFiltersSheet) {
                 filtersSheet

@@ -251,6 +251,7 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
+                    .environment(store)
             }
             .alert("Fun is 0%", isPresented: $showZeroFunWarning) {
                 Button("Keep 0%") {
@@ -708,6 +709,7 @@ struct SettingsView: View {
                     Text(language.title).tag(language)
                 }
             }
+            .pickerStyle(.menu)
 
             Picker("Display Currency", selection: Binding(
                 get: { appPreferences.currencyPreference },
@@ -717,6 +719,7 @@ struct SettingsView: View {
                     Text(currency.title).tag(currency)
                 }
             }
+            .pickerStyle(.menu)
         } header: {
             Text("Language & Currency")
         } footer: {
@@ -815,8 +818,10 @@ struct SettingsView: View {
             LabeledContent("Receipt OCR", value: "English Only")
 
             Button("View Onboarding Again") {
-                didCompleteAppOnboarding = false
                 dismiss()
+                DispatchQueue.main.async {
+                    didCompleteAppOnboarding = false
+                }
             }
         } header: {
             Text("About")

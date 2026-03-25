@@ -49,12 +49,24 @@ struct ContentView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             DashboardView(launchAction: $dashboardLaunchAction)
+                .environment(llmService)
+                .environment(appPreferences)
+                .environment(budgetEngine)
+                .environment(categoryManager)
+                .environment(storeKitManager)
+                .environment(usageTracker)
+                .environment(diagnosticLogger)
                 .tabItem {
                     Label("Home", systemImage: "house")
                 }
                 .tag(RootTab.home)
 
             HistoryView()
+                .environment(appPreferences)
+                .environment(budgetEngine)
+                .environment(categoryManager)
+                .environment(storeKitManager)
+                .environment(diagnosticLogger)
                 .tabItem {
                     Label("History", systemImage: "clock.arrow.circlepath")
                 }
@@ -71,6 +83,9 @@ struct ContentView: View {
         .environment(appPreferences)
         .overlay {
             WidgetSnapshotSyncView()
+                .environment(budgetEngine)
+                .environment(storeKitManager)
+                .environment(appPreferences)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         }
@@ -103,6 +118,12 @@ struct ContentView: View {
             }
             .environment(llmService)
             .environment(networkMonitor)
+            .environment(storeKitManager)
+            .environment(appPreferences)
+            .environment(budgetEngine)
+            .environment(categoryManager)
+            .environment(diagnosticLogger)
+            .environment(financeKitManager)
         }
         .onOpenURL { url in
             handleIncomingURL(url)

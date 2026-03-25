@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var usageTracker = UsageTracker()
     @State private var diagnosticLogger = DiagnosticLogger.shared
     @State private var financeKitManager = FinanceKitManager()
+    @State private var appPreferences = AppPreferences()
     @State private var didWarmModelThisLaunch = false
     @AppStorage("didCompleteAppOnboarding") private var didCompleteAppOnboarding = false
     @AppStorage("appThemeMode") private var appThemeMode = "system"
@@ -59,6 +60,7 @@ struct ContentView: View {
         .environment(usageTracker)
         .environment(diagnosticLogger)
         .environment(financeKitManager)
+        .environment(appPreferences)
         .overlay {
             WidgetSnapshotSyncView()
                 .allowsHitTesting(false)

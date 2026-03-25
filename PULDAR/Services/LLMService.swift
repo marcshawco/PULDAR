@@ -113,7 +113,12 @@ final class LLMService {
     /// - Parameter input: e.g. `"I just spent $54.83 on sushi"`
     /// - Parameter allowedCategories: optional user-customized category labels.
     /// - Returns: `LLMExpenseResult` with merchant, amount, category, and transaction type.
-    func parseExpense(from input: String, allowedCategories: [String]? = nil) async throws -> LLMExpenseResult {
+    func parseExpense(
+        from input: String,
+        allowedCategories: [String]? = nil,
+        inputLanguage: AppPreferences.InputLanguage = .english,
+        currencyCode: String = "USD"
+    ) async throws -> LLMExpenseResult {
         if modelContainer == nil {
             await loadModel()
         }
@@ -127,7 +132,11 @@ final class LLMService {
         if !isReceiptScan, let cached = parseCache[cacheKey] {
             return cached
         }
-        let systemPrompt = makeSystemPrompt(categories: categories)
+        let systemPrompt = makeSystemPrompt(
+            categories: categories,
+            inputLanguage: inputLanguage,
+            currencyCode: currencyCode
+        )
 
         // Build chat messages for template formatting.
         let messages: [[String: String]] = [
@@ -178,10 +187,17 @@ final class LLMService {
         return refined
     }
 
-    private func makeSystemPrompt(categories: [String]) -> String {
+    private func makeSystemPrompt(
+        categories: [String],
+        inputLanguage: AppPreferences.InputLanguage,
+        currencyCode: String
+    ) -> String {
         """
         You are an expense parser. Given a natural language expense description, \
         extract the merchant name, dollar amount, and spending category.
+
+        \(inputLanguage.parserInstruction)
+        The user's preferred display currency is \(currencyCode). Preserve the numeric amount from the input, but do not convert currencies.
 
         If the input is a receipt scan:
         - Prefer the establishment name near the top of the receipt.

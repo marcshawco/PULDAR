@@ -17,6 +17,7 @@ struct SettingsView: View {
     }
 
     @Environment(BudgetEngine.self) private var budgetEngine
+    @Environment(AppPreferences.self) private var appPreferences
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(DiagnosticLogger.self) private var diagnosticLogger
     @Environment(FinanceKitManager.self) private var financeKitManager
@@ -98,6 +99,7 @@ struct SettingsView: View {
                 rolloverSection
                 dataExportSection
                 localBackupSection
+                languageAndCurrencySection
                 appearanceSection
                 widgetsSection
                 appleWalletSyncSection
@@ -381,7 +383,7 @@ struct SettingsView: View {
                 }
 
                 LabeledContent("Estimated monthly income") {
-                    Text(estimatedMonthlyIncome, format: .currency(code: "USD"))
+                    Text(estimatedMonthlyIncome.formattedCurrency(code: appPreferences.currencyCode))
                         .fontWeight(.semibold)
                 }
             }
@@ -506,7 +508,7 @@ struct SettingsView: View {
 
                             Spacer()
 
-                            Text(recurring.safeAmount, format: .currency(code: "USD"))
+                            Text(recurring.safeAmount.formattedCurrency(code: appPreferences.currencyCode))
                                 .font(.subheadline.weight(.semibold))
 
                             Toggle("", isOn: recurringActiveBinding(for: recurring.id))
@@ -693,6 +695,32 @@ struct SettingsView: View {
         }
     }
 
+    private var languageAndCurrencySection: some View {
+        Section {
+            Picker("Typing Language", selection: Binding(
+                get: { appPreferences.inputLanguage },
+                set: { appPreferences.inputLanguage = $0 }
+            )) {
+                ForEach(AppPreferences.InputLanguage.allCases) { language in
+                    Text(language.title).tag(language)
+                }
+            }
+
+            Picker("Display Currency", selection: Binding(
+                get: { appPreferences.currencyPreference },
+                set: { appPreferences.currencyPreference = $0 }
+            )) {
+                ForEach(AppPreferences.CurrencyPreference.allCases) { currency in
+                    Text(currency.title).tag(currency)
+                }
+            }
+        } header: {
+            Text("Language & Currency")
+        } footer: {
+            Text("Plain-text entry supports English, French, Italian, and Spanish to the best of the local model and app rules. Receipt scanning is currently English-only.")
+        }
+    }
+
     private var appearanceSection: some View {
         Section {
             Picker("Theme", selection: $appThemeMode) {
@@ -781,6 +809,7 @@ struct SettingsView: View {
             LabeledContent("AI Model", value: "Qwen 2.5 0.5B")
             LabeledContent("Processing", value: "100% On-Device")
             LabeledContent("AI Use", value: "Expense Parsing Only")
+            LabeledContent("Receipt OCR", value: "English Only")
 
             Button("View Onboarding Again") {
                 didCompleteAppOnboarding = false
@@ -850,7 +879,7 @@ struct SettingsView: View {
 
     private func draftBucketBudgetDisplay(for bucket: BudgetBucket) -> String {
         guard budgetEngine.monthlyIncome > 0 else { return "$ --" }
-        return draftBucketBudget(for: bucket).formatted(.currency(code: "USD"))
+        return draftBucketBudget(for: bucket).formattedCurrency(code: appPreferences.currencyCode)
     }
 
     private var incomeInputMode: IncomeInputMode {

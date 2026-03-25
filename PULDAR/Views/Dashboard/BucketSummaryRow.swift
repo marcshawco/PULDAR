@@ -5,6 +5,7 @@ import SwiftUI
 /// The fill colour turns `overspend` red when the user exceeds
 /// the bucket's allocation.  Text also shifts to red.
 struct BucketSummaryRow: View {
+    @Environment(AppPreferences.self) private var appPreferences
     let status: BudgetEngine.BucketStatus
     var isSelected: Bool = false
     var onTap: (() -> Void)? = nil
@@ -25,18 +26,18 @@ struct BucketSummaryRow: View {
                 Spacer()
 
                 // Spent / Budget
-                Text(safeSpent, format: .currency(code: "USD"))
+                Text(safeSpent.formattedCurrency(code: appPreferences.currencyCode))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(textColor)
 
-                Text("/ \(safeBudgeted, format: .currency(code: "USD"))")
+                Text("/ \(safeBudgeted.formattedCurrency(code: appPreferences.currencyCode))")
                     .font(.caption2)
                     .foregroundStyle(AppColors.textTertiary)
             }
 
             if overByAmount > 0 {
                 HStack {
-                    Text("Over by \(overByAmount, format: .currency(code: "USD"))")
+                    Text("Over by \(overByAmount.formattedCurrency(code: appPreferences.currencyCode))")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
@@ -49,7 +50,7 @@ struct BucketSummaryRow: View {
                 }
             } else {
                 HStack {
-                    Text("Left \(remainingAmount, format: .currency(code: "USD"))")
+                    Text("Left \(remainingAmount.formattedCurrency(code: appPreferences.currencyCode))")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(AppColors.textSecondary)
                     Spacer()

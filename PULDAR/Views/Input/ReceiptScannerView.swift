@@ -19,10 +19,11 @@ enum ReceiptScannerError: LocalizedError {
 }
 
 struct ReceiptScannerView: UIViewControllerRepresentable {
+    let currencyCode: String
     let onComplete: (Result<String, Error>) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onComplete: onComplete)
+        Coordinator(currencyCode: currencyCode, onComplete: onComplete)
     }
 
     func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
@@ -47,8 +48,10 @@ struct ReceiptScannerView: UIViewControllerRepresentable {
         }
 
         private let onComplete: (Result<String, Error>) -> Void
+        private let currencyCode: String
 
-        init(onComplete: @escaping (Result<String, Error>) -> Void) {
+        init(currencyCode: String, onComplete: @escaping (Result<String, Error>) -> Void) {
+            self.currencyCode = currencyCode
             self.onComplete = onComplete
         }
 
@@ -69,7 +72,7 @@ struct ReceiptScannerView: UIViewControllerRepresentable {
         ) {
             Task {
                 do {
-                    let text = try await Self.extractText(from: scan)
+                    let text = try await Self.extractText(from: scan, currencyCode: currencyCode)
                     onComplete(.success(text))
                 } catch {
                     onComplete(.failure(error))
@@ -77,7 +80,10 @@ struct ReceiptScannerView: UIViewControllerRepresentable {
             }
         }
 
-        nonisolated private static func extractText(from scan: VNDocumentCameraScan) async throws -> String {
+        nonisolated private static func extractText(
+            from scan: VNDocumentCameraScan,
+            currencyCode: String
+        ) async throws -> String {
             var pages: [[RecognizedLine]] = []
 
             for pageIndex in 0..<scan.pageCount {
@@ -107,7 +113,7 @@ struct ReceiptScannerView: UIViewControllerRepresentable {
                 .flatMap(bottomAmountCandidates(from:))
                 .prefix(5)
                 .map { candidate in
-                    let amount = candidate.value.formatted(.currency(code: "USD"))
+                    let amount = candidate.value.formatted(.currency(code: currencyCode))
                     if let label = candidate.label, !label.isEmpty {
                         return "\(amount) from '\(label)'"
                     }
@@ -123,7 +129,7 @@ struct ReceiptScannerView: UIViewControllerRepresentable {
                 sections.append("Likely merchant: \(merchantHint)")
             }
             if let totalHint {
-                sections.append("Likely total: \(totalHint.value.formatted(.currency(code: "USD")))")
+                sections.append("Likely total: \(totalHint.value.formatted(.currency(code: currencyCode)))")
             }
             if !merchantCandidates.isEmpty {
                 sections.append("Merchant candidates: \(merchantCandidates.prefix(4).joined(separator: " | "))")
@@ -162,6 +168,7 @@ struct ReceiptScannerView: UIViewControllerRepresentable {
 
                 request.recognitionLevel = .accurate
                 request.usesLanguageCorrection = true
+                request.recognitionLanguages = ["en-US"]
 
                 let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
 

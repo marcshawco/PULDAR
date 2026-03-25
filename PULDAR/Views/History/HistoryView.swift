@@ -3,6 +3,7 @@ import SwiftData
 
 /// Historical reporting by month with CSV export.
 struct HistoryView: View {
+    @Environment(AppPreferences.self) private var appPreferences
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(StoreKitManager.self) private var store
@@ -166,7 +167,7 @@ struct HistoryView: View {
                 }
 
                 Section("Summary") {
-                    LabeledContent("Total", value: selectedTotal.formatted(.currency(code: "USD")))
+                    LabeledContent("Total", value: selectedTotal.formattedCurrency(code: appPreferences.currencyCode))
                     HStack(spacing: 8) {
                         ForEach(selectedStatuses) { status in
                             summaryCard(status)
@@ -256,7 +257,7 @@ struct HistoryView: View {
                 Text(expense.normalizedMerchant)
                     .font(.subheadline.weight(.semibold))
                 Spacer()
-                Text(expense.amount, format: .currency(code: "USD"))
+                Text(expense.amount.formattedCurrency(code: appPreferences.currencyCode))
                     .foregroundStyle(expense.amount < 0 ? .green : AppColors.textPrimary)
             }
             HStack(spacing: 10) {
@@ -363,7 +364,7 @@ struct HistoryView: View {
             .font(.caption2.weight(.semibold))
             .frame(maxWidth: .infinity, alignment: .center)
 
-            Text(status.spent, format: .currency(code: "USD"))
+            Text(status.spent.formattedCurrency(code: appPreferences.currencyCode))
                 .font(.caption.weight(.semibold))
                 .monospacedDigit()
                 .lineLimit(1)

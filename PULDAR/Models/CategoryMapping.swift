@@ -96,6 +96,7 @@ enum ExpenseCategory: String, Codable, CaseIterable {
         value
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
             .replacingOccurrences(of: "[^a-z0-9 ]", with: "", options: .regularExpression)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
     }
@@ -134,7 +135,48 @@ enum ExpenseCategory: String, Codable, CaseIterable {
         "snack": .dining,
         "snacks": .dining,
         "snack shop": .dining,
-        "snack bar": .dining
+        "snack bar": .dining,
+
+        "epicerie": .groceries,
+        "supermarche": .groceries,
+        "courses": .groceries,
+        "restaurant": .dining,
+        "cafe": .coffee,
+        "loyer": .rent,
+        "assurance": .insurance,
+        "essence": .gas,
+        "transport": .transportation,
+        "voyage": .travel,
+        "abonnements": .subscriptions,
+        "epargne": .savings,
+        "dette": .debt,
+        "investissement": .investments,
+
+        "spesa": .groceries,
+        "supermercato": .groceries,
+        "ristorante": .dining,
+        "affitto": .rent,
+        "assicurazione": .insurance,
+        "benzina": .gas,
+        "trasporto": .transportation,
+        "viaggio": .travel,
+        "abbonamenti": .subscriptions,
+        "risparmio": .savings,
+        "debito": .debt,
+        "investimenti": .investments,
+
+        "comestibles": .groceries,
+        "supermercado": .groceries,
+        "restaurante": .dining,
+        "alquiler": .rent,
+        "seguro": .insurance,
+        "gasolina": .gas,
+        "transporte": .transportation,
+        "viaje": .travel,
+        "suscripciones": .subscriptions,
+        "ahorro": .savings,
+        "deuda": .debt,
+        "inversiones": .investments
     ]
 
     private static let investmentKeywords: [String] = [
@@ -208,7 +250,18 @@ enum ExpenseCategory: String, Codable, CaseIterable {
         "dessert",
         "ice cream",
         "treat",
-        "treats"
+        "treats",
+        "restaurant",
+        "restaurante",
+        "ristorante",
+        "cena",
+        "almuerzo",
+        "desayuno",
+        "dejeuner",
+        "diner",
+        "petit dejeuner",
+        "colazione",
+        "pranzo"
     ]
 
     private static let shoppingKeywords: [String] = [

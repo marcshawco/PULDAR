@@ -33,23 +33,36 @@ struct LLMExpenseResult: Codable {
         if amount < 0 { return true }
         if transactionType == .credit { return true }
 
-        let normalized = fallbackInput.lowercased()
+        let normalized = normalize(fallbackInput)
         let creditSignals = [
             "gave me", "gift", "refund", "reimburs", "cashback", "cash back",
             "found", "increase", "add ", "added ", "credit", "deposit",
-            "income", "paid me", "sent me", "received", "got paid"
+            "income", "paid me", "sent me", "received", "got paid",
+            "reembolso", "regalo", "deposito", "ingreso", "me pagaron", "recibi",
+            "rimborso", "regalo", "deposito", "entrata", "ricevuto",
+            "remboursement", "cadeau", "depot", "revenu", "recu"
         ]
 
         return creditSignals.contains { normalized.contains($0) }
     }
 
     func isIncome(fallbackInput: String) -> Bool {
-        let normalized = fallbackInput.lowercased()
+        let normalized = normalize(fallbackInput)
         let incomeSignals = [
             "salary", "paycheck", "pay check", "got paid", "paid me",
             "direct deposit", "payroll", "wages", "bonus",
-            "freelance", "invoice", "client paid", "income"
+            "freelance", "invoice", "client paid", "income",
+            "salario", "nomina", "sueldo", "pago directo", "factura", "ingreso",
+            "stipendio", "busta paga", "salario", "bonifico", "fattura", "entrata",
+            "salaire", "paie", "depot direct", "facture", "revenu"
         ]
         return incomeSignals.contains { normalized.contains($0) }
+    }
+
+    private func normalize(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
     }
 }

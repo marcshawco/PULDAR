@@ -7,6 +7,7 @@ import Charts
 /// - Sector colours shift to red when a bucket is overspent.
 /// - The chart gently expands on first appearance via a spring animation.
 struct BucketDonutChart: View {
+    @Environment(AppPreferences.self) private var appPreferences
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let statuses: [BudgetEngine.BucketStatus]
@@ -182,7 +183,8 @@ struct BucketDonutChart: View {
         let valueText = displayMode.centerValue(
             totalSpent: totalSpent,
             totalLeft: totalLeft,
-            percentUsed: percentUsed
+            percentUsed: percentUsed,
+            currencyCode: appPreferences.currencyCode
         )
 
         return VStack(spacing: 2) {
@@ -205,9 +207,9 @@ struct BucketDonutChart: View {
     private var accessibilityLabel: String {
         switch displayMode {
         case .spent:
-            return "Spent funds \(totalSpent.formatted(.currency(code: "USD")))"
+            return "Spent funds \(totalSpent.formattedCurrency(code: appPreferences.currencyCode))"
         case .remaining:
-            return "Remaining funds \(totalLeft.formatted(.currency(code: "USD")))"
+            return "Remaining funds \(totalLeft.formattedCurrency(code: appPreferences.currencyCode))"
         case .breakdown:
             return "Budget used \(percentUsed.formatted(.percent.precision(.fractionLength(0))))"
         }
@@ -241,12 +243,12 @@ struct BucketDonutChart: View {
             }
         }
 
-        func centerValue(totalSpent: Double, totalLeft: Double, percentUsed: Double) -> String {
+        func centerValue(totalSpent: Double, totalLeft: Double, percentUsed: Double, currencyCode: String) -> String {
             switch self {
             case .spent:
-                return totalSpent.formatted(.currency(code: "USD"))
+                return totalSpent.formattedCurrency(code: currencyCode)
             case .remaining:
-                return totalLeft.formatted(.currency(code: "USD"))
+                return totalLeft.formattedCurrency(code: currencyCode)
             case .breakdown:
                 return percentUsed.formatted(.percent.precision(.fractionLength(0)))
             }

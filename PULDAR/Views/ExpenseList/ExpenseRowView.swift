@@ -5,6 +5,7 @@ import SwiftUI
 /// Tap to expand and reveal category, bucket, and original note.
 /// Matching search text is highlighted in yellow.
 struct ExpenseRowView: View {
+    @Environment(AppPreferences.self) private var appPreferences
     @Environment(CategoryManager.self) private var categoryManager
     let expense: Expense
     let highlightText: String
@@ -42,7 +43,7 @@ struct ExpenseRowView: View {
 
                 Spacer()
 
-                Text(expense.amount, format: .currency(code: "USD"))
+                Text(expense.amount.formattedCurrency(code: appPreferences.currencyCode))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(expense.amount < 0 ? .green : AppColors.textPrimary)
 

@@ -22,6 +22,7 @@ struct DashboardView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(LLMService.self) private var llmService
+    @Environment(AppPreferences.self) private var appPreferences
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(StoreKitManager.self) private var storeKit
@@ -142,7 +143,7 @@ struct DashboardView: View {
                 SettingsView()
             }
             .sheet(isPresented: $showReceiptScanner) {
-                ReceiptScannerView { result in
+                ReceiptScannerView(currencyCode: appPreferences.currencyCode) { result in
                     showReceiptScanner = false
 
                     switch result {
@@ -173,7 +174,7 @@ struct DashboardView: View {
                 message: {
                     if let suggestion = recurringSuggestion {
                         Text(
-                            "\(suggestion.name) appears monthly. Add \(suggestion.amount, format: .currency(code: "USD"))/month to \(suggestion.bucket.rawValue)?"
+                            "\(suggestion.name) appears monthly. Add \(suggestion.amount.formattedCurrency(code: appPreferences.currencyCode))/month to \(suggestion.bucket.rawValue)?"
                         )
                     }
                 }
@@ -317,7 +318,9 @@ struct DashboardView: View {
         do {
             let result = try await llmService.parseExpense(
                 from: rawInput,
-                allowedCategories: categoryManager.promptCategories
+                allowedCategories: categoryManager.promptCategories,
+                inputLanguage: appPreferences.inputLanguage,
+                currencyCode: appPreferences.currencyCode
             )
             let resolved = categoryManager.resolve(
                 raw: result.category,
@@ -592,11 +595,11 @@ struct DashboardView: View {
 
                 Spacer()
 
-                Text(amount, format: .currency(code: "USD"))
+                Text(amount.formattedCurrency(code: appPreferences.currencyCode))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AppColors.overspend)
 
-                Text("/ \(0, format: .currency(code: "USD"))")
+                Text("/ \(0.0.formattedCurrency(code: appPreferences.currencyCode))")
                     .font(.caption2)
                     .foregroundStyle(AppColors.textTertiary)
             }
@@ -633,7 +636,7 @@ struct DashboardView: View {
 
             Spacer()
 
-            Text(amount, format: .currency(code: "USD"))
+            Text(amount.formattedCurrency(code: appPreferences.currencyCode))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AppColors.textPrimary)
 
@@ -661,11 +664,11 @@ struct DashboardView: View {
 
             Spacer()
 
-            Text(amount, format: .currency(code: "USD"))
+            Text(amount.formattedCurrency(code: appPreferences.currencyCode))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.green)
 
-            Text("/ \(total, format: .currency(code: "USD"))")
+            Text("/ \(total.formattedCurrency(code: appPreferences.currencyCode))")
                 .font(.caption2)
                 .foregroundStyle(AppColors.textTertiary)
 

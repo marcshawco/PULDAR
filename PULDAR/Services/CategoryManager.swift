@@ -236,6 +236,7 @@ final class CategoryManager {
         value
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
             .replacingOccurrences(of: "[^a-z0-9 ]", with: "", options: .regularExpression)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
     }

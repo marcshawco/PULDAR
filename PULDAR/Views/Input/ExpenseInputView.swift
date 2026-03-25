@@ -13,6 +13,7 @@ struct ExpenseInputView: View {
     var onLockedTap: (() -> Void)? = nil
     var onCameraTap: (() -> Void)? = nil
     var onFocusChange: ((Bool) -> Void)? = nil
+    var focusTrigger: Int = 0
 
     @State private var inputText = ""
     @State private var showCheckmark = false
@@ -121,6 +122,10 @@ struct ExpenseInputView: View {
             .animation(.spring(duration: 0.3), value: isProcessing)
         }
         .padding(.horizontal)
+        .onChange(of: focusTrigger) {
+            guard !isLocked else { return }
+            isFocused = true
+        }
     }
 
     // MARK: - Actions

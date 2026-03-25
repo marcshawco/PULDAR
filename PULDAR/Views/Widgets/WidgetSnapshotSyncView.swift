@@ -4,6 +4,7 @@ import SwiftData
 struct WidgetSnapshotSyncView: View {
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(StoreKitManager.self) private var storeKit
+    @Environment(AppPreferences.self) private var appPreferences
     @Environment(\.scenePhase) private var scenePhase
 
     @Query(sort: \Expense.date, order: .reverse)
@@ -67,7 +68,8 @@ struct WidgetSnapshotSyncView: View {
         WidgetBudgetSnapshotStore.publish(
             statuses: statuses,
             totalBudget: totalBudget,
-            totalSpent: totalSpent
+            totalSpent: totalSpent,
+            currencyCode: appPreferences.currencyCode
         )
     }
 }

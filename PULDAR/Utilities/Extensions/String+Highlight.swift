@@ -88,7 +88,7 @@ extension String {
             .joined(separator: " ")
     }
 
-    static func canonicalMerchantName(from value: String) -> String? {
+    nonisolated static func canonicalMerchantName(from value: String) -> String? {
         let normalized = value
             .lowercased()
             .replacingOccurrences(of: "[^a-z0-9]", with: "", options: .regularExpression)

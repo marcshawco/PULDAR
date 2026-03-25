@@ -13,6 +13,7 @@ struct WidgetBudgetSnapshot: Codable {
     }
 
     let generatedAt: Date
+    let currencyCode: String
     let totalRemaining: Double
     let totalBudget: Double
     let totalSpent: Double
@@ -26,7 +27,8 @@ enum WidgetBudgetSnapshotStore {
     static func publish(
         statuses: [BudgetEngine.BucketStatus],
         totalBudget: Double,
-        totalSpent: Double
+        totalSpent: Double,
+        currencyCode: String
     ) {
         guard let containerURL = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: appGroupID
@@ -36,6 +38,7 @@ enum WidgetBudgetSnapshotStore {
 
         let snapshot = WidgetBudgetSnapshot(
             generatedAt: .now,
+            currencyCode: currencyCode,
             totalRemaining: max(totalBudget - totalSpent, 0),
             totalBudget: totalBudget,
             totalSpent: totalSpent,

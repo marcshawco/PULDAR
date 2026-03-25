@@ -12,6 +12,10 @@ import UIKit
 /// Root coordinator that owns all service objects and injects them
 /// into the environment for the entire view hierarchy.
 struct ContentView: View {
+    private enum RootTab: Hashable {
+        case home
+        case history
+    }
 
     // MARK: - Services (owned at the root)
 
@@ -25,6 +29,8 @@ struct ContentView: View {
     @State private var financeKitManager = FinanceKitManager()
     @State private var appPreferences = AppPreferences()
     @State private var didWarmModelThisLaunch = false
+    @State private var selectedTab: RootTab = .home
+    @State private var dashboardLaunchAction: DashboardLaunchAction?
     @AppStorage("didCompleteAppOnboarding") private var didCompleteAppOnboarding = false
     @AppStorage("appThemeMode") private var appThemeMode = "system"
 
@@ -41,16 +47,18 @@ struct ContentView: View {
     // MARK: - Body
 
     var body: some View {
-        TabView {
-            DashboardView()
+        TabView(selection: $selectedTab) {
+            DashboardView(launchAction: $dashboardLaunchAction)
                 .tabItem {
                     Label("Home", systemImage: "house")
                 }
+                .tag(RootTab.home)
 
             HistoryView()
                 .tabItem {
                     Label("History", systemImage: "clock.arrow.circlepath")
                 }
+                .tag(RootTab.history)
         }
         .environment(llmService)
         .environment(budgetEngine)
@@ -96,6 +104,9 @@ struct ContentView: View {
             .environment(llmService)
             .environment(networkMonitor)
         }
+        .onOpenURL { url in
+            handleIncomingURL(url)
+        }
     }
 
     private var preferredColorScheme: ColorScheme? {
@@ -106,6 +117,21 @@ struct ContentView: View {
             return .dark
         default:
             return nil
+        }
+    }
+
+    private func handleIncomingURL(_ url: URL) {
+        guard url.scheme?.lowercased() == "puldar" else { return }
+
+        selectedTab = .home
+
+        switch url.host?.lowercased() {
+        case "quick-add":
+            dashboardLaunchAction = DashboardLaunchAction(kind: .focusComposer)
+        case "scan-receipt":
+            dashboardLaunchAction = DashboardLaunchAction(kind: .scanReceipt)
+        default:
+            break
         }
     }
 }

@@ -11,6 +11,8 @@ import VisionKit
 ///   4. Search bar    →  filter & highlight
 ///   5. Expense list  →  progressive disclosure
 struct DashboardView: View {
+    @Binding var launchAction: DashboardLaunchAction?
+
     private struct RecurringSuggestion: Identifiable {
         let id = UUID()
         let name: String
@@ -52,6 +54,7 @@ struct DashboardView: View {
     @State private var showOverspentBanner = false
     @State private var recurringSuggestion: RecurringSuggestion?
     @State private var showReceiptScanner = false
+    @State private var composerFocusTrigger = 0
     @AppStorage("didCompleteModelOnboarding") private var didCompleteModelOnboarding = false
     @AppStorage("didRunCategoryConsistencyFixV2") private var didRunCategoryConsistencyFixV2 = false
     @AppStorage("didNormalizeMerchantsV1") private var didNormalizeMerchantsV1 = false
@@ -196,6 +199,12 @@ struct DashboardView: View {
             }
             .onChange(of: expenses.count) {
                 usageTracker.reconcile(with: expenses)
+            }
+            .onAppear {
+                consumeLaunchActionIfNeeded()
+            }
+            .onChange(of: launchAction?.id) {
+                consumeLaunchActionIfNeeded()
             }
         }
     }
@@ -540,6 +549,7 @@ struct DashboardView: View {
                 isProcessing: isProcessing,
                 isLocked: !storeKit.isPro && usageTracker.isAtLimit,
                 onSubmit: submitExpense,
+                focusTrigger: composerFocusTrigger,
                 onLockedTap: {
                     if !storeKit.isPro && usageTracker.isAtLimit {
                         showPaywall = true
@@ -937,5 +947,22 @@ struct DashboardView: View {
         }
 
         didNormalizeMerchantsV1 = true
+    }
+
+    private func consumeLaunchActionIfNeeded() {
+        guard let action = launchAction else { return }
+
+        switch action.kind {
+        case .focusComposer:
+            composerFocusTrigger += 1
+        case .scanReceipt:
+            if VNDocumentCameraViewController.isSupported {
+                showReceiptScanner = true
+            } else {
+                presentTransientError(ReceiptScannerError.unavailable.localizedDescription)
+            }
+        }
+
+        launchAction = nil
     }
 }

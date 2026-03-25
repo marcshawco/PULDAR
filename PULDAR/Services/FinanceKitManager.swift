@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import Security
 import SwiftData
 
 #if canImport(FinanceKit)
@@ -277,22 +276,8 @@ final class FinanceKitManager {
     }
 
     private static func hasFinanceKitEntitlement() -> Bool {
-        guard let task = SecTaskCreateFromSelf(nil) else {
-            return false
-        }
-        let entitlementName = "com.apple.developer.financekit" as CFString
-        guard let value = SecTaskCopyValueForEntitlement(task, entitlementName, nil) else {
-            return false
-        }
-
-        if let boolValue = value as? Bool {
-            return boolValue
-        }
-
-        if CFGetTypeID(value) == CFBooleanGetTypeID() {
-            return CFBooleanGetValue((value as! CFBoolean))
-        }
-
+        // Keep this conservative in development builds. Live FinanceKit access
+        // still depends on Apple granting the entitlement for the signed app.
         return false
     }
 }

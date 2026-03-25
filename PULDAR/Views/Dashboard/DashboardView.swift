@@ -548,7 +548,9 @@ struct DashboardView: View {
             ExpenseInputView(
                 isProcessing: isProcessing,
                 isLocked: !storeKit.isPro && usageTracker.isAtLimit,
-                onSubmit: submitExpense,
+                onSubmit: { text in
+                    await submitExpense(text)
+                },
                 focusTrigger: composerFocusTrigger,
                 onLockedTap: {
                     if !storeKit.isPro && usageTracker.isAtLimit {

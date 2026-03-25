@@ -83,9 +83,11 @@ final class BudgetEngine {
     }
 
     deinit {
-        pendingCloudSyncTask?.cancel()
-        if let cloudObserver {
-            NotificationCenter.default.removeObserver(cloudObserver)
+        MainActor.assumeIsolated {
+            pendingCloudSyncTask?.cancel()
+            if let cloudObserver {
+                NotificationCenter.default.removeObserver(cloudObserver)
+            }
         }
     }
 
@@ -446,7 +448,9 @@ final class BudgetEngine {
             object: cloudStore,
             queue: .main
         ) { [weak self] _ in
-            self?.syncFromCloud()
+            Task { @MainActor [weak self] in
+                self?.syncFromCloud()
+            }
         }
         cloudStore.synchronize()
     }
@@ -465,9 +469,9 @@ final class BudgetEngine {
         guard !isApplyingRemoteSync else { return }
         dirtySyncKeys.insert(key)
         pendingCloudSyncTask?.cancel()
-        pendingCloudSyncTask = Task { [weak self] in
+        pendingCloudSyncTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(350))
-            await self?.flushPendingCloudSync()
+            self?.flushPendingCloudSync()
         }
     }
 

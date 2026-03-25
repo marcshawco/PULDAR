@@ -285,15 +285,14 @@ struct SettingsView: View {
             } message: {
                 Text("Your budget allocation decides how much of your monthly income goes to Fundamentals, Fun, and Future. Setting clear percentages helps you spend with intention and stay on track.")
             }
-            .alert(
-                selectedBudgetInfoBucket?.rawValue ?? "",
-                isPresented: selectedBudgetInfoBinding
-            ) {
-                Button("Got it", role: .cancel) {
-                    selectedBudgetInfoBucket = nil
-                }
-            } message: {
-                Text(selectedBudgetInfoBucket?.infoExplanation ?? "")
+            .alert(item: $selectedBudgetInfoBucket) { bucket in
+                Alert(
+                    title: Text(bucket.rawValue),
+                    message: Text(bucket.infoExplanation),
+                    dismissButton: .default(Text("Got it")) {
+                        selectedBudgetInfoBucket = nil
+                    }
+                )
             }
             .alert(item: $financeKitNotice) { notice in
                 Alert(
@@ -547,7 +546,7 @@ struct SettingsView: View {
     }
 
     private var widgetsSection: some View {
-        Section("Widgets") {
+        Section {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Home Screen Snapshot")
                     .font(.headline)
@@ -560,11 +559,13 @@ struct SettingsView: View {
                     .foregroundStyle(AppColors.textTertiary)
             }
             .padding(.vertical, 4)
+        } header: {
+            Text("Widgets")
         }
     }
 
     private var appleWalletSyncSection: some View {
-        Section("Apple Wallet Sync") {
+        Section {
             VStack(alignment: .leading, spacing: 8) {
                 LabeledContent("Status", value: financeKitManager.statusTitle)
 
@@ -590,6 +591,8 @@ struct SettingsView: View {
                 }
             }
             .padding(.vertical, 4)
+        } header: {
+            Text("Apple Wallet Sync")
         } footer: {
             Text("When available, this will import Apple Card, Apple Cash, and Savings activity without using third-party aggregators. If it is unavailable, PULDAR falls back to manual entry, receipt scanning, and CSV/JSON portability.")
         }
@@ -918,17 +921,6 @@ struct SettingsView: View {
 
     private var totalDraftPercentage: Double {
         BudgetBucket.allCases.reduce(0) { $0 + draftPercentage(for: $1) }
-    }
-
-    private var selectedBudgetInfoBinding: Binding<Bool> {
-        Binding(
-            get: { selectedBudgetInfoBucket != nil },
-            set: { isPresented in
-                if !isPresented {
-                    selectedBudgetInfoBucket = nil
-                }
-            }
-        )
     }
 
     private var isAllocationValid: Bool {
@@ -1511,7 +1503,7 @@ struct SettingsView: View {
         }
     }
 
-    private static func makeLocalBackupExpense(_ expense: Expense) -> LocalBackupExpense {
+    nonisolated private static func makeLocalBackupExpense(_ expense: Expense) -> LocalBackupExpense {
         LocalBackupExpense(
             id: expense.id,
             date: expense.date,
@@ -1528,7 +1520,7 @@ struct SettingsView: View {
         )
     }
 
-    private static func makeLocalBackupRecurring(_ recurring: RecurringExpense) -> LocalBackupRecurring {
+    nonisolated private static func makeLocalBackupRecurring(_ recurring: RecurringExpense) -> LocalBackupRecurring {
         LocalBackupRecurring(
             id: recurring.id,
             name: recurring.name,

@@ -56,7 +56,7 @@ private struct BudgetWidgetConfigurationIntent: WidgetConfigurationIntent {
     )
 
     @Parameter(title: "Display")
-    var mode: BudgetWidgetMode
+    var mode: BudgetWidgetMode?
 
     init() {
         mode = .remaining
@@ -109,6 +109,10 @@ private struct PULDARBudgetWidgetEntryView: View {
     @Environment(\.widgetFamily) private var family
     let entry: PULDARBudgetEntry
 
+    private var selectedMode: BudgetWidgetMode {
+        entry.configuration.mode ?? .remaining
+    }
+
     var body: some View {
         Group {
             if let snapshot = entry.snapshot {
@@ -135,7 +139,7 @@ private struct PULDARBudgetWidgetEntryView: View {
                 .font(.title3.weight(.bold))
                 .minimumScaleFactor(0.75)
 
-            Text(entry.configuration.mode == .remaining ? "Remaining this month" : "Spent this month")
+            Text(selectedMode == .remaining ? "Remaining this month" : "Spent this month")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
@@ -151,7 +155,7 @@ private struct PULDARBudgetWidgetEntryView: View {
                         Spacer(minLength: 4)
                         Text(displayAmount(for: bucket, currencyCode: snapshot.currencyCode))
                             .font(.caption2.weight(.semibold))
-                            .foregroundStyle(bucket.isOverspent && entry.configuration.mode == .remaining ? .red : .primary)
+                            .foregroundStyle(bucket.isOverspent && selectedMode == .remaining ? .red : .primary)
                     }
                 }
             }
@@ -164,14 +168,14 @@ private struct PULDARBudgetWidgetEntryView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(entry.configuration.mode == .remaining ? "Budget Remaining" : "Budget Spending")
+                    Text(selectedMode == .remaining ? "Budget Remaining" : "Budget Spending")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Text(primaryTotal(for: snapshot), format: .currency(code: snapshot.currencyCode))
                         .font(.title2.weight(.bold))
                 }
                 Spacer()
-                Text(entry.configuration.mode == .remaining ? "Allocation view" : "Spending view")
+                Text(selectedMode == .remaining ? "Allocation view" : "Spending view")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -196,7 +200,7 @@ private struct PULDARBudgetWidgetEntryView: View {
                         VStack(alignment: .trailing, spacing: 1) {
                             Text(displayAmount(for: bucket, currencyCode: snapshot.currencyCode))
                                 .font(.subheadline.weight(.bold))
-                                .foregroundStyle(bucket.isOverspent && entry.configuration.mode == .remaining ? .red : .primary)
+                                .foregroundStyle(bucket.isOverspent && selectedMode == .remaining ? .red : .primary)
                             Text(secondaryLabel(for: bucket, currencyCode: snapshot.currencyCode))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -222,16 +226,16 @@ private struct PULDARBudgetWidgetEntryView: View {
     }
 
     private func primaryTotal(for snapshot: WidgetBudgetSnapshot) -> Double {
-        entry.configuration.mode == .remaining ? snapshot.totalRemaining : snapshot.totalSpent
+        selectedMode == .remaining ? snapshot.totalRemaining : snapshot.totalSpent
     }
 
     private func displayAmount(for bucket: WidgetBudgetSnapshot.Bucket, currencyCode: String) -> String {
-        let value = entry.configuration.mode == .remaining ? bucket.remaining : bucket.spent
+        let value = selectedMode == .remaining ? bucket.remaining : bucket.spent
         return value.formatted(.currency(code: currencyCode))
     }
 
     private func secondaryLabel(for bucket: WidgetBudgetSnapshot.Bucket, currencyCode: String) -> String {
-        if entry.configuration.mode == .remaining {
+        if selectedMode == .remaining {
             return "\(bucket.spent.formatted(.currency(code: currencyCode))) spent"
         }
         return "\(bucket.remaining.formatted(.currency(code: currencyCode))) left"

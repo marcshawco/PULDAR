@@ -119,7 +119,7 @@ final class DiagnosticLogger {
 
     func export(state: SupportState) throws -> URL {
         let bundle = ExportBundle(
-            app: AppInfo(
+            app: ExportBundle.AppInfo(
                 appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown",
                 buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown",
                 systemVersion: UIDevice.current.systemVersion,

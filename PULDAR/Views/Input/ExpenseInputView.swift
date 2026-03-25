@@ -10,10 +10,10 @@ struct ExpenseInputView: View {
     let isProcessing: Bool
     let isLocked: Bool
     let onSubmit: (String) async -> Bool
+    var focusTrigger: Int = 0
     var onLockedTap: (() -> Void)? = nil
     var onCameraTap: (() -> Void)? = nil
     var onFocusChange: ((Bool) -> Void)? = nil
-    var focusTrigger: Int = 0
 
     @State private var inputText = ""
     @State private var showCheckmark = false

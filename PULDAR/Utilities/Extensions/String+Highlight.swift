@@ -1,7 +1,7 @@
 import SwiftUI
 
 extension String {
-    private static let merchantAliases: [(contains: [String], replacement: String)] = [
+    nonisolated private static let merchantAliases: [(contains: [String], replacement: String)] = [
         (["wholefoodsmarket", "wholefoods", "wholefds"], "Whole Foods"),
         (["walmartsupercenter", "walmart", "wmt"], "Walmart"),
         (["target"], "Target"),

@@ -34,16 +34,42 @@ struct WidgetSnapshotSyncView: View {
         )
     }
 
+    private var expenseRefreshSignature: [String] {
+        expenses.map { expense in
+            [
+                expense.id.uuidString,
+                expense.updatedAt?.timeIntervalSinceReferenceDate.description ?? "nil",
+                expense.date.timeIntervalSinceReferenceDate.description,
+                expense.amount.description,
+                expense.category,
+                expense.bucket,
+                expense.isOverspent.description
+            ].joined(separator: "|")
+        }
+    }
+
+    private var recurringRefreshSignature: [String] {
+        recurringExpenses.map { recurring in
+            [
+                recurring.id.uuidString,
+                recurring.updatedAt?.timeIntervalSinceReferenceDate.description ?? "nil",
+                recurring.amount.description,
+                recurring.bucket,
+                recurring.isActive.description
+            ].joined(separator: "|")
+        }
+    }
+
     var body: some View {
         Color.clear
             .frame(width: 0, height: 0)
             .task {
                 publishSnapshot()
             }
-            .onChange(of: expenses.count) {
+            .onChange(of: expenseRefreshSignature) {
                 publishSnapshot()
             }
-            .onChange(of: recurringExpenses.count) {
+            .onChange(of: recurringRefreshSignature) {
                 publishSnapshot()
             }
             .onChange(of: budgetEngine.monthlyIncome) {
@@ -56,6 +82,9 @@ struct WidgetSnapshotSyncView: View {
                 publishSnapshot()
             }
             .onChange(of: storeKit.isPro) {
+                publishSnapshot()
+            }
+            .onChange(of: appPreferences.currencyPreference) {
                 publishSnapshot()
             }
             .onChange(of: scenePhase) {

@@ -39,7 +39,7 @@ enum WidgetBudgetSnapshotStore {
         let snapshot = WidgetBudgetSnapshot(
             generatedAt: .now,
             currencyCode: currencyCode,
-            totalRemaining: max(totalBudget - totalSpent, 0),
+            totalRemaining: totalBudget - totalSpent,
             totalBudget: totalBudget,
             totalSpent: totalSpent,
             buckets: statuses.map { status in

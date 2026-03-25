@@ -956,6 +956,17 @@ struct DashboardView: View {
         case .focusComposer:
             composerFocusTrigger += 1
         case .scanReceipt:
+            if !storeKit.isPro && usageTracker.isAtLimit {
+                showPaywall = true
+                HapticManager.warning()
+                diagnosticLogger.record(
+                    level: .warning,
+                    category: "widget.quickAdd",
+                    message: "Blocked widget receipt launch at free limit"
+                )
+                launchAction = nil
+                return
+            }
             if VNDocumentCameraViewController.isSupported {
                 showReceiptScanner = true
             } else {

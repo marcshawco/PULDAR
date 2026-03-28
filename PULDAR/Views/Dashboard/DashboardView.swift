@@ -583,7 +583,7 @@ struct DashboardView: View {
                 usageIndicator
             }
         }
-        .padding(.top, 14)
+        .padding(.top, 22)
         .padding(.bottom, 8)
         .background(
             UnevenRoundedRectangle(

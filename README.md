@@ -59,7 +59,7 @@ PULDAR is built around three jobs:
   - direct monthly income
   - hourly pay + hours/week estimate
 - enforced `100%` allocation before saving
-- rollover budgeting for Pro users
+- recurring expenses and rollover budgeting included for everyone
 - overspend and remaining-state visibility
 
 ### Daily Utility
@@ -76,9 +76,11 @@ PULDAR is built around three jobs:
 
 - month-based history view
 - category, merchant, date, amount, grouping, and sort filters
-- export support in both:
+- entry export support in both:
   - `CSV`
   - `JSON`
+- settings-level snapshot and all-data exports in JSON
+- optional automatic monthly CSV export
 - full device backup in JSON
 
 ### Apple Wallet Import Readiness
@@ -105,36 +107,25 @@ PULDAR is built around three jobs:
 
 ---
 
-## Pricing Model
+## Access Model
 
-PULDAR uses a trial-first subscription model:
+PULDAR is currently free to the public.
 
-- **14-day free trial**
-- **$4.99/month**
-- **$49.99/year**
+- no paywall
+- no trial
+- no subscription purchase flow
+- no usage cap on AI-powered entries
 
-Product IDs:
+### Included For Everyone
 
-- `puldar_pro_monthly`
-- `puldar_pro_yearly`
-
-Users who decline the trial still get a restricted freemium experience.
-
-### Pro Includes
-
-- unlimited entries
+- unlimited plain-English entries
+- receipt scanning
 - recurring expenses
 - rollover budgets
-- full export workflows
-- higher-usage budgeting workflows
-
-### Free Includes
-
-- onboarding
-- on-device model download
-- limited AI-powered entries
-- manual budgeting flow
-- restricted but usable core experience
+- CSV / JSON exports
+- full JSON backup
+- widgets
+- optional local diagnostics export
 
 ---
 
@@ -213,7 +204,7 @@ Because PULDAR does not rely on a central user database, support tooling is buil
 This helps investigate issues like:
 
 - incorrect budget math
-- unexpected subscription state
+- sync or configuration issues
 - export failures
 - recurring expense issues
 
@@ -229,7 +220,7 @@ without collecting user data by default.
 - `DashboardView` — capture flow, budget state, recent transactions
 - `HistoryView` — filtering, grouping, exporting, deletion
 - `SettingsView` — income, allocation, diagnostics, export, personalization
-- `PaywallView` — trial-first subscription UI
+- `PaywallView` — legacy compatibility screen that now explains everything is included
 - `AppOnboardingView` — first-run onboarding
 
 ### Core Services
@@ -238,8 +229,8 @@ without collecting user data by default.
 - `BudgetEngine` — financial math, allocation, rollover, cached month state
 - `CategoryManager` — canonical/custom category mapping
 - `FinanceKitManager` — Apple Wallet import gating, import preview, deduplication scaffolding, fallback messaging
-- `StoreKitManager` — subscriptions, restore, entitlement listening
-- `UsageTracker` — free-tier usage tracking
+- `StoreKitManager` — legacy compatibility placeholder; no live purchase flow
+- `UsageTracker` — legacy compatibility placeholder; entries are unlimited
 - `DiagnosticLogger` — optional local support logging
 - `WidgetBudgetSnapshotStore` — widget snapshot publishing
 
@@ -249,9 +240,8 @@ without collecting user data by default.
   - `Expense`
   - `RecurringExpense`
 - UserDefaults / iCloud KVS:
-  - usage state
   - theme
-  - allocation settings
+  - budget and allocation settings
   - diagnostics preference
   - category settings
 
@@ -261,7 +251,6 @@ without collecting user data by default.
 
 - **UI:** SwiftUI
 - **Persistence:** SwiftData
-- **Subscriptions:** StoreKit 2
 - **Widgets:** WidgetKit
 - **Receipt OCR / scan:** Vision + VisionKit
 - **Apple Wallet import:** FinanceKit-ready scaffolding
@@ -276,23 +265,19 @@ without collecting user data by default.
 ### Requirements
 
 - macOS with full Xcode installed
-- iOS target with modern SwiftUI / SwiftData support
-- iOS 18+ recommended for the current app experience
+- iOS Simulator or iPhone running iOS 17.6 or later
+- modern SwiftUI / SwiftData support
 
 ### Run
 
-1. Open [PULDAR.xcodeproj](/Users/astral/Documents/PROJECTS/XCODE/PULDAR/PULDAR.xcodeproj)
+1. Open `PULDAR.xcodeproj`
 2. Select the `PULDAR` scheme
 3. Build and run
 
-### StoreKit Testing
+### Legacy StoreKit Config
 
-- local config: `PULDAR/Resources/Products.storekit`
-- expected products:
-  - `puldar_pro_monthly`
-  - `puldar_pro_yearly`
-
-Note: actual introductory trial behavior still needs to be configured in App Store Connect / Xcode StoreKit configuration, not just in app copy.
+- `PULDAR/Resources/Products.storekit` is intentionally empty.
+- The file remains in the repo only as a compatibility artifact while all features stay unlocked.
 
 ### iCloud / CloudKit
 
@@ -326,15 +311,15 @@ These are usually simulator/debugger environment messages rather than app logic 
 
 ### Areas Worth Validating Before Release
 
-- onboarding → paywall → freemium fallback
-- monthly and yearly subscription purchase flow
-- restore purchases
+- onboarding and local model download flow
+- recurring expense creation, toggling, deletion, and dashboard suggestions
+- rollover math across month boundaries
 - Apple Wallet eligibility and fallback messaging
 - FinanceKit import deduplication once entitlement access is granted
 - widget rendering and refresh timing
 - receipt scanning on real receipts
 - multi-device iCloud sync behavior
-- CSV / JSON export output
+- CSV / JSON export output, including current-month snapshot contents
 - diagnostic export flow
 
 ---
@@ -345,6 +330,7 @@ Near-term priorities:
 
 - keep expense capture fast and trustworthy
 - keep budgeting understandable at a glance
+- keep every core feature available without access gating
 - improve multi-device reliability
 - prepare Apple Wallet import without compromising privacy or fallback usability
 - make support feasible without compromising privacy

@@ -5,7 +5,7 @@ import SwiftUI
 /// Features:
 /// - Spring-animated submit button (arrow → checkmark on success).
 /// - Processing spinner while the LLM parses.
-/// - Disabled state for paywall lock with a playful shake.
+/// - Optional disabled state with shake feedback.
 struct ExpenseInputView: View {
     let isProcessing: Bool
     let isLocked: Bool
@@ -30,7 +30,7 @@ struct ExpenseInputView: View {
                     .foregroundStyle(AppColors.textTertiary)
 
                 TextField(
-                    isLocked ? "Free limit reached — upgrade to Pro" : "spent 45 at whole foods, or got 20 refund…",
+                    isLocked ? "Input unavailable right now" : "spent 45 at whole foods, or got 20 refund…",
                     text: $inputText
                 )
                 .textFieldStyle(.plain)
@@ -143,18 +143,16 @@ struct ExpenseInputView: View {
         inputText = ""
         Task {
             let success = await onSubmit(rawInput)
-            if !success {
+            if success {
+                withAnimation(.spring(duration: 0.4, bounce: 0.5)) {
+                    showCheckmark = true
+                }
+                try? await Task.sleep(for: .seconds(1.5))
+                withAnimation(.spring(duration: 0.3)) {
+                    showCheckmark = false
+                }
+            } else {
                 inputText = rawInput
-            }
-        }
-
-        // Arrow → checkmark animation
-        withAnimation(.spring(duration: 0.4, bounce: 0.5)) {
-            showCheckmark = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation(.spring(duration: 0.3)) {
-                showCheckmark = false
             }
         }
     }

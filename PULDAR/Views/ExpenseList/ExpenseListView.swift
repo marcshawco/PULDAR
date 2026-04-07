@@ -9,7 +9,6 @@ struct ExpenseListView: View {
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(DiagnosticLogger.self) private var diagnosticLogger
-    @Environment(StoreKitManager.self) private var storeKit
     @Environment(\.modelContext) private var modelContext
     let expenses: [Expense]
     let searchText: String
@@ -243,7 +242,7 @@ struct ExpenseListView: View {
         }
 
         expense.merchant = trimmedMerchant.normalizedMerchantName()
-        expense.amount = (editCategory == "income") ? -abs(amount) : (expense.amount < 0 ? -abs(amount) : abs(amount))
+        expense.amount = (editCategory == "income") ? -abs(amount) : abs(amount)
         expense.category = editCategory
         expense.bucket = editBucket.rawValue
         expense.date = editDate
@@ -278,16 +277,15 @@ struct ExpenseListView: View {
 
     private func recomputedOverspendState(for editedExpense: Expense) -> Bool {
         guard editedExpense.amount > 0 else { return false }
-        let effectiveRecurring = storeKit.isPro ? recurringExpenses : []
         let otherExpenses = expenses.filter { $0.id != editedExpense.id }
         let projectedSpent = budgetEngine.totalSpent(
             expenses: otherExpenses + [editedExpense],
-            recurringExpenses: effectiveRecurring,
+            recurringExpenses: recurringExpenses,
             for: editedExpense.date
         )
         let spendCapacity = budgetEngine.monthSpendCapacity(
             expenses: otherExpenses + [editedExpense],
-            recurringExpenses: effectiveRecurring,
+            recurringExpenses: recurringExpenses,
             for: editedExpense.date
         )
         guard spendCapacity > 0 else { return false }
@@ -380,8 +378,8 @@ struct ExpenseListView: View {
                 if let monthDate = calendar.date(from: comps), let parsed = monthRange(monthDate) {
                     range = parsed
                     remaining = remaining.replacingOccurrences(of: monthName, with: "")
+                    break
                 }
-                break
             }
         }
 

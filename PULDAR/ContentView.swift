@@ -23,8 +23,6 @@ struct ContentView: View {
     @State private var budgetEngine = BudgetEngine()
     @State private var categoryManager = CategoryManager()
     @State private var networkMonitor = NetworkMonitor()
-    @State private var storeKitManager = StoreKitManager()
-    @State private var usageTracker = UsageTracker()
     @State private var diagnosticLogger = DiagnosticLogger.shared
     @State private var financeKitManager = FinanceKitManager()
     @State private var appPreferences = AppPreferences()
@@ -53,8 +51,6 @@ struct ContentView: View {
                 .environment(appPreferences)
                 .environment(budgetEngine)
                 .environment(categoryManager)
-                .environment(storeKitManager)
-                .environment(usageTracker)
                 .environment(diagnosticLogger)
                 .tabItem {
                     Label("Home", systemImage: "house")
@@ -65,7 +61,6 @@ struct ContentView: View {
                 .environment(appPreferences)
                 .environment(budgetEngine)
                 .environment(categoryManager)
-                .environment(storeKitManager)
                 .environment(diagnosticLogger)
                 .tabItem {
                     Label("History", systemImage: "clock.arrow.circlepath")
@@ -76,15 +71,12 @@ struct ContentView: View {
         .environment(budgetEngine)
         .environment(categoryManager)
         .environment(networkMonitor)
-        .environment(storeKitManager)
-        .environment(usageTracker)
         .environment(diagnosticLogger)
         .environment(financeKitManager)
         .environment(appPreferences)
         .overlay {
             WidgetSnapshotSyncView()
                 .environment(budgetEngine)
-                .environment(storeKitManager)
                 .environment(appPreferences)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
@@ -97,9 +89,6 @@ struct ContentView: View {
             Task.detached(priority: .utility) {
                 await llmService.loadModel()
             }
-        }
-        .task {
-            await storeKitManager.listenForTransactions()
         }
         .task {
             diagnosticLogger.record(
@@ -118,7 +107,6 @@ struct ContentView: View {
             }
             .environment(llmService)
             .environment(networkMonitor)
-            .environment(storeKitManager)
             .environment(appPreferences)
             .environment(budgetEngine)
             .environment(categoryManager)

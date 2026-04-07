@@ -200,7 +200,7 @@ final class BudgetEngine {
             .reduce(0) { partial, expense in
                 partial + (expense.amount.isFinite ? expense.amount : 0)
             }
-        let recurringSpent = recurringTotal(recurringExpenses)
+        let recurringSpent = recurringTotal(recurringExpenses, for: month)
         return directSpent + recurringSpent
     }
 
@@ -228,7 +228,8 @@ final class BudgetEngine {
         let result = BudgetBucket.allCases.map { bucket in
             let spent = (spentByBucket[bucket] ?? 0) + recurringTotal(
                 recurringExpenses,
-                bucket: bucket
+                bucket: bucket,
+                for: month
             )
 
             return BucketStatus(
@@ -301,11 +302,15 @@ final class BudgetEngine {
 
     func recurringTotal(
         _ recurringExpenses: [RecurringExpense],
-        bucket: BudgetBucket? = nil
+        bucket: BudgetBucket? = nil,
+        for month: Date = .now
     ) -> Double {
-        recurringExpenses
+        let calendar = Calendar.current
+        return recurringExpenses
             .filter { recurring in
-                recurring.isActive && (bucket == nil || recurring.budgetBucket == bucket)
+                recurring.isActive
+                    && recurringApplies(recurring, to: month, calendar: calendar)
+                    && (bucket == nil || recurring.budgetBucket == bucket)
             }
             .reduce(0) { partial, recurring in
                 partial + recurring.safeAmount
@@ -323,6 +328,20 @@ final class BudgetEngine {
 
     private func isIncomeTransaction(_ expense: Expense) -> Bool {
         normalize(expense.category) == "income"
+    }
+
+    private func recurringApplies(
+        _ recurring: RecurringExpense,
+        to month: Date,
+        calendar: Calendar
+    ) -> Bool {
+        let recurringMonth = calendar.date(
+            from: calendar.dateComponents([.year, .month], from: recurring.createdAt)
+        ) ?? recurring.createdAt
+        let targetMonth = calendar.date(
+            from: calendar.dateComponents([.year, .month], from: month)
+        ) ?? month
+        return recurringMonth <= targetMonth
     }
 
     private let rolloverEligibleBuckets: [BudgetBucket] = [.fundamentals, .fun]
@@ -391,7 +410,7 @@ final class BudgetEngine {
         let monthSpent = filterToMonth(expenses, month: month)
             .filter { !isIncomeTransaction($0) && $0.budgetBucket == bucket }
             .reduce(0) { $0 + ($1.amount.isFinite ? $1.amount : 0) }
-        return monthSpent + recurringTotal(recurringExpenses, bucket: bucket)
+        return monthSpent + recurringTotal(recurringExpenses, bucket: bucket, for: month)
     }
 
     private func clamp(_ value: Double) -> Double {

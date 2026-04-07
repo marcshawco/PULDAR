@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct AppOnboardingView: View {
-    @Environment(StoreKitManager.self) private var store
-
     private struct OnboardingPage: Identifiable {
         let id = UUID()
         let title: String
@@ -16,7 +14,6 @@ struct AppOnboardingView: View {
     let onCompleted: () -> Void
 
     @State private var currentPage = 0
-    @State private var showTrialOffer = false
 
     private let pages: [OnboardingPage] = [
         .init(
@@ -68,15 +65,15 @@ struct AppOnboardingView: View {
             ]
         ),
         .init(
-            title: "Try Pro First",
-            subtitle: "Start with 14 days free, then decide what fits.",
-            detail: "We’ll offer the trial immediately so high-intent users can unlock the full experience right away. If you pass for now, you will still get a restricted freemium version to keep building conviction.",
-            symbol: "gift.fill",
+            title: "Everything Is Ready To Use",
+            subtitle: "Jump in with the full PULDAR experience.",
+            detail: "Recurring expenses, rollover budgets, exports, receipt scanning, and unlimited entries are all included. Set your budget, add your first expense, and make the app your own.",
+            symbol: "checkmark.seal.fill",
             accent: AppColors.accent,
             highlights: [
-                "14 full days of Pro access",
-                "Yearly saves money vs monthly",
-                "Skip now and keep using free"
+                "Unlimited entries",
+                "Recurring expenses and rollover",
+                "CSV and JSON exports included"
             ]
         ),
     ]
@@ -122,13 +119,6 @@ struct AppOnboardingView: View {
                 }
             }
             .interactiveDismissDisabled(true)
-            .sheet(isPresented: $showTrialOffer) {
-                PaywallView(context: .onboardingTrial) {
-                    showTrialOffer = false
-                    onCompleted()
-                }
-                .environment(store)
-            }
         }
     }
 
@@ -232,11 +222,11 @@ struct AppOnboardingView: View {
 
             if currentPage == pages.count - 1 {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Next up: trial or freemium")
+                    Text("Next up: your first entry")
                         .font((compact ? Font.caption : .footnote).weight(.semibold))
                         .foregroundStyle(AppColors.textPrimary)
 
-                    Text("We’ll present the 14-day trial right away. If you skip it, you will still land in the limited free version and can upgrade later.")
+                    Text("Finish onboarding and you’ll land directly in the app with every feature available.")
                         .font(compact ? .caption : .footnote)
                         .foregroundStyle(AppColors.textSecondary)
                 }
@@ -274,9 +264,9 @@ struct AppOnboardingView: View {
                 )
             }
 
-            Button(currentPage == pages.count - 1 ? "See Trial Options" : "Continue") {
+            Button(currentPage == pages.count - 1 ? "Get Started" : "Continue") {
                 if currentPage == pages.count - 1 {
-                    showTrialOffer = true
+                    onCompleted()
                 } else {
                     currentPage += 1
                 }

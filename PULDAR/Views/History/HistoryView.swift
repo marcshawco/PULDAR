@@ -6,7 +6,6 @@ struct HistoryView: View {
     @Environment(AppPreferences.self) private var appPreferences
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(CategoryManager.self) private var categoryManager
-    @Environment(StoreKitManager.self) private var store
     @Environment(DiagnosticLogger.self) private var diagnosticLogger
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -23,7 +22,6 @@ struct HistoryView: View {
     @State private var groupingMode: GroupingMode = .day
     @State private var sortMode: SortMode = .newest
     @State private var exportURL: URL?
-    @State private var showPaywall = false
     @State private var showFiltersSheet = false
     @State private var showExportSheet = false
     @FocusState private var focusedField: FocusField?
@@ -237,10 +235,6 @@ struct HistoryView: View {
             }
             .onChange(of: autoMonthlyCSVExportEnabled) {
                 runAutoMonthlyExportIfNeeded()
-            }
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
-                    .environment(store)
             }
             .sheet(isPresented: $showFiltersSheet) {
                 filtersSheet
@@ -469,37 +463,24 @@ struct HistoryView: View {
     private var exportSheet: some View {
         NavigationStack {
             List {
-                if store.isPro {
-                    Section("Export") {
-                        Button("Export Selected Month (CSV)") {
-                            exportCSV(for: filteredExpenses, scope: monthLabel(selectedMonth))
-                        }
-                        Button("Export Selected Month (JSON)") {
-                            exportJSON(for: filteredExpenses, scope: monthLabel(selectedMonth))
-                        }
-                        Button("Export All Data (CSV)") {
-                            exportCSV(for: expenses, scope: "all_months")
-                        }
-                        Button("Export All Data (JSON)") {
-                            exportJSON(for: expenses, scope: "all_months")
-                        }
-                        Toggle("Auto Monthly CSV Export", isOn: $autoMonthlyCSVExportEnabled)
-                            .tint(AppColors.accent)
-                        if let exportURL {
-                            ShareLink(item: exportURL) {
-                                Label("Share Last Export", systemImage: "square.and.arrow.up")
-                            }
-                        }
+                Section("Export") {
+                    Button("Export Selected Entries (CSV)") {
+                        exportCSV(for: filteredExpenses, scope: monthLabel(selectedMonth))
                     }
-                } else {
-                    Section("Pro Export") {
-                        Text("Exports are available on Pro.")
-                            .foregroundStyle(AppColors.textTertiary)
-                        lockedExportPreview
-                        Button {
-                            showPaywall = true
-                        } label: {
-                            Label("Unlock Pro (\(AppConstants.proPrice))", systemImage: "lock.open")
+                    Button("Export Selected Entries (JSON)") {
+                        exportJSON(for: filteredExpenses, scope: monthLabel(selectedMonth))
+                    }
+                    Button("Export All Entries (CSV)") {
+                        exportCSV(for: expenses, scope: "all_entries")
+                    }
+                    Button("Export All Entries (JSON)") {
+                        exportJSON(for: expenses, scope: "all_entries")
+                    }
+                    Toggle("Auto Monthly CSV Export", isOn: $autoMonthlyCSVExportEnabled)
+                        .tint(AppColors.accent)
+                    if let exportURL {
+                        ShareLink(item: exportURL) {
+                            Label("Share Last Export", systemImage: "square.and.arrow.up")
                         }
                     }
                 }
@@ -643,7 +624,7 @@ struct HistoryView: View {
     }
 
     private func runAutoMonthlyExportIfNeeded() {
-        guard store.isPro, autoMonthlyCSVExportEnabled else { return }
+        guard autoMonthlyCSVExportEnabled else { return }
 
         let calendar = Calendar.current
         guard let previousMonth = calendar.date(byAdding: .month, value: -1, to: .now) else {
@@ -669,38 +650,6 @@ struct HistoryView: View {
     private func monthKey(_ date: Date) -> String {
         let comps = Calendar.current.dateComponents([.year, .month], from: date)
         return "\(comps.year ?? 0)-\(comps.month ?? 0)"
-    }
-
-    private var lockedExportPreview: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Preview")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(AppColors.textSecondary)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("date,merchant,amount,category,bucket")
-                Text("2026-02-27,Whole Foods,45.00,Groceries,Fundamentals")
-                Text("2026-02-26,Bitcoin,200.00,Investments,Future")
-                Text("2026-02-25,Hulu,9.99,Subscriptions,Fun")
-            }
-            .font(.caption2.monospaced())
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(AppColors.tertiaryBg)
-            )
-            .blur(radius: 2.4)
-            .overlay(alignment: .center) {
-                Label("Pro Export Preview", systemImage: "lock.fill")
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(AppColors.background.opacity(0.92))
-                    )
-            }
-        }
     }
 
     private struct ExpenseGroup: Identifiable {

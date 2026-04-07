@@ -7,7 +7,7 @@ enum AppColors {
     static let secondaryBg = Color(.secondarySystemBackground)
     static let tertiaryBg = Color(.tertiarySystemBackground)
 
-    // 3-Bucket colors — muted, premium tones
+    // 3-Bucket colors — muted tones
     static let bucketFundamentals = Color(red: 0.35, green: 0.55, blue: 0.78)
     static let bucketFun = Color(red: 0.55, green: 0.75, blue: 0.52)
     static let bucketFuture = Color(red: 0.68, green: 0.52, blue: 0.82)
@@ -26,11 +26,6 @@ enum AppColors {
 // MARK: - App-wide Constants
 
 enum AppConstants {
-    static let freeInputsPerMonth = 10
-    static let proPrice = "14-day trial, then $4.99/mo or $49.99/yr"
-    static let proMonthlyProductID = "puldar_pro_monthly"
-    static let proYearlyProductID = "puldar_pro_yearly"
-    static let legacyProLifetimeProductID = "puldar_pro_lifetime"
     static let modelID = "mlx-community/Qwen2.5-0.5B-Instruct-4bit"
     static let gpuCacheLimitBytes = 128 * 1024 * 1024 // 128 MB
 }

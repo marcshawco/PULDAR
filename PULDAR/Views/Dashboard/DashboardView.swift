@@ -28,11 +28,8 @@ struct DashboardView: View {
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(NetworkMonitor.self) private var networkMonitor
-    @Environment(StoreKitManager.self) private var storeKit
-    @Environment(UsageTracker.self) private var usageTracker
     @Environment(DiagnosticLogger.self) private var diagnosticLogger
     @Environment(FinanceKitManager.self) private var financeKitManager
-    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     // MARK: - SwiftData Query
@@ -47,7 +44,6 @@ struct DashboardView: View {
     @State private var isProcessing = false
     @State private var searchText = ""
     @State private var selectedBucketFilter: BudgetBucket?
-    @State private var showPaywall = false
     @State private var showSettings = false
     @State private var showModelOnboarding = false
     @State private var errorMessage: String?
@@ -63,7 +59,7 @@ struct DashboardView: View {
     @State private var didRunStartupMaintenance = false
 
     private var effectiveRecurringExpenses: [RecurringExpense] {
-        storeKit.isPro ? recurringExpenses : []
+        recurringExpenses
     }
 
     private var bucketStatuses: [BudgetEngine.BucketStatus] {
@@ -99,7 +95,7 @@ struct DashboardView: View {
     }
 
     private var recurringMonthlyTotal: Double {
-        storeKit.isPro ? budgetEngine.recurringTotal(recurringExpenses) : 0
+        budgetEngine.recurringTotal(recurringExpenses)
     }
 
     private var dashboardMaxWidth: CGFloat {
@@ -143,10 +139,6 @@ struct DashboardView: View {
                 .environment(llmService)
                 .environment(networkMonitor)
             }
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
-                    .environment(storeKit)
-            }
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .environment(budgetEngine)
@@ -154,7 +146,6 @@ struct DashboardView: View {
                     .environment(categoryManager)
                     .environment(diagnosticLogger)
                     .environment(financeKitManager)
-                    .environment(storeKit)
             }
             .sheet(isPresented: $showReceiptScanner) {
                 ReceiptScannerView(currencyCode: appPreferences.currencyCode) { result in
@@ -199,17 +190,7 @@ struct DashboardView: View {
                 }
             }
             .task {
-                await storeKit.checkEntitlement()
-            }
-            .task {
                 await scheduleStartupMaintenance()
-            }
-            .onChange(of: scenePhase) {
-                guard scenePhase == .active else { return }
-                Task { await storeKit.checkEntitlement() }
-            }
-            .onChange(of: expenses.count) {
-                usageTracker.reconcile(with: expenses)
             }
             .onAppear {
                 consumeLaunchActionIfNeeded()
@@ -313,18 +294,6 @@ struct DashboardView: View {
         _ rawInput: String,
         source: Expense.SourceKind = .manual
     ) async -> Bool {
-        // Gate: paywall check
-        if !storeKit.isPro && usageTracker.isAtLimit {
-            showPaywall = true
-            HapticManager.warning()
-            diagnosticLogger.record(
-                level: .warning,
-                category: "expense.submit",
-                message: "Blocked expense submission at free limit"
-            )
-            return false
-        }
-
         guard !rawInput.isEmpty else { return false }
         diagnosticLogger.record(
             category: "expense.submit",
@@ -382,14 +351,7 @@ struct DashboardView: View {
                 ]
             )
 
-            // Track usage (free tier only)
-            if !storeKit.isPro {
-                usageTracker.recordInput()
-            }
-
-            if storeKit.isPro {
-                recurringSuggestion = recurringSuggestionCandidate(for: expense)
-            }
+            recurringSuggestion = recurringSuggestionCandidate(for: expense)
 
             if crossedIntoOverspent {
                 showOverspendTriggeredBanner(for: storageBucket)
@@ -488,26 +450,6 @@ struct DashboardView: View {
         .padding(.horizontal)
     }
 
-    private var usageIndicator: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<AppConstants.freeInputsPerMonth, id: \.self) { i in
-                Circle()
-                    .fill(
-                        i < usageTracker.currentCount
-                            ? AppColors.accent
-                            : Color(.systemGray4)
-                    )
-                    .frame(width: 6, height: 6)
-            }
-
-            Text("\(usageTracker.remainingFreeInputs) Monthly Entries Remaining")
-                .font(.caption2)
-                .foregroundStyle(AppColors.textTertiary)
-                .padding(.leading, 4)
-        }
-        .padding(.horizontal)
-    }
-
     private func errorBanner(_ message: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.circle")
@@ -558,16 +500,11 @@ struct DashboardView: View {
         VStack(spacing: 8) {
             ExpenseInputView(
                 isProcessing: isProcessing,
-                isLocked: !storeKit.isPro && usageTracker.isAtLimit,
+                isLocked: false,
                 onSubmit: { text in
                     await submitExpense(text)
                 },
                 focusTrigger: composerFocusTrigger,
-                onLockedTap: {
-                    if !storeKit.isPro && usageTracker.isAtLimit {
-                        showPaywall = true
-                    }
-                },
                 onCameraTap: {
                     if !VNDocumentCameraViewController.isSupported {
                         presentTransientError(
@@ -578,10 +515,6 @@ struct DashboardView: View {
                     showReceiptScanner = true
                 }
             )
-
-            if !storeKit.isPro {
-                usageIndicator
-            }
         }
         .padding(.top, 22)
         .padding(.bottom, 8)
@@ -709,7 +642,7 @@ struct DashboardView: View {
         guard budgetEngine.monthlyIncome > 0 else { return false }
         let projected = budgetEngine.totalSpent(
             expenses: expenses,
-            recurringExpenses: storeKit.isPro ? recurringExpenses : []
+            recurringExpenses: recurringExpenses
         ) + amount
         return projected > budgetEngine.monthlyIncome
     }
@@ -717,9 +650,8 @@ struct DashboardView: View {
     private func didCrossIntoOverspent(bucket: BudgetBucket, adding expense: Expense) -> Bool {
         guard expense.amount > 0 else { return false }
 
-        let recurring = storeKit.isPro ? recurringExpenses : []
-        let before = bucketStatuses(for: expenses, recurringExpenses: recurring)
-        let after = bucketStatuses(for: expenses + [expense], recurringExpenses: recurring)
+        let before = bucketStatuses(for: expenses, recurringExpenses: recurringExpenses)
+        let after = bucketStatuses(for: expenses + [expense], recurringExpenses: recurringExpenses)
 
         let beforeStatus = before.first(where: { $0.bucket == bucket })
         let afterStatus = after.first(where: { $0.bucket == bucket })
@@ -859,7 +791,6 @@ struct DashboardView: View {
         guard !didRunStartupMaintenance else { return }
         didRunStartupMaintenance = true
 
-        usageTracker.reconcile(with: expenses)
         migrateCategoryConsistencyIfNeeded()
         migrateMerchantCapitalizationIfNeeded()
     }
@@ -876,7 +807,6 @@ struct DashboardView: View {
     private func refreshDashboard() async {
         await MainActor.run {
             budgetEngine.markDataChanged()
-            usageTracker.reconcile(with: expenses)
 
             if !didRunCategoryConsistencyFixV2 {
                 migrateCategoryConsistencyIfNeeded()
@@ -969,17 +899,6 @@ struct DashboardView: View {
         case .focusComposer:
             composerFocusTrigger += 1
         case .scanReceipt:
-            if !storeKit.isPro && usageTracker.isAtLimit {
-                showPaywall = true
-                HapticManager.warning()
-                diagnosticLogger.record(
-                    level: .warning,
-                    category: "widget.quickAdd",
-                    message: "Blocked widget receipt launch at free limit"
-                )
-                launchAction = nil
-                return
-            }
             if VNDocumentCameraViewController.isSupported {
                 showReceiptScanner = true
             } else {

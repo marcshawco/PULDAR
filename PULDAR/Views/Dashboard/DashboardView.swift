@@ -58,27 +58,35 @@ struct DashboardView: View {
     @AppStorage("didNormalizeMerchantsV1") private var didNormalizeMerchantsV1 = false
     @State private var didRunStartupMaintenance = false
 
+    private var currentMonthExpenses: [Expense] {
+        let calendar = Calendar.current
+        let now = Date.now
+        return expenses.filter {
+            calendar.isDate($0.date, equalTo: now, toGranularity: .month)
+        }
+    }
+
     private var effectiveRecurringExpenses: [RecurringExpense] {
         recurringExpenses
     }
 
     private var bucketStatuses: [BudgetEngine.BucketStatus] {
         budgetEngine.calculateStatus(
-            expenses: expenses,
+            expenses: currentMonthExpenses,
             recurringExpenses: effectiveRecurringExpenses
         )
     }
 
     private var monthlyOverspentAmount: Double {
         budgetEngine.monthlyOverspentAmount(
-            expenses: expenses,
+            expenses: currentMonthExpenses,
             recurringExpenses: effectiveRecurringExpenses
         )
     }
 
     private var monthlySpendCapacity: Double {
         budgetEngine.monthSpendCapacity(
-            expenses: expenses,
+            expenses: currentMonthExpenses,
             recurringExpenses: effectiveRecurringExpenses
         )
     }
@@ -87,7 +95,7 @@ struct DashboardView: View {
         return max(
             monthlySpendCapacity
                 - budgetEngine.totalSpent(
-                    expenses: expenses,
+                    expenses: currentMonthExpenses,
                     recurringExpenses: effectiveRecurringExpenses
                 ),
             0
@@ -244,8 +252,10 @@ struct DashboardView: View {
                 incomePrompt
             }
 
-            Divider()
-                .padding(.horizontal, 24)
+            if !currentMonthExpenses.isEmpty {
+                Divider()
+                    .padding(.horizontal, 24)
+            }
 
             if let selectedBucketFilter {
                 HStack(spacing: 8) {
@@ -267,16 +277,16 @@ struct DashboardView: View {
                 overspentEntryBanner(message)
             }
 
-            if !expenses.isEmpty {
+            if !currentMonthExpenses.isEmpty {
                 SearchBar(text: $searchText)
                     .padding(.horizontal)
             }
 
-            if expenses.isEmpty {
+            if currentMonthExpenses.isEmpty {
                 EmptyStateView()
             } else {
                 ExpenseListView(
-                    expenses: expenses,
+                    expenses: currentMonthExpenses,
                     searchText: searchText,
                     bucketFilter: selectedBucketFilter,
                     onDeleteExpense: deleteExpense
@@ -641,7 +651,7 @@ struct DashboardView: View {
         guard amount > 0 else { return false }
         guard budgetEngine.monthlyIncome > 0 else { return false }
         let projected = budgetEngine.totalSpent(
-            expenses: expenses,
+            expenses: currentMonthExpenses,
             recurringExpenses: recurringExpenses
         ) + amount
         return projected > budgetEngine.monthlyIncome
@@ -650,8 +660,8 @@ struct DashboardView: View {
     private func didCrossIntoOverspent(bucket: BudgetBucket, adding expense: Expense) -> Bool {
         guard expense.amount > 0 else { return false }
 
-        let before = bucketStatuses(for: expenses, recurringExpenses: recurringExpenses)
-        let after = bucketStatuses(for: expenses + [expense], recurringExpenses: recurringExpenses)
+        let before = bucketStatuses(for: currentMonthExpenses, recurringExpenses: recurringExpenses)
+        let after = bucketStatuses(for: currentMonthExpenses + [expense], recurringExpenses: recurringExpenses)
 
         let beforeStatus = before.first(where: { $0.bucket == bucket })
         let afterStatus = after.first(where: { $0.bucket == bucket })

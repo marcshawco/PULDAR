@@ -11,13 +11,21 @@ struct WidgetSnapshotSyncView: View {
     @Query(sort: \RecurringExpense.createdAt, order: .reverse)
     private var recurringExpenses: [RecurringExpense]
 
+    private var currentMonthExpenses: [Expense] {
+        let calendar = Calendar.current
+        let now = Date.now
+        return expenses.filter {
+            calendar.isDate($0.date, equalTo: now, toGranularity: .month)
+        }
+    }
+
     private var effectiveRecurringExpenses: [RecurringExpense] {
         recurringExpenses
     }
 
     private var statuses: [BudgetEngine.BucketStatus] {
         budgetEngine.calculateStatus(
-            expenses: expenses,
+            expenses: currentMonthExpenses,
             recurringExpenses: effectiveRecurringExpenses
         )
     }
@@ -28,13 +36,13 @@ struct WidgetSnapshotSyncView: View {
 
     private var totalSpent: Double {
         budgetEngine.totalSpent(
-            expenses: expenses,
+            expenses: currentMonthExpenses,
             recurringExpenses: effectiveRecurringExpenses
         )
     }
 
     private var expenseRefreshSignature: [String] {
-        expenses.map { expense in
+        currentMonthExpenses.map { expense in
             [
                 expense.id.uuidString,
                 expense.updatedAt?.timeIntervalSinceReferenceDate.description ?? "nil",

@@ -146,7 +146,11 @@ final class DiagnosticLogger {
     private func loadEntries() -> [Entry] {
         let url = storageURL()
         guard let data = try? Data(contentsOf: url),
-              let decoded = try? JSONDecoder().decode([Entry].self, from: data) else {
+              let decoded = try? {
+                  let decoder = JSONDecoder()
+                  decoder.dateDecodingStrategy = .iso8601
+                  return try decoder.decode([Entry].self, from: data)
+              }() else {
             return []
         }
         return decoded

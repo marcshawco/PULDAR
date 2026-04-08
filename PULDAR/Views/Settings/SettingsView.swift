@@ -54,6 +54,7 @@ struct SettingsView: View {
     @State private var selectedBudgetInfoBucket: BudgetBucket?
     @State private var financeKitNotice: FinanceKitManager.Notice?
     @AppStorage("appThemeMode") private var appThemeMode = "system"
+    @State private var selectedAppIcon: AppIcon = AppIconManager.current
     @AppStorage("didCompleteAppOnboarding") private var didCompleteAppOnboarding = false
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
     @AppStorage("hourlyPayRate") private var hourlyPayRate: Double = 0
@@ -663,6 +664,50 @@ struct SettingsView: View {
                 Text("Dark").tag("dark")
             }
             .pickerStyle(.menu)
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("App Icon")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 14) {
+                        ForEach(AppIcon.allCases) { icon in
+                            Button {
+                                selectedAppIcon = icon
+                                AppIconManager.apply(icon)
+                                HapticManager.selection()
+                            } label: {
+                                VStack(spacing: 6) {
+                                    Image(icon.previewImageName)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 60, height: 60)
+                                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .strokeBorder(
+                                                    selectedAppIcon == icon ? Color.accentColor : Color.clear,
+                                                    lineWidth: 2.5
+                                                )
+                                        )
+                                        .shadow(color: .black.opacity(0.12), radius: 4, x: 0, y: 2)
+
+                                    Text(icon.displayName)
+                                        .font(.caption2)
+                                        .foregroundStyle(selectedAppIcon == icon ? .primary : .secondary)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.center)
+                                        .frame(width: 60)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                }
+            }
+            .padding(.vertical, 4)
         } header: {
             Text("Appearance")
         }

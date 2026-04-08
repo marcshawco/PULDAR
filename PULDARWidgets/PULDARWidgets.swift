@@ -23,17 +23,12 @@ private struct WidgetBudgetSnapshot: Codable {
 
 private enum WidgetBudgetSnapshotReader {
     static let appGroupID = "group.marcshaw.PULDAR"
-    static let fileName = "widget-budget-snapshot.json"
+    static let defaultsKey = "widgetBudgetSnapshot"
 
     static func load() -> WidgetBudgetSnapshot? {
-        guard let containerURL = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: appGroupID
-        ) else {
+        guard let data = UserDefaults(suiteName: appGroupID)?.data(forKey: defaultsKey) else {
             return nil
         }
-
-        let url = containerURL.appendingPathComponent(fileName)
-        guard let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(WidgetBudgetSnapshot.self, from: data)
     }
 }
@@ -493,7 +488,6 @@ private struct PULDARQuickAddWidget: Widget {
 @main
 struct PULDARWidgetsBundle: WidgetBundle {
     var body: some Widget {
-        PULDARBudgetWidget()
         PULDARQuickAddWidget()
     }
 }

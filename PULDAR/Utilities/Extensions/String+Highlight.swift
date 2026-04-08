@@ -56,7 +56,7 @@ extension String {
     func normalizedMerchantName() -> String {
         let cleaned = self
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: #"(?i)\b(store|st|unit|terminal|lane|register|reg|loc|location|#)\s*[0-9A-Z-]+\b"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"(?i)\b(store|st|unit|terminal|lane|register|reg|loc|location|#)\s*[0-9][0-9A-Z-]*\b"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"(?i)\b(?:www\.)?[a-z0-9.-]+\.(com|net|org)\b"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"(?i)\b(?:tel|phone|ph)\b.*$"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: #"(?i)\b(?:customer copy|merchant copy|approved|declined|transaction|receipt)\b"#, with: "", options: .regularExpression)

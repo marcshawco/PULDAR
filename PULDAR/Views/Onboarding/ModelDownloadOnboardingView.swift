@@ -28,7 +28,7 @@ struct ModelDownloadOnboardingView: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: compact ? 16 : 20) {
-                        Text("Down Local AI")
+                        Text("Download Local AI")
                             .font(compact ? .title2.bold() : .largeTitle.bold())
 
                         Text("PULDAR runs AI fully on-device. We download a one-time model so your expense text never leaves your phone.")

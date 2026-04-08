@@ -5,6 +5,7 @@
 //  Created by Marcus Shaw II on 2/22/26.
 //
 
+import AppIntents
 import SwiftUI
 import SwiftData
 import UIKit
@@ -95,6 +96,15 @@ struct ContentView: View {
                 category: "app.lifecycle",
                 message: "App launched"
             )
+            PULDARAppShortcuts.updateAppShortcutParameters()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .puldarFocusComposer)) { _ in
+            selectedTab = .home
+            dashboardLaunchAction = DashboardLaunchAction(kind: .focusComposer)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .puldarScanReceipt)) { _ in
+            selectedTab = .home
+            dashboardLaunchAction = DashboardLaunchAction(kind: .scanReceipt)
         }
         .fullScreenCover(
             isPresented: Binding(

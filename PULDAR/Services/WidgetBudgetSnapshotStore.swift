@@ -22,7 +22,7 @@ struct WidgetBudgetSnapshot: Codable {
 
 enum WidgetBudgetSnapshotStore {
     static let appGroupID = "group.marcshaw.PULDAR"
-    private static let fileName = "widget-budget-snapshot.json"
+    private static let defaultsKey = "widgetBudgetSnapshot"
 
     static func publish(
         statuses: [BudgetEngine.BucketStatus],
@@ -30,12 +30,6 @@ enum WidgetBudgetSnapshotStore {
         totalSpent: Double,
         currencyCode: String
     ) {
-        guard let containerURL = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: appGroupID
-        ) else {
-            return
-        }
-
         let snapshot = WidgetBudgetSnapshot(
             generatedAt: .now,
             currencyCode: currencyCode,
@@ -55,16 +49,8 @@ enum WidgetBudgetSnapshotStore {
             }
         )
 
-        let destinationURL = containerURL.appendingPathComponent(fileName)
-
-        do {
-            let data = try JSONEncoder().encode(snapshot)
-            try data.write(to: destinationURL, options: .atomic)
-            WidgetCenter.shared.reloadAllTimelines()
-        } catch {
-            #if DEBUG
-            print("Widget snapshot publish failed: \(error)")
-            #endif
-        }
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        UserDefaults(suiteName: appGroupID)?.set(data, forKey: defaultsKey)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }

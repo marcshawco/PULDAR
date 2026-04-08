@@ -73,9 +73,9 @@ struct ReceiptScannerView: UIViewControllerRepresentable {
             Task {
                 do {
                     let text = try await Self.extractText(from: scan, currencyCode: currencyCode)
-                    onComplete(.success(text))
+                    await MainActor.run { onComplete(.success(text)) }
                 } catch {
-                    onComplete(.failure(error))
+                    await MainActor.run { onComplete(.failure(error)) }
                 }
             }
         }

@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "White_BlackBG.png",
+      "filename" : "Ethereal_WhiteBG.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -13,7 +13,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "White_BlackBG.png",
+      "filename" : "Ethereal_BlackBG.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -25,7 +25,7 @@
           "value" : "tinted"
         }
       ],
-      "filename" : "White_AppTint.png",
+      "filename" : "Ethereal_AppTint.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"

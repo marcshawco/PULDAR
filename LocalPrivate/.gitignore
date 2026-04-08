@@ -1,0 +1,8 @@
+# Put local-only files here so they never get committed.
+# Examples:
+# - private logos and images
+# - screenshots and scanned receipts
+# - exported budgets, backups, and diagnostics
+# - any other sensitive personal data
+*
+!.gitignore

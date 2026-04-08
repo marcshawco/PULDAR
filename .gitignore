@@ -1,0 +1,21 @@
+.DS_Store
+
+# Xcode user-specific state
+*.xcuserstate
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Local build artifacts
+DerivedData/
+.build/
+
+# App-generated local exports and diagnostics if copied into the repo
+puldar_*.csv
+puldar_*.json
+puldar_backup_*.json
+puldar_diagnostics_*.json
+diagnostic_logs.json
+
+# Local-only private assets and personal data
+LocalPrivate/*
+!LocalPrivate/.gitignore

@@ -18,6 +18,7 @@ private struct BudgetSnapshotDTO: Decodable {
 extension Notification.Name {
     static let puldarFocusComposer = Notification.Name("puldarFocusComposer")
     static let puldarScanReceipt   = Notification.Name("puldarScanReceipt")
+    static let puldarReplayOnboarding = Notification.Name("puldarReplayOnboarding")
 }
 
 // MARK: - Log Expense Intent

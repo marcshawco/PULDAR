@@ -55,7 +55,6 @@ struct SettingsView: View {
     @State private var financeKitNotice: FinanceKitManager.Notice?
     @AppStorage("appThemeMode") private var appThemeMode = "system"
     @State private var selectedAppIcon: AppIcon = AppIconManager.current
-    @AppStorage("didCompleteAppOnboarding") private var didCompleteAppOnboarding = false
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
     @AppStorage("hourlyPayRate") private var hourlyPayRate: Double = 0
     @AppStorage("hoursPerWeek") private var hoursPerWeek: Double = 40
@@ -778,7 +777,7 @@ struct SettingsView: View {
             Button("View Onboarding Again") {
                 dismiss()
                 DispatchQueue.main.async {
-                    didCompleteAppOnboarding = false
+                    NotificationCenter.default.post(name: .puldarReplayOnboarding, object: nil)
                 }
             }
         } header: {

@@ -106,6 +106,9 @@ struct ContentView: View {
             selectedTab = .home
             dashboardLaunchAction = DashboardLaunchAction(kind: .scanReceipt)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .puldarReplayOnboarding)) { _ in
+            didCompleteAppOnboarding = false
+        }
         .fullScreenCover(
             isPresented: Binding(
                 get: { !didCompleteAppOnboarding },

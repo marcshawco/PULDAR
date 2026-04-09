@@ -29,7 +29,6 @@ struct DashboardView: View {
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(NetworkMonitor.self) private var networkMonitor
     @Environment(DiagnosticLogger.self) private var diagnosticLogger
-    @Environment(FinanceKitManager.self) private var financeKitManager
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     // MARK: - SwiftData Query
@@ -153,7 +152,6 @@ struct DashboardView: View {
                     .environment(appPreferences)
                     .environment(categoryManager)
                     .environment(diagnosticLogger)
-                    .environment(financeKitManager)
             }
             .sheet(isPresented: $showReceiptScanner) {
                 ReceiptScannerView(currencyCode: appPreferences.currencyCode) { result in

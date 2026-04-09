@@ -20,7 +20,6 @@ struct SettingsView: View {
     @Environment(AppPreferences.self) private var appPreferences
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(DiagnosticLogger.self) private var diagnosticLogger
-    @Environment(FinanceKitManager.self) private var financeKitManager
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -53,7 +52,6 @@ struct SettingsView: View {
     @State private var showClearDiagnosticsAlert = false
     @State private var showBudgetAllocationInfo = false
     @State private var selectedBudgetInfoBucket: BudgetBucket?
-    @State private var financeKitNotice: FinanceKitManager.Notice?
     @State private var diagnosticsStatusMessage: String?
     @AppStorage("appThemeMode") private var appThemeMode = "system"
     @State private var selectedAppIcon: AppIcon = AppIconManager.current
@@ -114,7 +112,6 @@ struct SettingsView: View {
                 }
             }
             .onAppear {
-                financeKitManager.refreshAvailability()
                 if budgetEngine.monthlyIncome > 0 {
                     incomeText = String(format: "%.0f", budgetEngine.monthlyIncome)
                 }
@@ -187,13 +184,6 @@ struct SettingsView: View {
                     }
                 )
             }
-            .alert(item: $financeKitNotice) { notice in
-                Alert(
-                    title: Text(notice.title),
-                    message: Text(notice.message),
-                    dismissButton: .default(Text("OK"))
-                )
-            }
     }
 
     private var settingsForm: some View {
@@ -207,7 +197,6 @@ struct SettingsView: View {
             languageAndCurrencySection
             appearanceSection
             widgetsSection
-            appleWalletSyncSection
             customCategoriesSection
             accountSection
             diagnosticsSection
@@ -566,40 +555,6 @@ struct SettingsView: View {
             .padding(.vertical, 4)
         } header: {
             Text("Widgets")
-        }
-    }
-
-    private var appleWalletSyncSection: some View {
-        Section {
-            VStack(alignment: .leading, spacing: 8) {
-                LabeledContent("Status", value: financeKitManager.statusTitle)
-
-                Text(financeKitManager.detailText)
-                    .font(.caption)
-                    .foregroundStyle(AppColors.textSecondary)
-
-                if let lastSyncError = financeKitManager.lastSyncError {
-                    Text(lastSyncError)
-                        .font(.caption)
-                        .foregroundStyle(AppColors.overspend)
-                }
-
-                if financeKitManager.lastImportedCount > 0 {
-                    Text("Last Apple Wallet import added \(financeKitManager.lastImportedCount) transaction(s).")
-                        .font(.caption2)
-                        .foregroundStyle(AppColors.textTertiary)
-                }
-
-                Button(financeKitManager.primaryActionTitle) {
-                    financeKitManager.refreshAvailability()
-                    financeKitNotice = financeKitManager.primaryActionNotice()
-                }
-            }
-            .padding(.vertical, 4)
-        } header: {
-            Text("Apple Wallet Sync")
-        } footer: {
-            Text("When available, this will import Apple Card, Apple Cash, and Savings activity without using third-party aggregators. If it is unavailable, PULDAR falls back to manual entry, receipt scanning, and CSV/JSON portability.")
         }
     }
 

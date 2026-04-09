@@ -46,6 +46,7 @@ struct SettingsView: View {
     @State private var exportURL: URL?
     @State private var backupURL: URL?
     @State private var diagnosticURL: URL?
+    @State private var activeShareFile: SharedFile?
     @State private var selectedAllocationPreset: AllocationPreset = .custom
     @State private var showZeroFunWarning = false
     @State private var showDeleteAllConfirmation = false
@@ -152,6 +153,9 @@ struct SettingsView: View {
             }
             .onChange(of: autoMonthlyCSVExportEnabled) {
                 runAutoMonthlyExportIfNeeded()
+            }
+            .sheet(item: $activeShareFile) { sharedFile in
+                ActivityShareSheet(activityItems: [sharedFile.url])
             }
             .sheet(isPresented: $showAddRecurringSheet) {
                 NavigationStack {
@@ -1009,6 +1013,7 @@ struct SettingsView: View {
         do {
             try csv.write(to: url, atomically: true, encoding: .utf8)
             exportURL = url
+            activeShareFile = SharedFile(url: url)
             diagnosticLogger.record(
                 category: "export.csv",
                 message: "Exported CSV from settings",
@@ -1060,6 +1065,7 @@ struct SettingsView: View {
             let data = try encoder.encode(payload)
             try data.write(to: url, options: .atomic)
             exportURL = url
+            activeShareFile = SharedFile(url: url)
             diagnosticLogger.record(
                 category: "export.json",
                 message: "Exported JSON from settings",
@@ -1120,6 +1126,9 @@ struct SettingsView: View {
 
         do {
             diagnosticURL = try diagnosticLogger.export(state: state)
+            if let diagnosticURL {
+                activeShareFile = SharedFile(url: diagnosticURL)
+            }
             diagnosticLogger.record(
                 category: "diagnostics.export",
                 message: "Exported diagnostic log bundle",
@@ -1408,6 +1417,7 @@ struct SettingsView: View {
             let data = try encoder.encode(payload)
             try data.write(to: url, options: .atomic)
             backupURL = url
+            activeShareFile = SharedFile(url: url)
             diagnosticLogger.record(
                 category: "backup.json",
                 message: "Created full device backup",

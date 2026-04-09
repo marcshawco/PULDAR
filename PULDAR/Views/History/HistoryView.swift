@@ -22,6 +22,7 @@ struct HistoryView: View {
     @State private var groupingMode: GroupingMode = .day
     @State private var sortMode: SortMode = .newest
     @State private var exportURL: URL?
+    @State private var activeShareFile: SharedFile?
     @State private var showFiltersSheet = false
     @State private var showExportSheet = false
     @FocusState private var focusedField: FocusField?
@@ -235,6 +236,9 @@ struct HistoryView: View {
             }
             .onChange(of: autoMonthlyCSVExportEnabled) {
                 runAutoMonthlyExportIfNeeded()
+            }
+            .sheet(item: $activeShareFile) { sharedFile in
+                ActivityShareSheet(activityItems: [sharedFile.url])
             }
             .sheet(isPresented: $showFiltersSheet) {
                 filtersSheet
@@ -520,6 +524,7 @@ struct HistoryView: View {
         do {
             try csv.write(to: url, atomically: true, encoding: .utf8)
             exportURL = url
+            activeShareFile = SharedFile(url: url)
             diagnosticLogger.record(
                 category: "export.csv",
                 message: "Exported CSV from history",
@@ -578,6 +583,7 @@ struct HistoryView: View {
             let data = try encoder.encode(payload)
             try data.write(to: url, options: .atomic)
             exportURL = url
+            activeShareFile = SharedFile(url: url)
             diagnosticLogger.record(
                 category: "export.json",
                 message: "Exported JSON from history",

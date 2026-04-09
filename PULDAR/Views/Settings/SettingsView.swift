@@ -32,10 +32,6 @@ struct SettingsView: View {
     @State private var hourlyPayText: String = ""
     @State private var hoursPerWeekText: String = ""
     @FocusState private var focusedIncomeField: IncomeFocusField?
-    @State private var showAddCategorySheet = false
-    @State private var newCategoryName = ""
-    @State private var newCategoryBucket: BudgetBucket = .fun
-    @State private var addCategoryError: String?
     @State private var draftPercentages: [String: Double] = [:]
     @State private var showAddRecurringSheet = false
     @State private var newRecurringName = ""
@@ -45,7 +41,6 @@ struct SettingsView: View {
     @State private var exportURL: URL?
     @State private var backupURL: URL?
     @State private var diagnosticURL: URL?
-    @State private var activeShareFile: SharedFile?
     @State private var selectedAllocationPreset: AllocationPreset = .custom
     @State private var showZeroFunWarning = false
     @State private var showDeleteAllAlert = false
@@ -136,14 +131,8 @@ struct SettingsView: View {
             .onChange(of: autoMonthlyCSVExportEnabled) {
                 runAutoMonthlyExportIfNeeded()
             }
-            .sheet(item: $activeShareFile) { sharedFile in
-                ActivityShareSheet(activityItems: [sharedFile.url])
-            }
             .sheet(isPresented: $showAddRecurringSheet) {
                 addRecurringSheetContent
-            }
-            .sheet(isPresented: $showAddCategorySheet) {
-                addCategorySheetContent
             }
             .alert("Fun is 0%", isPresented: $showZeroFunWarning) {
                 Button("Keep 0%") {
@@ -203,7 +192,6 @@ struct SettingsView: View {
             languageAndCurrencySection
             appearanceSection
             widgetsSection
-            customCategoriesSection
             accountSection
             diagnosticsSection
             dangerZoneSection
@@ -212,13 +200,6 @@ struct SettingsView: View {
         .frame(maxWidth: contentMaxWidth)
         .frame(maxWidth: .infinity, alignment: .center)
         .scrollDismissesKeyboard(.interactively)
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                if focusedIncomeField != nil {
-                    dismissActiveKeyboard()
-                }
-            }
-        )
     }
 
     private var addRecurringSheetContent: some View {
@@ -244,11 +225,6 @@ struct SettingsView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(
-                TapGesture().onEnded {
-                    dismissActiveKeyboard()
-                }
-            )
             .navigationTitle("Recurring Expense")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -265,45 +241,6 @@ struct SettingsView: View {
         }
     }
 
-    private var addCategorySheetContent: some View {
-        NavigationStack {
-            Form {
-                TextField("Category name", text: $newCategoryName)
-                    .textInputAutocapitalization(.words)
-
-                Picker("Bucket", selection: $newCategoryBucket) {
-                    ForEach(BudgetBucket.allCases) { bucket in
-                        Text(bucket.rawValue).tag(bucket)
-                    }
-                }
-
-                if let addCategoryError {
-                    Text(addCategoryError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-            }
-            .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(
-                TapGesture().onEnded {
-                    dismissActiveKeyboard()
-                }
-            )
-            .navigationTitle("New Category")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismissActiveKeyboard()
-                        showAddCategorySheet = false
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") { addCustomCategory() }
-                }
-            }
-        }
-    }
 
     private var diagnosticsStatusAlertBinding: Binding<Bool> {
         Binding(
@@ -783,10 +720,12 @@ struct SettingsView: View {
             LabeledContent("AI Use", value: "Expense Parsing Only")
             LabeledContent("Receipt OCR", value: "English Only")
 
+            Link("Privacy Policy", destination: URL(string: "https://shawhause.com/puldar-privacy.html")!)
+
             Button("View Onboarding Again") {
                 dismiss()
                 Task { @MainActor in
-                    await Task.yield()
+                    try? await Task.sleep(for: .milliseconds(600))
                     NotificationCenter.default.post(name: .puldarReplayOnboarding, object: nil)
                 }
             }
@@ -797,39 +736,6 @@ struct SettingsView: View {
         }
     }
 
-    private var customCategoriesSection: some View {
-        Section {
-            if categoryManager.customCategories.isEmpty {
-                Text("No custom categories yet.")
-                    .foregroundStyle(AppColors.textTertiary)
-            } else {
-                ForEach(categoryManager.customCategories) { custom in
-                    VStack(alignment: .leading, spacing: 8) {
-                        TextField("Category name", text: customNameBinding(for: custom.id))
-                        Picker("Bucket", selection: customBucketBinding(for: custom.id)) {
-                            ForEach(BudgetBucket.allCases) { bucket in
-                                Text(bucket.rawValue).tag(bucket)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
-                    .padding(.vertical, 4)
-                }
-                .onDelete(perform: categoryManager.removeCustomCategories)
-            }
-
-            Button {
-                newCategoryName = ""
-                newCategoryBucket = .fun
-                addCategoryError = nil
-                showAddCategorySheet = true
-            } label: {
-                Label("Add Category", systemImage: "plus")
-            }
-        } header: {
-            Text("Custom Categories")
-        }
-    }
 
     private func percentageBinding(for bucket: BudgetBucket) -> Binding<Double> {
         Binding(
@@ -842,6 +748,30 @@ struct SettingsView: View {
         if focusedIncomeField != nil {
             focusedIncomeField = nil
         }
+    }
+
+    /// Presents UIActivityViewController directly on the topmost view controller,
+    /// bypassing SwiftUI's sheet system to avoid nested-presentation conflicts.
+    private func shareFile(_ url: URL) {
+        let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        guard
+            let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+            let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first,
+            let rootVC = window.rootViewController
+        else { return }
+
+        var topVC = rootVC
+        while let presented = topVC.presentedViewController {
+            topVC = presented
+        }
+
+        activityVC.popoverPresentationController?.sourceView = topVC.view
+        activityVC.popoverPresentationController?.sourceRect = CGRect(
+            x: topVC.view.bounds.midX, y: topVC.view.bounds.midY,
+            width: 0, height: 0
+        )
+        activityVC.popoverPresentationController?.permittedArrowDirections = []
+        topVC.present(activityVC, animated: true)
     }
 
     private func draftPercentage(for bucket: BudgetBucket) -> Double {
@@ -907,41 +837,6 @@ struct SettingsView: View {
         return values
     }
 
-    private func customNameBinding(for id: UUID) -> Binding<String> {
-        Binding(
-            get: {
-                categoryManager.customCategories.first(where: { $0.id == id })?.name ?? ""
-            },
-            set: { newName in
-                categoryManager.updateCustomCategory(id: id, name: newName)
-            }
-        )
-    }
-
-    private func customBucketBinding(for id: UUID) -> Binding<BudgetBucket> {
-        Binding(
-            get: {
-                categoryManager.customCategories.first(where: { $0.id == id })?.bucket ?? .fun
-            },
-            set: { newBucket in
-                categoryManager.updateCustomCategory(id: id, bucket: newBucket)
-            }
-        )
-    }
-
-    private func addCustomCategory() {
-        let ok = categoryManager.addCustomCategory(
-            name: newCategoryName,
-            bucket: newCategoryBucket
-        )
-
-        guard ok else {
-            addCategoryError = "This category already exists or is invalid."
-            return
-        }
-
-        showAddCategorySheet = false
-    }
 
     private func recurringBucketLabel(_ bucket: BudgetBucket) -> String {
         switch bucket {
@@ -1009,7 +904,7 @@ struct SettingsView: View {
         do {
             try csv.write(to: url, atomically: true, encoding: .utf8)
             exportURL = url
-            activeShareFile = SharedFile(url: url)
+            shareFile(url)
             diagnosticLogger.record(
                 category: "export.csv",
                 message: "Exported CSV from settings",
@@ -1061,7 +956,7 @@ struct SettingsView: View {
             let data = try encoder.encode(payload)
             try data.write(to: url, options: .atomic)
             exportURL = url
-            activeShareFile = SharedFile(url: url)
+            shareFile(url)
             diagnosticLogger.record(
                 category: "export.json",
                 message: "Exported JSON from settings",
@@ -1123,7 +1018,7 @@ struct SettingsView: View {
         do {
             diagnosticURL = try diagnosticLogger.export(state: state)
             if let diagnosticURL {
-                activeShareFile = SharedFile(url: diagnosticURL)
+                shareFile(diagnosticURL)
             }
             diagnosticLogger.record(
                 category: "diagnostics.export",
@@ -1414,7 +1309,7 @@ struct SettingsView: View {
             let data = try encoder.encode(payload)
             try data.write(to: url, options: .atomic)
             backupURL = url
-            activeShareFile = SharedFile(url: url)
+            shareFile(url)
             diagnosticLogger.record(
                 category: "backup.json",
                 message: "Created full device backup",

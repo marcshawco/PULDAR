@@ -381,6 +381,13 @@ final class BudgetEngine {
             return 0
         }
 
+        // Don't roll over from months with no activity (e.g. before the app was used)
+        let prevMonthExpenses = filterToMonth(expenses, month: previousMonth)
+        let prevRecurringTotal = recurringTotal(recurringExpenses, for: previousMonth)
+        if prevMonthExpenses.isEmpty && prevRecurringTotal == 0 {
+            return 0
+        }
+
         let prevIncome = effectiveMonthlyIncome(expenses: expenses, for: previousMonth)
         let prevBaseBudget = bucketBudget(for: bucket, monthIncome: prevIncome)
         let prevCarry = rolloverCarryover(

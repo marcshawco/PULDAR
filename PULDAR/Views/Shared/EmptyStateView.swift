@@ -67,6 +67,7 @@ struct EmptyStateView: View {
                 }
             }
             .frame(maxWidth: .infinity, minHeight: proxy.size.height)
+            .offset(y: proxy.size.height * 0.08)
             .padding(.vertical, compact ? 32 : 48)
         }
     }

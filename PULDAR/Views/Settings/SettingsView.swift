@@ -87,6 +87,12 @@ struct SettingsView: View {
         return sorted
     }
 
+    private var appVersionLabel: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+        return "\(version) (\(build))"
+    }
+
     var body: some View {
         NavigationStack {
             settingsContent
@@ -771,7 +777,7 @@ struct SettingsView: View {
 
     private var aboutSection: some View {
         Section {
-            LabeledContent("Version", value: "1.0.0")
+            LabeledContent("Version", value: appVersionLabel)
             LabeledContent("AI Model", value: "Qwen 2.5 0.5B")
             LabeledContent("Processing", value: "100% On-Device")
             LabeledContent("AI Use", value: "Expense Parsing Only")
@@ -779,7 +785,8 @@ struct SettingsView: View {
 
             Button("View Onboarding Again") {
                 dismiss()
-                DispatchQueue.main.async {
+                Task { @MainActor in
+                    await Task.yield()
                     NotificationCenter.default.post(name: .puldarReplayOnboarding, object: nil)
                 }
             }

@@ -194,15 +194,22 @@ final class CategoryManager {
         return true
     }
 
-    func updateCustomCategory(id: UUID, name: String? = nil, bucket: BudgetBucket? = nil) {
-        guard let index = customCategories.firstIndex(where: { $0.id == id }) else { return }
+    @discardableResult
+    func updateCustomCategory(id: UUID, name: String? = nil, bucket: BudgetBucket? = nil) -> Bool {
+        guard let index = customCategories.firstIndex(where: { $0.id == id }) else { return false }
         var updated = customCategories[index]
 
         if let name {
             let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
-                updated.name = trimmed
-            }
+            let key = Self.normalize(trimmed)
+            guard !trimmed.isEmpty, !key.isEmpty else { return false }
+            guard !canonicalCategoryKeys.contains(key) else { return false }
+            guard !customCategories.contains(where: {
+                $0.id != id && ($0.key == key || Self.normalize($0.name) == key)
+            }) else { return false }
+
+            updated.name = trimmed
+            updated.key = key
         }
 
         if let bucket {
@@ -210,6 +217,7 @@ final class CategoryManager {
         }
 
         customCategories[index] = updated
+        return true
     }
 
     func removeCustomCategories(at offsets: IndexSet) {

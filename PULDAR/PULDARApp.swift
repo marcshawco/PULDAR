@@ -10,6 +10,10 @@ import SwiftData
 
 @main
 struct PULDARApp: App {
+    private enum BootstrapError: Error {
+        case missingAppGroupContainer
+    }
+
     static let sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Expense.self,
@@ -57,7 +61,7 @@ struct PULDARApp: App {
     }
 
     private static func knownStoreURLs() -> [URL] {
-        let urls = [localStoreURL(), cloudStoreURL()]
+        let urls = [localStoreURL(), cloudStoreURL()].compactMap { $0 }
 
         return urls.flatMap { url in
             [
@@ -70,9 +74,8 @@ struct PULDARApp: App {
 
     private static func localStoreURL() -> URL {
         let fm = FileManager.default
-        guard let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            preconditionFailure("Application Support directory is unavailable.")
-        }
+        let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fm.temporaryDirectory
 
         let directory = appSupport.appendingPathComponent("PULDAR", isDirectory: true)
         if !fm.fileExists(atPath: directory.path) {
@@ -82,12 +85,12 @@ struct PULDARApp: App {
         return directory.appendingPathComponent("local.store")
     }
 
-    private static func cloudStoreURL() -> URL {
+    private static func cloudStoreURL() -> URL? {
         let fm = FileManager.default
         guard let appGroupRoot = fm.containerURL(
             forSecurityApplicationGroupIdentifier: "group.marcshaw.PULDAR"
         ) else {
-            preconditionFailure("App Group container is unavailable.")
+            return nil
         }
 
         let directory = appGroupRoot
@@ -117,7 +120,9 @@ struct PULDARApp: App {
     }
 
     private static func makeCloudModelContainer(schema: Schema) throws -> ModelContainer {
-        _ = cloudStoreURL()
+        guard cloudStoreURL() != nil else {
+            throw BootstrapError.missingAppGroupContainer
+        }
 
         let configuration = ModelConfiguration(
             "PULDARCloudStore",

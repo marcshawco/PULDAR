@@ -50,9 +50,11 @@ struct SettingsView: View {
     @State private var selectedAllocationPreset: AllocationPreset = .custom
     @State private var showZeroFunWarning = false
     @State private var showDeleteAllAlert = false
+    @State private var showClearDiagnosticsAlert = false
     @State private var showBudgetAllocationInfo = false
     @State private var selectedBudgetInfoBucket: BudgetBucket?
     @State private var financeKitNotice: FinanceKitManager.Notice?
+    @State private var diagnosticsStatusMessage: String?
     @AppStorage("appThemeMode") private var appThemeMode = "system"
     @State private var selectedAppIcon: AppIcon = AppIconManager.current
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
@@ -89,33 +91,12 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                incomeSection
-                bucketAllocationSection
-                recurringSection
-                rolloverSection
-                dataExportSection
-                localBackupSection
-                languageAndCurrencySection
-                appearanceSection
-                widgetsSection
-                appleWalletSyncSection
-                customCategoriesSection
-                accountSection
-                diagnosticsSection
-                dangerZoneSection
-                aboutSection
-            }
-            .frame(maxWidth: contentMaxWidth)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(
-                TapGesture().onEnded {
-                    if focusedIncomeField != nil {
-                        dismissActiveKeyboard()
-                    }
-                }
-            )
+            settingsContent
+        }
+    }
+
+    private var settingsContent: some View {
+        settingsForm
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -128,8 +109,8 @@ struct SettingsView: View {
                             saveAndDismiss()
                         }
                     }
-                        .fontWeight(.medium)
-                        .disabled(!isAllocationValid)
+                    .fontWeight(.medium)
+                    .disabled(!isAllocationValid)
                 }
             }
             .onAppear {
@@ -156,86 +137,10 @@ struct SettingsView: View {
                 ActivityShareSheet(activityItems: [sharedFile.url])
             }
             .sheet(isPresented: $showAddRecurringSheet) {
-                NavigationStack {
-                    Form {
-                        TextField("Name (e.g. Hulu)", text: $newRecurringName)
-                            .textInputAutocapitalization(.words)
-
-                        TextField("Monthly amount", text: $newRecurringAmount)
-                            .keyboardType(.decimalPad)
-
-                        Picker("Category", selection: $newRecurringBucket) {
-                            ForEach(BudgetBucket.allCases) { bucket in
-                                Text(recurringBucketLabel(bucket)).tag(bucket)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-
-                        if let addRecurringError {
-                            Text(addRecurringError)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                    .simultaneousGesture(
-                        TapGesture().onEnded {
-                            dismissActiveKeyboard()
-                        }
-                    )
-                    .navigationTitle("Recurring Expense")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancel") {
-                                dismissActiveKeyboard()
-                                showAddRecurringSheet = false
-                            }
-                        }
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Add") { addRecurringExpense() }
-                        }
-                    }
-                }
+                addRecurringSheetContent
             }
             .sheet(isPresented: $showAddCategorySheet) {
-                NavigationStack {
-                    Form {
-                        TextField("Category name", text: $newCategoryName)
-                            .textInputAutocapitalization(.words)
-
-                        Picker("Bucket", selection: $newCategoryBucket) {
-                            ForEach(BudgetBucket.allCases) { bucket in
-                                Text(bucket.rawValue).tag(bucket)
-                            }
-                        }
-
-                        if let addCategoryError {
-                            Text(addCategoryError)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                    .simultaneousGesture(
-                        TapGesture().onEnded {
-                            dismissActiveKeyboard()
-                        }
-                    )
-                    .navigationTitle("New Category")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancel") {
-                                dismissActiveKeyboard()
-                                showAddCategorySheet = false
-                            }
-                        }
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Add") { addCustomCategory() }
-                        }
-                    }
-                }
+                addCategorySheetContent
             }
             .alert("Fun is 0%", isPresented: $showZeroFunWarning) {
                 Button("Keep 0%") {
@@ -253,10 +158,25 @@ struct SettingsView: View {
             } message: {
                 Text("This removes every expense and recurring expense from this device. This action cannot be undone.")
             }
+            .alert("Clear Diagnostic Logs", isPresented: $showClearDiagnosticsAlert) {
+                Button("Clear", role: .destructive) {
+                    diagnosticLogger.clear()
+                    diagnosticURL = nil
+                    diagnosticsStatusMessage = "Local diagnostic logs cleared."
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This permanently removes all locally stored diagnostic logs from this device.")
+            }
             .alert("Budget Allocation", isPresented: $showBudgetAllocationInfo) {
                 Button("Got it", role: .cancel) {}
             } message: {
                 Text("Your budget allocation decides how much of your monthly income goes to Fundamentals, Fun, and Future. Setting clear percentages helps you spend with intention and stay on track.")
+            }
+            .alert("Diagnostics", isPresented: diagnosticsStatusAlertBinding) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(diagnosticsStatusMessage ?? "")
             }
             .alert(item: $selectedBudgetInfoBucket) { bucket in
                 Alert(
@@ -274,7 +194,131 @@ struct SettingsView: View {
                     dismissButton: .default(Text("OK"))
                 )
             }
+    }
+
+    private var settingsForm: some View {
+        Form {
+            incomeSection
+            bucketAllocationSection
+            recurringSection
+            rolloverSection
+            dataExportSection
+            localBackupSection
+            languageAndCurrencySection
+            appearanceSection
+            widgetsSection
+            appleWalletSyncSection
+            customCategoriesSection
+            accountSection
+            diagnosticsSection
+            dangerZoneSection
+            aboutSection
         }
+        .frame(maxWidth: contentMaxWidth)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .scrollDismissesKeyboard(.interactively)
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                if focusedIncomeField != nil {
+                    dismissActiveKeyboard()
+                }
+            }
+        )
+    }
+
+    private var addRecurringSheetContent: some View {
+        NavigationStack {
+            Form {
+                TextField("Name (e.g. Hulu)", text: $newRecurringName)
+                    .textInputAutocapitalization(.words)
+
+                TextField("Monthly amount", text: $newRecurringAmount)
+                    .keyboardType(.decimalPad)
+
+                Picker("Category", selection: $newRecurringBucket) {
+                    ForEach(BudgetBucket.allCases) { bucket in
+                        Text(recurringBucketLabel(bucket)).tag(bucket)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if let addRecurringError {
+                    Text(addRecurringError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    dismissActiveKeyboard()
+                }
+            )
+            .navigationTitle("Recurring Expense")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismissActiveKeyboard()
+                        showAddRecurringSheet = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") { addRecurringExpense() }
+                }
+            }
+        }
+    }
+
+    private var addCategorySheetContent: some View {
+        NavigationStack {
+            Form {
+                TextField("Category name", text: $newCategoryName)
+                    .textInputAutocapitalization(.words)
+
+                Picker("Bucket", selection: $newCategoryBucket) {
+                    ForEach(BudgetBucket.allCases) { bucket in
+                        Text(bucket.rawValue).tag(bucket)
+                    }
+                }
+
+                if let addCategoryError {
+                    Text(addCategoryError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    dismissActiveKeyboard()
+                }
+            )
+            .navigationTitle("New Category")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismissActiveKeyboard()
+                        showAddCategorySheet = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") { addCustomCategory() }
+                }
+            }
+        }
+    }
+
+    private var diagnosticsStatusAlertBinding: Binding<Bool> {
+        Binding(
+            get: { diagnosticsStatusMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    diagnosticsStatusMessage = nil
+                }
+            }
+        )
     }
 
     // MARK: - Helpers
@@ -724,7 +768,12 @@ struct SettingsView: View {
                 "Enable Local Diagnostic Logs",
                 isOn: Binding(
                     get: { diagnosticLogger.isEnabled },
-                    set: { diagnosticLogger.setEnabled($0) }
+                    set: { isEnabled in
+                        diagnosticLogger.setEnabled(isEnabled)
+                        diagnosticsStatusMessage = isEnabled
+                            ? "Local diagnostic logging is now enabled."
+                            : "Local diagnostic logging is now disabled."
+                    }
                 )
             )
             .tint(AppColors.accent)
@@ -742,8 +791,7 @@ struct SettingsView: View {
 
             if !diagnosticLogger.entries.isEmpty {
                 Button("Clear Local Diagnostic Logs", role: .destructive) {
-                    diagnosticLogger.clear()
-                    diagnosticURL = nil
+                    showClearDiagnosticsAlert = true
                 }
             }
         } header: {
@@ -1127,6 +1175,7 @@ struct SettingsView: View {
                 message: "Failed to export diagnostic log bundle",
                 metadata: ["error": error.localizedDescription]
             )
+            diagnosticsStatusMessage = "Could not export diagnostic logs."
         }
     }
 

@@ -49,7 +49,6 @@ struct SettingsView: View {
     @State private var activeShareFile: SharedFile?
     @State private var selectedAllocationPreset: AllocationPreset = .custom
     @State private var showZeroFunWarning = false
-    @State private var showDeleteAllConfirmation = false
     @State private var showDeleteAllAlert = false
     @State private var showBudgetAllocationInfo = false
     @State private var selectedBudgetInfoBucket: BudgetBucket?
@@ -247,25 +246,13 @@ struct SettingsView: View {
             } message: {
                 Text("Fun is set to 0%. Are you sure you want to continue?")
             }
-            .confirmationDialog(
-                "Delete all expenses?",
-                isPresented: $showDeleteAllConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Delete All Expenses", role: .destructive) {
-                    showDeleteAllAlert = true
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This removes every expense and recurring expense from this device.")
-            }
             .alert("Delete Everything", isPresented: $showDeleteAllAlert) {
                 Button("Delete", role: .destructive) {
                     clearAllExpenses()
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This action cannot be undone.")
+                Text("This removes every expense and recurring expense from this device. This action cannot be undone.")
             }
             .alert("Budget Allocation", isPresented: $showBudgetAllocationInfo) {
                 Button("Got it", role: .cancel) {}
@@ -770,7 +757,7 @@ struct SettingsView: View {
     private var dangerZoneSection: some View {
         Section {
             Button(role: .destructive) {
-                showDeleteAllConfirmation = true
+                showDeleteAllAlert = true
             } label: {
                 Label("Delete All Expenses", systemImage: "trash")
                     .font(.subheadline)

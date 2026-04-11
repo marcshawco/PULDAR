@@ -6,10 +6,22 @@ import SwiftUI
 /// the bucket's allocation.  Text also shifts to red.
 struct BucketSummaryRow: View {
     @Environment(AppPreferences.self) private var appPreferences
+    @Environment(\.colorScheme) private var colorScheme
     let status: BudgetEngine.BucketStatus
     var isSelected: Bool = false
     var onTap: (() -> Void)? = nil
     @State private var animatedProgress: Double = 0
+
+    init(
+        status: BudgetEngine.BucketStatus,
+        isSelected: Bool = false,
+        onTap: (() -> Void)? = nil
+    ) {
+        self.status = status
+        self.isSelected = isSelected
+        self.onTap = onTap
+        _animatedProgress = State(initialValue: Self.sanitizedProgress(status.progress))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -81,7 +93,7 @@ struct BucketSummaryRow: View {
                 .fill(isSelected ? status.bucket.color.opacity(0.12) : Color.clear)
         )
         .onAppear {
-            updateAnimatedProgress(duration: 0.7, bounce: 0.2)
+            snapAnimatedProgress()
         }
         .onChange(of: status.spent) {
             updateAnimatedProgress(duration: 0.5, bounce: 0.12)
@@ -91,6 +103,9 @@ struct BucketSummaryRow: View {
         }
         .onChange(of: status.progress) {
             updateAnimatedProgress(duration: 0.5, bounce: 0.12)
+        }
+        .onChange(of: colorScheme) {
+            snapAnimatedProgress()
         }
     }
 
@@ -122,9 +137,7 @@ struct BucketSummaryRow: View {
     }
 
     private var safeProgress: Double {
-        let value = status.progress
-        guard value.isFinite else { return 0 }
-        return min(max(value, 0), 1.5)
+        Self.sanitizedProgress(status.progress)
     }
 
     private var safeAnimatedProgress: Double {
@@ -141,5 +154,18 @@ struct BucketSummaryRow: View {
         withAnimation(.spring(duration: duration, bounce: bounce)) {
             animatedProgress = safeProgress
         }
+    }
+
+    private func snapAnimatedProgress() {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            animatedProgress = safeProgress
+        }
+    }
+
+    private static func sanitizedProgress(_ value: Double) -> Double {
+        guard value.isFinite else { return 0 }
+        return min(max(value, 0), 1.5)
     }
 }

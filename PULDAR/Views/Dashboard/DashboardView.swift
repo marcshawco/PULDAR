@@ -52,6 +52,7 @@ struct DashboardView: View {
     @State private var recurringSuggestion: RecurringSuggestion?
     @State private var showReceiptScanner = false
     @State private var composerFocusTrigger = 0
+    @State private var isRecurringSummaryExpanded = false
     @AppStorage("didCompleteModelOnboarding") private var didCompleteModelOnboarding = false
     @AppStorage("didRunCategoryConsistencyFixV2") private var didRunCategoryConsistencyFixV2 = false
     @AppStorage("didNormalizeMerchantsV1") private var didNormalizeMerchantsV1 = false
@@ -103,6 +104,10 @@ struct DashboardView: View {
 
     private var recurringMonthlyTotal: Double {
         budgetEngine.recurringTotal(recurringExpenses)
+    }
+
+    private var activeRecurringExpenses: [RecurringExpense] {
+        recurringExpenses.filter(\.isActive)
     }
 
     private var dashboardMaxWidth: CGFloat {
@@ -241,7 +246,7 @@ struct DashboardView: View {
             if recurringMonthlyTotal > 0 {
                 recurringSummaryRow(
                     amount: recurringMonthlyTotal,
-                    count: recurringExpenses.filter(\.isActive).count
+                    items: activeRecurringExpenses
                 )
                 .padding(.horizontal)
             }
@@ -588,25 +593,52 @@ struct DashboardView: View {
         )
     }
 
-    private func recurringSummaryRow(amount: Double, count: Int) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "repeat")
-                .font(.system(size: 11, weight: .regular))
-                .foregroundStyle(AppColors.textSecondary)
+    private func recurringSummaryRow(amount: Double, items: [RecurringExpense]) -> some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.snappy(duration: 0.22)) {
+                    isRecurringSummaryExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "repeat")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(AppColors.textSecondary)
 
-            Text("Recurring (\(count))")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(AppColors.textSecondary)
+                    Text("Recurring (\(items.count))")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(AppColors.textSecondary)
 
-            Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(AppColors.textTertiary)
+                        .rotationEffect(.degrees(isRecurringSummaryExpanded ? 180 : 0))
 
-            Text(amount.formattedCurrency(code: appPreferences.currencyCode))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(AppColors.textPrimary)
+                    Spacer()
 
-            Text("/ month")
-                .font(.caption2)
-                .foregroundStyle(AppColors.textTertiary)
+                    Text(amount.formattedCurrency(code: appPreferences.currencyCode))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppColors.textPrimary)
+
+                    Text("/ month")
+                        .font(.caption2)
+                        .foregroundStyle(AppColors.textTertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isRecurringSummaryExpanded {
+                VStack(spacing: 8) {
+                    Divider()
+                        .padding(.top, 10)
+
+                    ForEach(items) { recurring in
+                        recurringDetailRow(recurring)
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -614,6 +646,39 @@ struct DashboardView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(AppColors.secondaryBg)
         )
+    }
+
+    private func recurringDetailRow(_ recurring: RecurringExpense) -> some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(recurring.budgetBucket.color)
+                .frame(width: 6, height: 6)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(recurring.name)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(AppColors.textPrimary)
+                    .lineLimit(1)
+
+                Text(recurringBucketLabel(recurring.budgetBucket))
+                    .font(.caption2)
+                    .foregroundStyle(AppColors.textTertiary)
+            }
+
+            Spacer()
+
+            Text(recurring.safeAmount.formattedCurrency(code: appPreferences.currencyCode))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(AppColors.textSecondary)
+        }
+    }
+
+    private func recurringBucketLabel(_ bucket: BudgetBucket) -> String {
+        switch bucket {
+        case .fundamentals: return "Need"
+        case .fun: return "Want"
+        case .future: return "Invest"
+        }
     }
 
     private func underspentSummaryRow(amount: Double, total: Double) -> some View {

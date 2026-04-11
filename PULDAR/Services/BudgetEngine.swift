@@ -210,7 +210,11 @@ final class BudgetEngine {
         recurringExpenses: [RecurringExpense] = [],
         for month: Date = .now
     ) -> [BucketStatus] {
-        let cacheKey = makeStatusCacheKey(month: month)
+        let cacheKey = makeStatusCacheKey(
+            month: month,
+            expenses: expenses,
+            recurringExpenses: recurringExpenses
+        )
         if let cached = monthlyStatusCache[cacheKey] {
             return cached
         }
@@ -436,7 +440,11 @@ final class BudgetEngine {
     private static let bucketPercentageKey = "bucketPercentages"
     private let maxMonthlyCacheEntries = 36
 
-    private func makeStatusCacheKey(month: Date) -> String {
+    private func makeStatusCacheKey(
+        month: Date,
+        expenses: [Expense],
+        recurringExpenses: [RecurringExpense]
+    ) -> String {
         let calendar = Calendar.current
         let monthKey = calendar.dateComponents([.year, .month], from: month)
         let monthStamp = "\(monthKey.year ?? 0)-\(monthKey.month ?? 0)"
@@ -450,8 +458,44 @@ final class BudgetEngine {
             "dataRevision:\(dataRevision)",
             "income:\(monthlyIncome)",
             "rollover:\(rolloverEnabled)",
-            percentagesStamp
+            percentagesStamp,
+            expenseFingerprint(expenses),
+            recurringFingerprint(recurringExpenses)
         ].joined(separator: "||")
+    }
+
+    private func expenseFingerprint(_ expenses: [Expense]) -> String {
+        expenses
+            .map { expense in
+                [
+                    expense.id.uuidString,
+                    "\(expense.date.timeIntervalSince1970)",
+                    "\(expense.amount)",
+                    expense.category,
+                    expense.bucket,
+                    expense.isOverspent ? "overspent" : "normal",
+                    expense.source ?? "",
+                    "\(expense.updatedAt?.timeIntervalSince1970 ?? 0)"
+                ].joined(separator: ":")
+            }
+            .sorted()
+            .joined(separator: "|")
+    }
+
+    private func recurringFingerprint(_ recurringExpenses: [RecurringExpense]) -> String {
+        recurringExpenses
+            .map { recurring in
+                [
+                    recurring.id.uuidString,
+                    "\(recurring.safeAmount)",
+                    recurring.bucket,
+                    recurring.isActive ? "active" : "inactive",
+                    "\(recurring.createdAt.timeIntervalSince1970)",
+                    "\(recurring.updatedAt?.timeIntervalSince1970 ?? 0)"
+                ].joined(separator: ":")
+            }
+            .sorted()
+            .joined(separator: "|")
     }
 
     private func cacheMonthlyStatus(_ status: [BucketStatus], for key: String) {

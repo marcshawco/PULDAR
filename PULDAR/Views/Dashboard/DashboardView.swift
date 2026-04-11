@@ -58,11 +58,17 @@ struct DashboardView: View {
     @AppStorage("didNormalizeMerchantsV1") private var didNormalizeMerchantsV1 = false
     @State private var didRunStartupMaintenance = false
 
+    private var currentMonth: Date {
+        let calendar = Calendar.current
+        return calendar.date(
+            from: calendar.dateComponents([.year, .month], from: .now)
+        ) ?? .now
+    }
+
     private var currentMonthExpenses: [Expense] {
         let calendar = Calendar.current
-        let now = Date.now
         return expenses.filter {
-            calendar.isDate($0.date, equalTo: now, toGranularity: .month)
+            calendar.isDate($0.date, equalTo: currentMonth, toGranularity: .month)
         }
     }
 
@@ -72,21 +78,21 @@ struct DashboardView: View {
 
     private var bucketStatuses: [BudgetEngine.BucketStatus] {
         budgetEngine.calculateStatus(
-            expenses: currentMonthExpenses,
+            expenses: expenses,
             recurringExpenses: effectiveRecurringExpenses
         )
     }
 
     private var monthlyOverspentAmount: Double {
         budgetEngine.monthlyOverspentAmount(
-            expenses: currentMonthExpenses,
+            expenses: expenses,
             recurringExpenses: effectiveRecurringExpenses
         )
     }
 
     private var monthlySpendCapacity: Double {
         budgetEngine.monthSpendCapacity(
-            expenses: currentMonthExpenses,
+            expenses: expenses,
             recurringExpenses: effectiveRecurringExpenses
         )
     }
@@ -95,7 +101,7 @@ struct DashboardView: View {
         return max(
             monthlySpendCapacity
                 - budgetEngine.totalSpent(
-                    expenses: currentMonthExpenses,
+                    expenses: expenses,
                     recurringExpenses: effectiveRecurringExpenses
                 ),
             0
@@ -103,11 +109,29 @@ struct DashboardView: View {
     }
 
     private var recurringMonthlyTotal: Double {
-        budgetEngine.recurringTotal(recurringExpenses)
+        budgetEngine.recurringTotal(recurringExpenses, for: currentMonth)
     }
 
-    private var activeRecurringExpenses: [RecurringExpense] {
-        recurringExpenses.filter(\.isActive)
+    private var currentMonthRecurringExpenses: [RecurringExpense] {
+        let calendar = Calendar.current
+        let month = currentMonth
+        return recurringExpenses.filter { recurring in
+            recurring.isActive && recurringApplies(recurring, to: month, calendar: calendar)
+        }
+    }
+
+    private func recurringApplies(
+        _ recurring: RecurringExpense,
+        to month: Date,
+        calendar: Calendar
+    ) -> Bool {
+        let recurringMonth = calendar.date(
+            from: calendar.dateComponents([.year, .month], from: recurring.createdAt)
+        ) ?? recurring.createdAt
+        let targetMonth = calendar.date(
+            from: calendar.dateComponents([.year, .month], from: month)
+        ) ?? month
+        return recurringMonth <= targetMonth
     }
 
     private var dashboardMaxWidth: CGFloat {
@@ -246,7 +270,7 @@ struct DashboardView: View {
             if recurringMonthlyTotal > 0 {
                 recurringSummaryRow(
                     amount: recurringMonthlyTotal,
-                    items: activeRecurringExpenses
+                    items: currentMonthRecurringExpenses
                 )
                 .padding(.horizontal)
             }

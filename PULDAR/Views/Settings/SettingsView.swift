@@ -840,9 +840,9 @@ struct SettingsView: View {
 
     private func recurringBucketLabel(_ bucket: BudgetBucket) -> String {
         switch bucket {
-        case .fundamentals: return "Need"
-        case .fun: return "Want"
-        case .future: return "Invest"
+        case .fundamentals: return "Fundamental"
+        case .fun: return "Fun"
+        case .future: return "Future"
         }
     }
 

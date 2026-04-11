@@ -14,6 +14,7 @@ struct AppOnboardingView: View {
     let onCompleted: () -> Void
 
     @State private var currentPage = 0
+    @State private var isAdvancing = false
 
     private let pages: [OnboardingPage] = [
         .init(
@@ -253,7 +254,7 @@ struct AppOnboardingView: View {
         HStack(spacing: 12) {
             if currentPage > 0 {
                 Button("Back") {
-                    currentPage = max(currentPage - 1, 0)
+                    moveToPreviousPage()
                 }
                 .font(.headline)
                 .frame(maxWidth: .infinity)
@@ -265,11 +266,7 @@ struct AppOnboardingView: View {
             }
 
             Button(currentPage == pages.count - 1 ? "Get Started" : "Continue") {
-                if currentPage == pages.count - 1 {
-                    onCompleted()
-                } else {
-                    currentPage += 1
-                }
+                advanceFromCurrentPage()
             }
             .font(.headline)
             .frame(maxWidth: .infinity)
@@ -279,6 +276,43 @@ struct AppOnboardingView: View {
                     .fill(AppColors.accent)
             )
             .foregroundStyle(.white)
+            .disabled(isAdvancing)
+        }
+    }
+
+    private func moveToPreviousPage() {
+        guard !isAdvancing else { return }
+        HapticManager.light()
+        withAnimation(.snappy(duration: 0.22)) {
+            currentPage = max(currentPage - 1, 0)
+        }
+    }
+
+    private func advanceFromCurrentPage() {
+        guard !isAdvancing else { return }
+        HapticManager.light()
+
+        guard currentPage < pages.count - 1 else {
+            completeOnboardingAfterTapFeedback()
+            return
+        }
+
+        isAdvancing = true
+        withAnimation(.snappy(duration: 0.22)) {
+            currentPage = min(currentPage + 1, pages.count - 1)
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(180))
+            isAdvancing = false
+        }
+    }
+
+    private func completeOnboardingAfterTapFeedback() {
+        isAdvancing = true
+        Task { @MainActor in
+            await Task.yield()
+            onCompleted()
         }
     }
 }

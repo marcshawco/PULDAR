@@ -86,6 +86,7 @@ struct ContentView: View {
             guard !didWarmModelThisLaunch else { return }
             didWarmModelThisLaunch = true
             Task.detached(priority: .utility) {
+                try? await Task.sleep(for: .milliseconds(450))
                 await llmService.loadModel()
             }
         }

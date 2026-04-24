@@ -223,6 +223,8 @@ without collecting user data by default.
 
 ## Technical Architecture
 
+![PULDAR Architecture](architecture.png)
+
 ### Main Views
 
 - `ContentView` — root shell, dependency injection, onboarding presentation

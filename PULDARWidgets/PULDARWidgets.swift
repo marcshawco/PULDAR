@@ -320,7 +320,7 @@ private struct PULDARQuickAddWidgetView: View {
     }
 
     private var smallQuickAdd: some View {
-        Link(destination: URL(string: "puldar://quick-add")!) {
+        Link(destination: deepLink("puldar://quick-add")) {
             VStack(alignment: .leading, spacing: 10) {
                 Image(systemName: "plus.circle.fill")
                     .font(.title2)
@@ -442,13 +442,17 @@ private struct PULDARQuickAddWidgetView: View {
         subtitle: String,
         systemImage: String
     ) -> some View {
-        Link(destination: URL(string: url)!) {
+        Link(destination: deepLink(url)) {
             quickActionCard(
                 title: title,
                 subtitle: subtitle.isEmpty ? nil : subtitle,
                 systemImage: systemImage
             )
         }
+    }
+
+    private func deepLink(_ urlString: String) -> URL {
+        URL(string: urlString) ?? URL(fileURLWithPath: "/")
     }
 
     private func quickActionCard(title: String, subtitle: String?, systemImage: String) -> some View {

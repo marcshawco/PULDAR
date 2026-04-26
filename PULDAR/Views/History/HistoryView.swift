@@ -516,29 +516,12 @@ struct HistoryView: View {
     }
 
     private func exportCSV(for items: [Expense], scope: String) {
-        let formatter = ISO8601DateFormatter()
-        var csv = "date,merchant,amount,category,bucket,isOverspent,notes\n"
-
-        for expense in items.sorted(by: { $0.date > $1.date }) {
-            let row = [
-                csvEscape(formatter.string(from: expense.date)),
-                csvEscape(expense.merchant),
-                csvEscape(String(format: "%.2f", expense.amount)),
-                csvEscape(categoryManager.displayName(forStoredCategory: expense.category)),
-                csvEscape(expense.bucket),
-                csvEscape(expense.isOverspent ? "true" : "false"),
-                csvEscape(expense.notes)
-            ].joined(separator: ",")
-            csv += row + "\n"
-        }
-
-        let safeScope = scope.replacingOccurrences(of: "[^a-zA-Z0-9_]+", with: "_", options: .regularExpression)
-        let filename = "puldar_\(safeScope.lowercased()).csv"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-
         do {
-            try csv.write(to: url, atomically: true, encoding: .utf8)
-            exportURL = url
+            exportURL = try ExpenseExportService.writeExpenseCSV(
+                expenses: items,
+                scope: scope,
+                categoryDisplayName: categoryManager.displayName(forStoredCategory:)
+            )
             diagnosticLogger.record(
                 category: "export.csv",
                 message: "Exported CSV from history",
@@ -558,45 +541,13 @@ struct HistoryView: View {
         }
     }
 
-    private func csvEscape(_ value: String) -> String {
-        let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
-        return "\"\(escaped)\""
-    }
-
     private func exportJSON(for items: [Expense], scope: String) {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-
-        let payload = items.sorted(by: { $0.date > $1.date }).map { expense in
-            ExportExpense(
-                id: expense.id,
-                date: expense.date,
-                merchant: expense.merchant,
-                amount: expense.amount,
-                category: categoryManager.displayName(forStoredCategory: expense.category),
-                bucket: expense.bucket,
-                isOverspent: expense.isOverspent,
-                notes: expense.notes,
-                source: expense.sourceKind.rawValue,
-                externalTransactionID: expense.externalTransactionID,
-                externalAccountID: expense.externalAccountID,
-                importedAt: expense.importedAt
-            )
-        }
-
-        let safeScope = scope.replacingOccurrences(
-            of: "[^a-zA-Z0-9_]+",
-            with: "_",
-            options: .regularExpression
-        )
-        let filename = "puldar_\(safeScope.lowercased()).json"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-
         do {
-            let data = try encoder.encode(payload)
-            try data.write(to: url, options: .atomic)
-            exportURL = url
+            exportURL = try ExpenseExportService.writeExpenseJSON(
+                expenses: items,
+                scope: scope,
+                categoryDisplayName: categoryManager.displayName(forStoredCategory:)
+            )
             diagnosticLogger.record(
                 category: "export.json",
                 message: "Exported JSON from history",
@@ -707,21 +658,6 @@ struct HistoryView: View {
         let title: String
         let items: [Expense]
         var id: String { title }
-    }
-
-    private struct ExportExpense: Codable {
-        let id: UUID
-        let date: Date
-        let merchant: String
-        let amount: Double
-        let category: String
-        let bucket: String
-        let isOverspent: Bool
-        let notes: String
-        let source: String
-        let externalTransactionID: String?
-        let externalAccountID: String?
-        let importedAt: Date?
     }
 
     private enum GroupingMode: String, CaseIterable, Identifiable {

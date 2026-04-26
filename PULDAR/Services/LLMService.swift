@@ -213,10 +213,35 @@ final class LLMService {
         expense, credit
         - Use "expense" for spending money.
         - Use "credit" for money received, refunds, reimbursements, gifts, or balance increases.
-        - Terms like "bitcoin", "btc", "crypto", "S&P 500", "stock", "ETF", and "index fund"
-          are investments and should be categorized as investments (never fun/entertainment).
-        - "comic books", "disneyland/theme park", and "snacks/treats" are fun spending,
-          not groceries or other essentials.
+
+        Category guide:
+        - rent: apartment rent, landlord, lease.
+        - mortgage: mortgage, home loan, HOA, property tax.
+        - utilities: electric, water, trash, sewer, natural gas, power bill.
+        - groceries: supermarket and food for home; not restaurants, coffee, snacks, or treats.
+        - insurance: health, car, renters, life, premiums.
+        - healthcare: doctor, dentist, pharmacy, prescriptions, copays, therapy.
+        - transportation: Uber/Lyft/taxi, transit, bus, train, parking, tolls.
+        - gas: gas station, fuel, gasoline.
+        - phone: phone, cell, wireless.
+        - internet: Wi-Fi, broadband, fiber, ISP bills.
+        - dining: restaurants, takeout, delivery, pizza, sushi, burgers, desserts, snacks.
+        - coffee: coffee shops, tea, boba, lattes, cafes.
+        - entertainment: movies, concerts, comics, games, shows, museums.
+        - shopping: general retail, Amazon/Target/Walmart, bookstore, mall.
+        - clothing: clothes, shoes, apparel.
+        - subscriptions: streaming, apps, memberships, gym, recurring services.
+        - hobbies: crafts, art supplies, sports gear, music gear, garden.
+        - travel: flights, hotels, Airbnb, trips, vacation, theme parks.
+        - alcohol: beer, wine, liquor, bars.
+        - gifts: presents, birthday/holiday/wedding gifts.
+        - savings: savings account or money set aside.
+        - investments: bitcoin, btc, crypto, S&P 500, stocks, ETF, index funds, brokerage.
+        - retirement: 401k, IRA, pension, retirement contributions.
+        - debt: loan payments, credit card payments, student loans.
+        - education: tuition, school, courses, textbooks, certifications.
+        - emergency: emergency fund or rainy-day fund.
+        - charity: donations, nonprofits, tithes, fundraisers.
 
         Category must be exactly one of:
         \(categories.joined(separator: ", "))

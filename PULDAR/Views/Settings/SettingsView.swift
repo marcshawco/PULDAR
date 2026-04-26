@@ -1015,33 +1015,12 @@ struct SettingsView: View {
     }
 
     private func exportCSV(for items: [Expense], scope: String) {
-        let formatter = ISO8601DateFormatter()
-        var csv = "date,merchant,amount,category,bucket,isOverspent,notes\n"
-
-        for expense in items.sorted(by: { $0.date > $1.date }) {
-            let row = [
-                csvEscape(formatter.string(from: expense.date)),
-                csvEscape(expense.merchant),
-                csvEscape(String(format: "%.2f", expense.amount)),
-                csvEscape(categoryManager.displayName(forStoredCategory: expense.category)),
-                csvEscape(expense.bucket),
-                csvEscape(expense.isOverspent ? "true" : "false"),
-                csvEscape(expense.notes)
-            ].joined(separator: ",")
-            csv += row + "\n"
-        }
-
-        let safeScope = scope.replacingOccurrences(
-            of: "[^a-zA-Z0-9_]+",
-            with: "_",
-            options: .regularExpression
-        )
-        let filename = "puldar_\(safeScope.lowercased()).csv"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-
         do {
-            try csv.write(to: url, atomically: true, encoding: .utf8)
-            exportURL = url
+            exportURL = try ExpenseExportService.writeExpenseCSV(
+                expenses: items,
+                scope: scope,
+                categoryDisplayName: categoryManager.displayName(forStoredCategory:)
+            )
             diagnosticLogger.record(
                 category: "export.csv",
                 message: "Exported CSV from settings",
@@ -1058,41 +1037,19 @@ struct SettingsView: View {
         }
     }
 
-    private func csvEscape(_ value: String) -> String {
-        let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
-        return "\"\(escaped)\""
-    }
-
     private func exportJSON(
         expenses: [Expense],
         recurring: [RecurringExpense],
         scope: String
     ) {
-        let payload = DataExportPayload(
-            createdAt: .now,
-            scope: scope,
-            monthlyIncome: budgetEngine.monthlyIncome,
-            percentages: currentPercentagesSnapshot(),
-            expenses: expenses.map(Self.makeLocalBackupExpense),
-            recurring: recurring.map(Self.makeLocalBackupRecurring)
-        )
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-
-        let safeScope = scope.replacingOccurrences(
-            of: "[^a-zA-Z0-9_]+",
-            with: "_",
-            options: .regularExpression
-        )
-        let filename = "puldar_\(safeScope.lowercased()).json"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-
         do {
-            let data = try encoder.encode(payload)
-            try data.write(to: url, options: .atomic)
-            exportURL = url
+            exportURL = try ExpenseExportService.writeBackupJSON(
+                expenses: expenses,
+                recurring: recurring,
+                scope: scope,
+                monthlyIncome: budgetEngine.monthlyIncome,
+                percentages: currentPercentagesSnapshot()
+            )
             diagnosticLogger.record(
                 category: "export.json",
                 message: "Exported JSON from settings",
@@ -1469,26 +1426,13 @@ struct SettingsView: View {
     }
 
     private func exportFullBackupJSON() {
-        let payload = DataExportPayload(
-            createdAt: .now,
-            scope: "full_device_backup",
-            monthlyIncome: budgetEngine.monthlyIncome,
-            percentages: currentPercentagesSnapshot(),
-            expenses: expenses.map(Self.makeLocalBackupExpense),
-            recurring: recurringExpenses.map(Self.makeLocalBackupRecurring)
-        )
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-
-        let filename = "puldar_backup_\(Int(Date.now.timeIntervalSince1970)).json"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-
         do {
-            let data = try encoder.encode(payload)
-            try data.write(to: url, options: .atomic)
-            backupURL = url
+            backupURL = try ExpenseExportService.writeFullDeviceBackupJSON(
+                expenses: expenses,
+                recurring: recurringExpenses,
+                monthlyIncome: budgetEngine.monthlyIncome,
+                percentages: currentPercentagesSnapshot()
+            )
             diagnosticLogger.record(
                 category: "backup.json",
                 message: "Created full device backup",
@@ -1508,64 +1452,4 @@ struct SettingsView: View {
         }
     }
 
-    nonisolated private static func makeLocalBackupExpense(_ expense: Expense) -> LocalBackupExpense {
-        LocalBackupExpense(
-            id: expense.id,
-            date: expense.date,
-            merchant: expense.merchant,
-            amount: expense.amount,
-            category: expense.category,
-            bucket: expense.bucket,
-            isOverspent: expense.isOverspent,
-            notes: expense.notes,
-            source: expense.sourceKind.rawValue,
-            externalTransactionID: expense.externalTransactionID,
-            externalAccountID: expense.externalAccountID,
-            importedAt: expense.importedAt
-        )
-    }
-
-    nonisolated private static func makeLocalBackupRecurring(_ recurring: RecurringExpense) -> LocalBackupRecurring {
-        LocalBackupRecurring(
-            id: recurring.id,
-            name: recurring.name,
-            amount: recurring.amount,
-            bucket: recurring.bucket,
-            isActive: recurring.isActive,
-            createdAt: recurring.createdAt
-        )
-    }
-
-    private struct DataExportPayload: Codable {
-        let createdAt: Date
-        let scope: String
-        let monthlyIncome: Double
-        let percentages: [String: Double]
-        let expenses: [LocalBackupExpense]
-        let recurring: [LocalBackupRecurring]
-    }
-
-    private struct LocalBackupExpense: Codable {
-        let id: UUID
-        let date: Date
-        let merchant: String
-        let amount: Double
-        let category: String
-        let bucket: String
-        let isOverspent: Bool
-        let notes: String
-        let source: String
-        let externalTransactionID: String?
-        let externalAccountID: String?
-        let importedAt: Date?
-    }
-
-    private struct LocalBackupRecurring: Codable {
-        let id: UUID
-        let name: String
-        let amount: Double
-        let bucket: String
-        let isActive: Bool
-        let createdAt: Date
-    }
 }

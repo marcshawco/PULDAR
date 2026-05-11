@@ -90,7 +90,9 @@ enum ExpenseExportService {
             expenses: sortedExpenses(expenses).map {
                 expenseRecord(from: $0, category: $0.category)
             },
-            recurring: recurring.sorted { $0.createdAt > $1.createdAt }.map(recurringRecord)
+            recurring: recurring.sorted { $0.createdAt > $1.createdAt }.map {
+                recurringRecord(from: $0)
+            }
         )
         let url = temporaryURL(prefix: filePrefix, scope: scope, fileExtension: "json")
         try encode(payload).write(to: url, options: .atomic)
@@ -113,7 +115,9 @@ enum ExpenseExportService {
             expenses: sortedExpenses(expenses).map {
                 expenseRecord(from: $0, category: $0.category)
             },
-            recurring: recurring.sorted { $0.createdAt > $1.createdAt }.map(recurringRecord)
+            recurring: recurring.sorted { $0.createdAt > $1.createdAt }.map {
+                recurringRecord(from: $0)
+            }
         )
         try encode(payload).write(to: url, options: .atomic)
         return url

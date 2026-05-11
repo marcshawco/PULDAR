@@ -128,7 +128,11 @@ final class LLMService {
             ? (allowedCategories ?? defaultCategories)
             : defaultCategories
         let isReceiptScan = input.localizedCaseInsensitiveContains("Receipt scan")
-        let cacheKey = makeParseCacheKey(input: input, categories: categories)
+        let cacheKey = makeParseCacheKey(
+            input: input,
+            categories: categories,
+            inputLanguage: inputLanguage
+        )
         if !isReceiptScan, let cached = parseCache[cacheKey] {
             return cached
         }
@@ -194,10 +198,10 @@ final class LLMService {
     ) -> String {
         """
         You are an expense parser. Given a natural language expense description, \
-        extract the merchant name, dollar amount, and spending category.
+        extract the merchant name, numeric amount, and spending category.
 
         \(inputLanguage.parserInstruction)
-        The user's preferred display currency is \(currencyCode). Preserve the numeric amount from the input, but do not convert currencies.
+        The user's preferred display currency is \(currencyCode). Preserve the numeric amount from the input, accept dot or comma decimal separators, but do not convert currencies.
 
         If the input is a receipt scan:
         - Prefer the establishment name near the top of the receipt.
@@ -414,10 +418,10 @@ final class LLMService {
     /// Last-resort parser using regex to extract merchant, amount, category,
     /// from semi-structured but malformed LLM output.
     private func regexFallback(from text: String) throws -> LLMExpenseResult {
-        // Try to find an amount like $12.50 or 12.50
-        let amountPattern = /\$?\s*(\d+\.?\d*)/
+        // Try to find an amount like $12.50, 12.50, €12,50, or 12,50.
+        let amountPattern = /[$€£]?\s*(\d+(?:[.,]\d{1,2})?)/
         guard let amountMatch = text.firstMatch(of: amountPattern),
-              let amount = Double(amountMatch.1) else {
+              let amount = Double(String(amountMatch.1).replacingOccurrences(of: ",", with: ".")) else {
             throw LLMError.noJSONFound(text)
         }
 
@@ -476,7 +480,11 @@ final class LLMService {
 
     // MARK: - Parse Cache
 
-    private func makeParseCacheKey(input: String, categories: [String]) -> String {
+    private func makeParseCacheKey(
+        input: String,
+        categories: [String],
+        inputLanguage: AppPreferences.InputLanguage
+    ) -> String {
         let normalizedInput = input
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
@@ -487,7 +495,7 @@ final class LLMService {
             }
             .sorted()
             .joined(separator: "|")
-        return "\(normalizedInput)||\(normalizedCategories)"
+        return "\(inputLanguage.rawValue)||\(normalizedInput)||\(normalizedCategories)"
     }
 
     private func cacheParsedExpense(_ parsed: LLMExpenseResult, for key: String) {

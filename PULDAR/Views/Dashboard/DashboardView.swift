@@ -66,6 +66,7 @@ struct DashboardView: View {
     @State private var editCategory = ""
     @State private var editBucket: BudgetBucket = .fun
     @State private var editDate = Date.now
+    @AppStorage("didCompleteAppOnboarding") private var didCompleteAppOnboarding = false
     @AppStorage("didCompleteModelOnboarding") private var didCompleteModelOnboarding = false
     @AppStorage("didRunCategoryConsistencyFixV2") private var didRunCategoryConsistencyFixV2 = false
     @AppStorage("didNormalizeMerchantsV1") private var didNormalizeMerchantsV1 = false
@@ -228,10 +229,8 @@ struct DashboardView: View {
                     }
                 }
             )
-            .task {
-                if !didCompleteModelOnboarding {
-                    showModelOnboarding = true
-                }
+            .task(id: didCompleteAppOnboarding) {
+                await presentModelOnboardingIfNeeded()
             }
             .task {
                 await storeKit.checkEntitlement()
@@ -1171,5 +1170,19 @@ struct DashboardView: View {
         }
 
         launchAction = nil
+    }
+
+    private func presentModelOnboardingIfNeeded() async {
+        guard didCompleteAppOnboarding else { return }
+        guard !didCompleteModelOnboarding else { return }
+        guard !showModelOnboarding else { return }
+
+        try? await Task.sleep(for: .milliseconds(350))
+
+        guard didCompleteAppOnboarding else { return }
+        guard !didCompleteModelOnboarding else { return }
+        guard !showPaywall && !showReceiptScanner && editingExpense == nil else { return }
+
+        showModelOnboarding = true
     }
 }

@@ -30,6 +30,7 @@ struct ContentView: View {
     @State private var didWarmModelThisLaunch = false
     @State private var selectedTab: RootTab = .home
     @State private var dashboardLaunchAction: DashboardLaunchAction?
+    @State private var showAppOnboarding = false
     @AppStorage("didCompleteAppOnboarding") private var didCompleteAppOnboarding = false
     @AppStorage("appThemeMode") private var appThemeMode = "system"
 
@@ -85,7 +86,9 @@ struct ContentView: View {
                 }
                 .tag(RootTab.history)
 
-            SettingsView()
+            SettingsView {
+                showAppOnboarding = true
+            }
                 .environment(appPreferences)
                 .environment(budgetEngine)
                 .environment(categoryManager)
@@ -127,11 +130,16 @@ struct ContentView: View {
         }
         .fullScreenCover(
             isPresented: Binding(
-                get: { !didCompleteAppOnboarding },
-                set: { if !$0 { didCompleteAppOnboarding = true } }
+                get: { showAppOnboarding || !didCompleteAppOnboarding },
+                set: { isPresented in
+                    guard !isPresented else { return }
+                    showAppOnboarding = false
+                    didCompleteAppOnboarding = true
+                }
             )
         ) {
             AppOnboardingView {
+                showAppOnboarding = false
                 didCompleteAppOnboarding = true
             }
             .environment(llmService)

@@ -20,13 +20,14 @@ struct SettingsView: View {
     @Environment(AppPreferences.self) private var appPreferences
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(DiagnosticLogger.self) private var diagnosticLogger
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Query(sort: \Expense.date, order: .reverse)
     private var expenses: [Expense]
     @Query(sort: \RecurringExpense.createdAt, order: .reverse)
     private var recurringExpenses: [RecurringExpense]
+
+    let onReplayOnboarding: () -> Void
 
     @State private var incomeText: String = ""
     @State private var hourlyPayText: String = ""
@@ -47,7 +48,6 @@ struct SettingsView: View {
     @State private var selectedBudgetInfoBucket: BudgetBucket?
     @AppStorage("appThemeMode") private var appThemeMode = "system"
     @State private var selectedAppIcon: AppIconVariant = .whiteOnBlack
-    @AppStorage("didCompleteAppOnboarding") private var didCompleteAppOnboarding = false
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
     @AppStorage("hourlyPayRate") private var hourlyPayRate: Double = 0
     @AppStorage("hoursPerWeek") private var hoursPerWeek: Double = 40
@@ -667,10 +667,7 @@ struct SettingsView: View {
             LabeledContent("Receipt OCR", value: "English Only")
 
             Button("View Onboarding Again") {
-                dismiss()
-                DispatchQueue.main.async {
-                    didCompleteAppOnboarding = false
-                }
+                onReplayOnboarding()
             }
         } header: {
             Text("About")

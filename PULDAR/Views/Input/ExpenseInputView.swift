@@ -1,11 +1,5 @@
 import SwiftUI
 
-/// The primary user intent — a single, prominent text input.
-///
-/// Features:
-/// - Spring-animated submit button (arrow → checkmark on success).
-/// - Processing spinner while the LLM parses.
-/// - Disabled state for paywall lock with a playful shake.
 struct ExpenseInputView: View {
     let isProcessing: Bool
     let isLocked: Bool
@@ -19,22 +13,18 @@ struct ExpenseInputView: View {
     @State private var showCheckmark = false
     @State private var shakeOffset: CGFloat = 0
     @FocusState private var isFocused: Bool
-    @ScaledMetric(relativeTo: .body) private var actionButtonSize = 40
 
     var body: some View {
-        HStack(spacing: 10) {
-            // ── Text Field ─────────────────────────────────────────────
-            HStack(spacing: 8) {
-                Image(systemName: "text.cursor")
-                    .font(.caption.weight(.light))
-                    .foregroundStyle(AppColors.textTertiary)
+        VStack(spacing: 0) {
+            Divider()
 
+            HStack(spacing: 10) {
                 TextField(
-                    isLocked ? "Free limit reached — upgrade to Pro" : "spent 45 at whole foods, or got 20 refund…",
+                    isLocked ? "Free limit reached — upgrade to Pro" : "spent 45 at whole foods…",
                     text: $inputText
                 )
                 .textFieldStyle(.plain)
-                .font(.subheadline)
+                .font(.system(size: 14))
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled(true)
                 .focused($isFocused)
@@ -45,91 +35,55 @@ struct ExpenseInputView: View {
                     onFocusChange?(isFocused)
                 }
 
-                if isFocused {
-                    Button {
-                        isFocused = false
-                    } label: {
-                        Image(systemName: "keyboard.chevron.compact.down")
-                            .font(.caption.weight(.regular))
-                            .foregroundStyle(AppColors.textTertiary)
+                Button {
+                    if isLocked {
+                        handleLockedInteraction()
+                        return
                     }
-                    .buttonStyle(.plain)
+                    isFocused = false
+                    onCameraTap?()
+                } label: {
+                    Image(systemName: "camera")
+                        .font(.system(size: 15, weight: .light))
+                        .foregroundStyle(isLocked ? AppColors.textTertiary : AppColors.textSecondary)
                 }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .onTapGesture {
-                if isLocked {
-                    handleLockedInteraction()
-                }
-            }
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(AppColors.secondaryBg)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(
-                                isFocused ? AppColors.accent.opacity(0.4) : Color.clear,
-                                lineWidth: 1
-                            )
-                    )
-            )
-            .offset(x: shakeOffset)
-            .animation(.easeOut(duration: 0.2), value: isFocused)
+                .buttonStyle(.plain)
+                .disabled(isProcessing)
 
-            Button {
-                if isLocked {
-                    handleLockedInteraction()
-                    return
-                }
-                isFocused = false
-                onCameraTap?()
-            } label: {
-                Image(systemName: "camera")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(width: actionButtonSize, height: actionButtonSize)
-                    .background(
-                        Circle()
-                            .fill(AppColors.secondaryBg)
-                    )
-                    .foregroundStyle(isLocked ? AppColors.textTertiary : AppColors.accent)
-            }
-            .buttonStyle(.plain)
-            .disabled(isProcessing)
-
-            // ── Submit Button ──────────────────────────────────────────
-            Button(action: handleSubmit) {
-                Group {
-                    if isProcessing {
-                        ProgressView()
-                            .tint(.white)
-                            .scaleEffect(0.8)
-                    } else {
-                        Image(systemName: showCheckmark ? "checkmark" : "arrow.up")
-                            .font(.subheadline.weight(.semibold))
-                            .contentTransition(.symbolEffect(.replace))
+                Button(action: handleSubmit) {
+                    Group {
+                        if isProcessing {
+                            ProgressView()
+                                .tint(.white)
+                                .scaleEffect(0.7)
+                        } else {
+                            Image(systemName: showCheckmark ? "checkmark" : "arrow.up")
+                                .font(.system(size: 13, weight: .semibold))
+                                .contentTransition(.symbolEffect(.replace))
+                        }
                     }
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(buttonColor))
+                    .foregroundStyle(.white)
                 }
-                .frame(width: actionButtonSize, height: actionButtonSize)
-                .background(
-                    Circle()
-                        .fill(buttonColor)
-                )
-                .foregroundStyle(.white)
+                .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isProcessing)
+                .scaleEffect(isProcessing ? 0.95 : 1.0)
+                .animation(.spring(duration: 0.3), value: isProcessing)
             }
-            .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isProcessing)
-            .scaleEffect(isProcessing ? 0.95 : 1.0)
-            .animation(.spring(duration: 0.3), value: isProcessing)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
         }
-        .padding(.horizontal)
+        .background(AppColors.background)
+        .offset(x: shakeOffset)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isLocked { handleLockedInteraction() }
+        }
         .onChange(of: focusTrigger) {
             guard !isLocked else { return }
             isFocused = true
         }
     }
-
-    // MARK: - Actions
 
     private func handleSubmit() {
         let rawInput = inputText.trimmingCharacters(in: .whitespaces)
@@ -148,7 +102,6 @@ struct ExpenseInputView: View {
             }
         }
 
-        // Arrow → checkmark animation
         withAnimation(.spring(duration: 0.4, bounce: 0.5)) {
             showCheckmark = true
         }
@@ -159,11 +112,9 @@ struct ExpenseInputView: View {
         }
     }
 
-    // MARK: - Colours
-
     private var buttonColor: Color {
-        if isLocked { return .gray.opacity(0.5) }
-        if showCheckmark { return .green }
+        if isLocked { return AppColors.textTertiary.opacity(0.5) }
+        if showCheckmark { return AppColors.success }
         return AppColors.accent
     }
 

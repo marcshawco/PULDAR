@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 enum ExpenseExportService {
     struct ExpenseRecord: Codable {
         let id: UUID

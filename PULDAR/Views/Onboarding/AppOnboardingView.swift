@@ -2,297 +2,595 @@ import SwiftUI
 
 struct AppOnboardingView: View {
     @Environment(StoreKitManager.self) private var store
-
-    private struct OnboardingPage: Identifiable {
-        let id = UUID()
-        let title: String
-        let subtitle: String
-        let detail: String
-        let symbol: String
-        let accent: Color
-        let highlights: [String]
-    }
+    @Environment(BudgetEngine.self) private var budgetEngine
+    @Environment(AppPreferences.self) private var appPreferences
 
     let onCompleted: () -> Void
 
-    @State private var currentPage = 0
-    @State private var showTrialOffer = false
-
-    private let pages: [OnboardingPage] = [
-        .init(
-            title: "Budgeting That Feels Effortless",
-            subtitle: "Track spending with plain language instead of manual forms.",
-            detail: "PULDAR turns quick text like \"spent 45 at whole foods\" into organized entries, live balances, and a cleaner monthly picture.",
-            symbol: "sparkles.rectangle.stack",
-            accent: AppColors.accent,
-            highlights: [
-                "Log expenses in seconds",
-                "See what is left this month",
-                "Keep everything on-device"
-            ]
-        ),
-        .init(
-            title: "Use It The Way You Already Think",
-            subtitle: "Type it naturally or scan a receipt.",
-            detail: "You can add expenses by typing one quick sentence or using the camera. PULDAR reads the merchant, amount, and category, then saves it into the right budget.",
-            symbol: "camera.viewfinder",
-            accent: AppColors.bucketFundamentals,
-            highlights: [
-                "Type: \"coffee 5.50\"",
-                "Scan long receipts with the camera",
-                "Review everything later in History"
-            ]
-        ),
-        .init(
-            title: "Your Money Lives In Three Budgets",
-            subtitle: "Fundamentals, Fun, and Future keep spending simple.",
-            detail: "Instead of forcing dozens of categories up front, PULDAR helps you stay oriented around needs, wants, and savings so your budget stays easy to maintain.",
-            symbol: "chart.pie.fill",
-            accent: AppColors.bucketFuture,
-            highlights: [
-                "Fundamentals = needs and bills",
-                "Fun = lifestyle and wants",
-                "Future = savings, debt, and investing"
-            ]
-        ),
-        .init(
-            title: "Built For Daily Check-Ins",
-            subtitle: "The widget keeps your balances visible without opening the app.",
-            detail: "Add the PULDAR widget to your Home Screen to keep your three remaining balances top-of-mind. It is a fast daily glance that helps you stay intentional before you spend.",
-            symbol: "rectangle.grid.2x2.fill",
-            accent: AppColors.bucketFun,
-            highlights: [
-                "See remaining balances at a glance",
-                "Make better decisions before spending",
-                "Open the app only when you need detail"
-            ]
-        ),
-        .init(
-            title: "Try Pro First",
-            subtitle: "Start with 14 days free, then decide what fits.",
-            detail: "We’ll offer the trial immediately so high-intent users can unlock the full experience right away. If you pass for now, you will still get a restricted freemium version to keep building conviction.",
-            symbol: "gift.fill",
-            accent: AppColors.accent,
-            highlights: [
-                "14 full days of Pro access",
-                "Yearly saves money vs monthly",
-                "Skip now and keep using free"
-            ]
-        ),
+    @State private var step = 0
+    @State private var incomeText = ""
+    @State private var draftAlloc: [String: Double] = [
+        "Fundamentals": 0.50, "Fun": 0.30, "Future": 0.20
     ]
+    @State private var showPaywall = false
+    @FocusState private var incomeFieldFocused: Bool
+
+    private let totalSteps = 5
+    private let quickPickAmounts = [3000, 4200, 5200, 6500, 8000, 10000]
+
+    private var draftIncome: Double {
+        Double(incomeText) ?? 0
+    }
 
     var body: some View {
-        NavigationStack {
-            GeometryReader { proxy in
-                let isCompactHeight = proxy.size.height < 760
-                let headerSpacing: CGFloat = isCompactHeight ? 2 : 4
-                let verticalSpacing: CGFloat = isCompactHeight ? 16 : 24
-                let horizontalPadding: CGFloat = isCompactHeight ? 16 : 20
-                let verticalPadding: CGFloat = isCompactHeight ? 16 : 24
-
-                ZStack {
-                    LinearGradient(
-                        colors: [
-                            AppColors.background,
-                            AppColors.secondaryBg,
-                            AppColors.background
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .ignoresSafeArea()
-
-                    VStack(spacing: verticalSpacing) {
-                        header(spacing: headerSpacing, compact: isCompactHeight)
-
-                        TabView(selection: $currentPage) {
-                            ForEach(Array(pages.enumerated()), id: \.offset) { index, page in
-                                pageCard(page, compact: isCompactHeight)
-                                    .tag(index)
-                            }
-                        }
-                        .tabViewStyle(.page(indexDisplayMode: .never))
-
-                        pageIndicator
-
-                        ctaRow(compact: isCompactHeight)
-                    }
-                    .padding(.horizontal, horizontalPadding)
-                    .padding(.vertical, verticalPadding)
-                }
+        VStack(spacing: 0) {
+            topBar
+            progressHairline
+            stepContent
+            Spacer(minLength: 0)
+            bottomButton
+        }
+        .background(AppColors.background.ignoresSafeArea())
+        .interactiveDismissDisabled(true)
+        .sheet(isPresented: $showPaywall) {
+            PaywallView(context: .onboardingTrial) {
+                showPaywall = false
+                finalizeAndComplete()
             }
-            .interactiveDismissDisabled(true)
-            .sheet(isPresented: $showTrialOffer) {
-                PaywallView(context: .onboardingTrial) {
-                    showTrialOffer = false
-                    onCompleted()
-                }
-                .environment(store)
-            }
+            .environment(store)
         }
     }
 
-    private func header(spacing: CGFloat, compact: Bool) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: spacing) {
-                Text("Welcome to PULDAR")
-                    .font(compact ? .largeTitle.weight(.bold) : .largeTitle.bold())
+    // MARK: - Top Bar
 
-                Text("A calmer way to track spending.")
-                    .font(compact ? .footnote : .subheadline)
-                    .foregroundStyle(AppColors.textSecondary)
+    private var topBar: some View {
+        HStack {
+            if step > 0 {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) { step -= 1 }
+                } label: {
+                    Text("← Back")
+                        .font(.system(size: 11, weight: .semibold))
+                        .kerning(1.6)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text("PULDAR")
+                    .font(.system(size: 10, weight: .bold))
+                    .kerning(2.2)
+                    .foregroundStyle(AppColors.textTertiary)
             }
 
             Spacer()
+
+            Text(String(format: "%02d / %02d", step + 1, totalSteps))
+                .font(.system(size: 10, weight: .semibold))
+                .kerning(1.8)
+                .foregroundStyle(AppColors.textTertiary)
         }
+        .padding(.horizontal, 22)
+        .padding(.top, 18)
+        .padding(.bottom, 14)
     }
 
-    private func pageCard(_ page: OnboardingPage, compact: Bool) -> some View {
-        let cardSpacing: CGFloat = compact ? 16 : 22
-        let cardPadding: CGFloat = compact ? 18 : 24
-        let heroSpacing: CGFloat = compact ? 14 : 18
-        let textSpacing: CGFloat = compact ? 8 : 10
-        let highlightSpacing: CGFloat = compact ? 8 : 12
-        let highlightVerticalPadding: CGFloat = compact ? 10 : 12
-        let iconSize: CGFloat = compact ? 34 : 42
-
-        return VStack(alignment: .leading, spacing: cardSpacing) {
-            VStack(alignment: .leading, spacing: heroSpacing) {
-                Image(systemName: page.symbol)
-                    .font(.system(size: iconSize, weight: .light))
-                    .foregroundStyle(page.accent)
-
-                VStack(alignment: .leading, spacing: textSpacing) {
-                    Text(page.title)
-                        .font(compact ? .title3.weight(.bold) : .title2.weight(.bold))
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(page.subtitle)
-                        .font(compact ? .subheadline.weight(.medium) : .headline.weight(.medium))
-                        .foregroundStyle(AppColors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(page.detail)
-                        .font(compact ? .callout : .body)
-                        .foregroundStyle(AppColors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(cardPadding)
-            .background {
-                ZStack(alignment: .topTrailing) {
-                    RoundedRectangle(cornerRadius: 30, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    page.accent.opacity(0.18),
-                                    AppColors.secondaryBg
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-
-                    Circle()
-                        .fill(page.accent.opacity(0.12))
-                        .frame(width: 120, height: 120)
-                        .offset(x: 22, y: -14)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 30, style: .continuous)
-                        .stroke(page.accent.opacity(0.18), lineWidth: 1)
-                }
-            }
-
-            VStack(spacing: highlightSpacing) {
-                ForEach(page.highlights, id: \.self) { item in
-                    HStack(spacing: 12) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: compact ? 14 : 16, weight: .semibold))
-                            .foregroundStyle(page.accent)
-
-                        Text(item)
-                            .font(compact ? .footnote.weight(.medium) : .subheadline.weight(.medium))
-                            .foregroundStyle(AppColors.textPrimary)
-                            .multilineTextAlignment(.leading)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.9)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, highlightVerticalPadding)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(AppColors.secondaryBg)
-                    )
-                }
-            }
-
-            if currentPage == pages.count - 1 {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Next up: trial or freemium")
-                        .font((compact ? Font.caption : .footnote).weight(.semibold))
-                        .foregroundStyle(AppColors.textPrimary)
-
-                    Text("We’ll present the 14-day trial right away. If you skip it, you will still land in the limited free version and can upgrade later.")
-                        .font(compact ? .caption : .footnote)
-                        .foregroundStyle(AppColors.textSecondary)
-                }
-                .padding(.top, 4)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, compact ? 0 : 8)
-    }
-
-    private var pageIndicator: some View {
-        HStack(spacing: 8) {
-            ForEach(pages.indices, id: \.self) { index in
-                Capsule(style: .continuous)
-                    .fill(index == currentPage ? AppColors.accent : AppColors.textTertiary.opacity(0.25))
-                    .frame(width: index == currentPage ? 24 : 8, height: 8)
+    private var progressHairline: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Rectangle().fill(AppColors.border)
+                Rectangle()
+                    .fill(AppColors.textPrimary)
+                    .frame(width: geo.size.width * CGFloat(step + 1) / CGFloat(totalSteps))
+                    .animation(.easeInOut(duration: 0.4), value: step)
             }
         }
-        .animation(.spring(duration: 0.3), value: currentPage)
+        .frame(height: 1)
     }
 
-    private func ctaRow(compact: Bool) -> some View {
-        HStack(spacing: 12) {
-            if currentPage > 0 {
-                Button("Back") {
-                    currentPage = max(currentPage - 1, 0)
-                }
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, compact ? 13 : 15)
-                .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(AppColors.secondaryBg)
-                )
-            }
+    // MARK: - Step Content
 
-            Button(currentPage == pages.count - 1 ? "See Trial Options" : "Continue") {
-                if currentPage == pages.count - 1 {
-                    showTrialOffer = true
-                } else {
-                    currentPage += 1
+    @ViewBuilder
+    private var stepContent: some View {
+        ScrollView {
+            Group {
+                switch step {
+                case 0: welcomeStep
+                case 1: incomeStep
+                case 2: ruleStep
+                case 3: mixStep
+                case 4: privacyStep
+                default: EmptyView()
                 }
             }
-            .font(.headline)
+            .padding(.horizontal, 28)
+        }
+        .scrollDismissesKeyboard(.interactively)
+    }
+
+    // MARK: Step 0 — Welcome
+
+    private var welcomeStep: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Welcome")
+                .font(.system(size: 11, weight: .bold))
+                .kerning(2.2)
+                .textCase(.uppercase)
+                .foregroundStyle(AppColors.textTertiary)
+                .padding(.top, 60)
+                .padding(.bottom, 24)
+
+            Text("Budget,\nsimply.")
+                .font(.system(size: 56, weight: .ultraLight))
+                .tracking(-1.7)
+                .foregroundStyle(AppColors.textPrimary)
+                .lineSpacing(-4)
+                .padding(.bottom, 36)
+
+            Divider()
+                .padding(.bottom, 28)
+
+            Text("Three buckets. One rule.\nA lifetime of clarity.\nNo bank linking. No accounts.")
+                .font(.system(size: 15, weight: .light))
+                .foregroundStyle(AppColors.textSecondary)
+                .lineSpacing(6)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: Step 1 — Income
+
+    private var incomeStep: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Step 01 — Income")
+                .font(.system(size: 11, weight: .bold))
+                .kerning(2.2)
+                .textCase(.uppercase)
+                .foregroundStyle(AppColors.textTertiary)
+                .padding(.top, 40)
+                .padding(.bottom, 18)
+
+            Text("How much do\nyou take home?")
+                .font(.system(size: 34, weight: .ultraLight))
+                .tracking(-0.7)
+                .foregroundStyle(AppColors.textPrimary)
+                .padding(.bottom, 28)
+
+            Text("Monthly, after tax. You can change this anytime.")
+                .font(.system(size: 13, weight: .light))
+                .foregroundStyle(AppColors.textSecondary)
+                .padding(.bottom, 32)
+
+            Divider()
+
+            VStack(spacing: 10) {
+                Text("Per month")
+                    .font(.system(size: 11, weight: .semibold))
+                    .kerning(2)
+                    .textCase(.uppercase)
+                    .foregroundStyle(AppColors.textTertiary)
+                    .padding(.top, 32)
+
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("$")
+                        .font(.system(size: 34, weight: .ultraLight))
+                        .foregroundStyle(AppColors.textSecondary)
+
+                    TextField("0", text: $incomeText)
+                        .font(.system(size: 56, weight: .ultraLight))
+                        .tracking(-2)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.center)
+                        .focused($incomeFieldFocused)
+                        .monospacedDigit()
+                        .frame(maxWidth: 200)
+                }
+
+                Rectangle()
+                    .fill(AppColors.textPrimary.opacity(0.4))
+                    .frame(width: 200, height: 1)
+
+                Text("Tap to edit")
+                    .font(.system(size: 10, weight: .semibold))
+                    .kerning(1.8)
+                    .textCase(.uppercase)
+                    .foregroundStyle(AppColors.textTertiary)
+            }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, compact ? 13 : 15)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(AppColors.accent)
+            .padding(.bottom, 24)
+
+            Divider()
+
+            Text("Quick pick")
+                .font(.system(size: 10, weight: .bold))
+                .kerning(2)
+                .textCase(.uppercase)
+                .foregroundStyle(AppColors.textTertiary)
+                .padding(.top, 24)
+                .padding(.bottom, 14)
+
+            LazyVGrid(columns: [
+                GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())
+            ], spacing: 10) {
+                ForEach(quickPickAmounts, id: \.self) { amount in
+                    Button {
+                        incomeText = "\(amount)"
+                    } label: {
+                        Text("$\(amount.formatted())")
+                            .font(.system(size: 13, weight: .medium))
+                            .monospacedDigit()
+                            .foregroundStyle(
+                                draftIncome == Double(amount)
+                                ? Color.white
+                                : AppColors.textPrimary
+                            )
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(
+                                        draftIncome == Double(amount)
+                                        ? AppColors.textPrimary
+                                        : AppColors.secondaryBg
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: Step 2 — The Rule
+
+    private var ruleStep: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Step 02 — The Rule")
+                .font(.system(size: 11, weight: .bold))
+                .kerning(2.2)
+                .textCase(.uppercase)
+                .foregroundStyle(AppColors.textTertiary)
+                .padding(.top, 32)
+                .padding(.bottom, 14)
+
+            Text("Three buckets.\nOne life.")
+                .font(.system(size: 30, weight: .ultraLight))
+                .tracking(-0.6)
+                .foregroundStyle(AppColors.textPrimary)
+                .padding(.bottom, 24)
+
+            Divider()
+
+            ForEach(Array(bucketRuleData.enumerated()), id: \.element.name) { index, item in
+                HStack(alignment: .center, spacing: 16) {
+                    Text(String(format: "%02d", index + 1))
+                        .font(.system(size: 9, weight: .bold))
+                        .kerning(2)
+                        .foregroundStyle(AppColors.textTertiary)
+
+                    Rectangle()
+                        .fill(item.color)
+                        .frame(width: 3, height: 32)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(item.name)
+                            .font(.system(size: 20, weight: .medium))
+                            .tracking(-0.2)
+                            .foregroundStyle(AppColors.textPrimary)
+                        Text(item.desc)
+                            .font(.system(size: 13, weight: .light))
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("\(item.pct)%")
+                            .font(.system(size: 28, weight: .ultraLight))
+                            .monospacedDigit()
+                            .tracking(-0.9)
+                            .foregroundStyle(AppColors.textPrimary)
+
+                        if draftIncome > 0 {
+                            Text((draftIncome * Double(item.pct) / 100).formattedCurrency(code: appPreferences.currencyCode))
+                                .font(.system(size: 11, weight: .light))
+                                .foregroundStyle(AppColors.textTertiary)
+                                .monospacedDigit()
+                        }
+                    }
+                }
+                .padding(.vertical, 24)
+
+                if index < bucketRuleData.count - 1 {
+                    Divider()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var bucketRuleData: [(name: String, desc: String, pct: Int, color: Color)] {
+        [
+            ("Fundamentals", "Rent, food, utilities. Needs.", Int(round((draftAlloc["Fundamentals"] ?? 0.5) * 100)), AppColors.bucketFundamentals),
+            ("Fun", "Dining, travel, leisure. Wants.", Int(round((draftAlloc["Fun"] ?? 0.3) * 100)), AppColors.bucketFun),
+            ("Future", "Savings, investing. Growth.", Int(round((draftAlloc["Future"] ?? 0.2) * 100)), AppColors.bucketFuture),
+        ]
+    }
+
+    // MARK: Step 3 — Mix
+
+    private var mixStep: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Step 04 — Mix")
+                .font(.system(size: 11, weight: .bold))
+                .kerning(2.2)
+                .textCase(.uppercase)
+                .foregroundStyle(AppColors.textTertiary)
+                .padding(.top, 40)
+                .padding(.bottom, 28)
+
+            Text("Choose\nyour mix.")
+                .font(.system(size: 38, weight: .ultraLight))
+                .tracking(-1)
+                .foregroundStyle(AppColors.textPrimary)
+                .padding(.bottom, 44)
+
+            Divider()
+
+            ForEach(presets) { preset in
+                Button {
+                    if let values = preset.allocValues {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            draftAlloc = values
+                        }
+                    }
+                } label: {
+                    HStack(alignment: .center, spacing: 14) {
+                        Circle()
+                            .strokeBorder(
+                                isPresetSelected(preset) ? AppColors.textPrimary : AppColors.border,
+                                lineWidth: 1.5
+                            )
+                            .frame(width: 14, height: 14)
+                            .overlay {
+                                if isPresetSelected(preset) {
+                                    Circle()
+                                        .fill(AppColors.textPrimary)
+                                        .frame(width: 6, height: 6)
+                                }
+                            }
+
+                        Text(preset.name)
+                            .font(.system(size: 15, weight: .medium))
+                            .tracking(-0.1)
+                            .foregroundStyle(AppColors.textPrimary)
+
+                        Spacer()
+
+                        if let values = preset.displayValues(alloc: draftAlloc, income: draftIncome) {
+                            HStack(spacing: 14) {
+                                presetColumn(pct: values.fundPct, amount: values.fundAmt, color: AppColors.bucketFundamentals)
+                                presetColumn(pct: values.funPct, amount: values.funAmt, color: AppColors.bucketFun)
+                                presetColumn(pct: values.futPct, amount: values.futAmt, color: AppColors.bucketFuture)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 18)
+                }
+                .buttonStyle(.plain)
+
+                Divider()
+            }
+
+            if draftIncome > 0 {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("You'll start with")
+                        .font(.system(size: 10, weight: .bold))
+                        .kerning(2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AppColors.textTertiary)
+
+                    GeometryReader { geo in
+                        HStack(spacing: 2) {
+                            ForEach(BudgetBucket.allCases) { bucket in
+                                let pct = draftAlloc[bucket.rawValue] ?? 0
+                                if pct > 0 {
+                                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                        .fill(bucket.color)
+                                        .frame(width: max(geo.size.width * pct - 1, 0))
+                                }
+                            }
+                        }
+                    }
+                    .frame(height: 8)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                }
+                .padding(.top, 32)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func presetColumn(pct: Int, amount: Double, color: Color) -> some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text("\(pct)%")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(color)
+                .monospacedDigit()
+            if amount > 0 {
+                Text(amount.formattedCurrency(code: appPreferences.currencyCode))
+                    .font(.system(size: 9))
+                    .foregroundStyle(AppColors.textTertiary)
+                    .monospacedDigit()
+            }
+        }
+        .frame(width: 60, alignment: .trailing)
+    }
+
+    // MARK: Step 4 — Privacy
+
+    private var privacyStep: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Step 05 — Privacy")
+                .font(.system(size: 11, weight: .bold))
+                .kerning(2.2)
+                .textCase(.uppercase)
+                .foregroundStyle(AppColors.textTertiary)
+                .padding(.top, 56)
+                .padding(.bottom, 28)
+
+            Text("On device.")
+                .font(.system(size: 52, weight: .ultraLight))
+                .tracking(-1.8)
+                .foregroundStyle(AppColors.textPrimary)
+            Text("Always.")
+                .font(.system(size: 52, weight: .ultraLight))
+                .tracking(-1.8)
+                .foregroundStyle(AppColors.textTertiary)
+                .padding(.bottom, 36)
+
+            Divider()
+                .padding(.bottom, 28)
+
+            Text("PULDAR parses your entries with a small language model that runs entirely on your phone. Your data never leaves the device.")
+                .font(.system(size: 16, weight: .light))
+                .foregroundStyle(AppColors.textSecondary)
+                .lineSpacing(5)
+                .padding(.bottom, 40)
+
+            ForEach(Array(privacyPillars.enumerated()), id: \.element.key) { index, pillar in
+                if index > 0 { Divider() }
+                HStack(alignment: .firstTextBaseline, spacing: 18) {
+                    Text(pillar.num)
+                        .font(.system(size: 11, weight: .semibold))
+                        .kerning(1.4)
+                        .foregroundStyle(AppColors.textTertiary)
+                        .frame(width: 24)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(pillar.key)
+                            .font(.system(size: 18, weight: .medium))
+                            .tracking(-0.3)
+                            .foregroundStyle(AppColors.textPrimary)
+                        Text(pillar.value)
+                            .font(.system(size: 13, weight: .light))
+                            .foregroundStyle(AppColors.textSecondary)
+                    }
+                }
+                .padding(.vertical, 20)
+            }
+
+            Divider()
+
+            HStack {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Includes")
+                        .font(.system(size: 9, weight: .bold))
+                        .kerning(2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AppColors.textTertiary)
+                    Text("PULDAR Mini · 1.2 GB")
+                        .font(.system(size: 14, weight: .medium))
+                        .tracking(-0.1)
+                        .foregroundStyle(AppColors.textPrimary)
+                }
+                Spacer()
+                Text("~3 min · Wi-Fi")
+                    .font(.system(size: 10, weight: .semibold))
+                    .kerning(1.8)
+                    .textCase(.uppercase)
+                    .foregroundStyle(AppColors.textTertiary)
+            }
+            .padding(.top, 32)
+            .padding(.bottom, 8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private let privacyPillars = [
+        (num: "i.", key: "No accounts", value: "Nothing to sign up for. Ever."),
+        (num: "ii.", key: "No tracking", value: "Zero analytics. Zero servers."),
+        (num: "iii.", key: "Yours alone", value: "Export or delete anytime."),
+    ]
+
+    // MARK: - Bottom Button
+
+    private var bottomButton: some View {
+        Button {
+            if step == totalSteps - 1 {
+                showPaywall = true
+            } else {
+                withAnimation(.easeInOut(duration: 0.25)) { step += 1 }
+            }
+        } label: {
+            Text(step == totalSteps - 1 ? "Get Started" : "Continue")
+                .font(.system(size: 15, weight: .semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(AppColors.accent)
+                )
+                .foregroundStyle(AppColors.background)
+        }
+        .padding(.horizontal, 22)
+        .padding(.bottom, 12)
+    }
+
+    // MARK: - Presets
+
+    private struct OnboardingPreset: Identifiable {
+        let id = UUID()
+        let name: String
+        let allocValues: [String: Double]?
+
+        struct DisplayValues {
+            let fundPct: Int, funPct: Int, futPct: Int
+            let fundAmt: Double, funAmt: Double, futAmt: Double
+        }
+
+        func displayValues(alloc: [String: Double], income: Double) -> DisplayValues? {
+            let vals = allocValues ?? alloc
+            let f = vals["Fundamentals"] ?? 0
+            let fu = vals["Fun"] ?? 0
+            let ft = vals["Future"] ?? 0
+            return DisplayValues(
+                fundPct: Int(round(f * 100)),
+                funPct: Int(round(fu * 100)),
+                futPct: Int(round(ft * 100)),
+                fundAmt: income * f,
+                funAmt: income * fu,
+                futAmt: income * ft
             )
-            .foregroundStyle(.white)
         }
     }
-}
 
-#Preview {
-    AppOnboardingView(onCompleted: {})
+    private let presets: [OnboardingPreset] = [
+        .init(name: "Classic", allocValues: ["Fundamentals": 0.50, "Fun": 0.30, "Future": 0.20]),
+        .init(name: "Saver", allocValues: ["Fundamentals": 0.50, "Fun": 0.20, "Future": 0.30]),
+        .init(name: "Lean", allocValues: ["Fundamentals": 0.60, "Fun": 0.20, "Future": 0.20]),
+        .init(name: "Custom", allocValues: nil),
+    ]
+
+    private func isPresetSelected(_ preset: OnboardingPreset) -> Bool {
+        guard let values = preset.allocValues else {
+            return !presets.compactMap(\.allocValues).contains(where: { vals in
+                BudgetBucket.allCases.allSatisfy { abs((draftAlloc[$0.rawValue] ?? 0) - (vals[$0.rawValue] ?? 0)) < 0.001 }
+            })
+        }
+        return BudgetBucket.allCases.allSatisfy {
+            abs((draftAlloc[$0.rawValue] ?? 0) - (values[$0.rawValue] ?? 0)) < 0.001
+        }
+    }
+
+    // MARK: - Finalize
+
+    private func finalizeAndComplete() {
+        if draftIncome > 0 {
+            budgetEngine.monthlyIncome = draftIncome
+        }
+        budgetEngine.setPercentages(draftAlloc)
+        onCompleted()
+    }
 }

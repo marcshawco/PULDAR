@@ -56,6 +56,7 @@ struct SettingsView: View {
     @State private var selectedBudgetInfoBucket: BudgetBucket?
     @State private var financeKitNotice: FinanceKitManager.Notice?
     @AppStorage("appThemeMode") private var appThemeMode = "system"
+    @State private var selectedAppIcon: AppIconVariant = .whiteOnBlack
     @AppStorage("didCompleteAppOnboarding") private var didCompleteAppOnboarding = false
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
     @AppStorage("hourlyPayRate") private var hourlyPayRate: Double = 0
@@ -151,6 +152,7 @@ struct SettingsView: View {
                     recalculateMonthlyIncomeFromHourlyInputs()
                 }
                 runAutoMonthlyExportIfNeeded()
+                selectedAppIcon = AppIconVariant.current
             }
             .onChange(of: store.isPro) {
                 if !store.isPro, budgetEngine.rolloverEnabled {
@@ -410,53 +412,68 @@ struct SettingsView: View {
                 applySelectedPresetIfNeeded()
             }
 
+            if budgetEngine.monthlyIncome > 0 {
+                dollarPreviewBar
+                    .padding(.vertical, 4)
+            }
+
             ForEach(BudgetBucket.allCases) { bucket in
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 10) {
-                        Image(systemName: bucket.icon)
-                            .font(.system(size: 12, weight: .thin))
-                            .foregroundStyle(bucket.color)
-                            .frame(width: 20)
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(bucket.color)
+                        .frame(width: 7, height: 7)
 
-                        VStack(alignment: .leading, spacing: 1) {
-                            HStack(spacing: 4) {
-                                Text(bucket.rawValue)
-                                    .font(.subheadline.weight(.medium))
-                                Button {
-                                    selectedBudgetInfoBucket = bucket
-                                } label: {
-                                    Image(systemName: "info.circle")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(AppColors.textTertiary)
-                                }
-                                .buttonStyle(.plain)
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 4) {
+                            Text(bucket.rawValue)
+                                .font(.subheadline.weight(.medium))
+                            Button {
+                                selectedBudgetInfoBucket = bucket
+                            } label: {
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(AppColors.textTertiary)
                             }
-                            Text(bucket.subtitle)
-                                .font(.caption2)
-                                .foregroundStyle(AppColors.textTertiary)
+                            .buttonStyle(.plain)
                         }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing, spacing: 1) {
-                            Text("\(Int(draftPercentage(for: bucket) * 100))%")
-                                .font(.subheadline.weight(.semibold))
-                        }
+                        Text(bucket.subtitle)
+                            .font(.caption2)
+                            .foregroundStyle(AppColors.textTertiary)
                     }
 
-                    HStack(spacing: 10) {
-                        Slider(
-                            value: percentageBinding(for: bucket),
-                            in: 0...1,
-                            step: 0.01
-                        )
-                        Text(draftBucketBudgetDisplay(for: bucket))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AppColors.textSecondary)
+                    Spacer()
+
+                    HStack(spacing: 8) {
+                        Button {
+                            adjustPercentage(for: bucket, by: -0.05)
+                        } label: {
+                            Image(systemName: "minus")
+                                .font(.system(size: 12, weight: .semibold))
+                                .frame(width: 28, height: 28)
+                                .background(Circle().fill(AppColors.secondaryBg))
+                                .foregroundStyle(AppColors.textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(draftPercentage(for: bucket) < 0.05)
+
+                        Text("\(Int(draftPercentage(for: bucket) * 100))%")
+                            .font(.system(size: 15, weight: .semibold))
                             .monospacedDigit()
-                            .frame(minWidth: 92, alignment: .trailing)
+                            .frame(minWidth: 36)
+
+                        Button {
+                            adjustPercentage(for: bucket, by: 0.05)
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.system(size: 12, weight: .semibold))
+                                .frame(width: 28, height: 28)
+                                .background(Circle().fill(AppColors.secondaryBg))
+                                .foregroundStyle(AppColors.textSecondary)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
+                .padding(.vertical, 2)
             }
         } header: {
             HStack(spacing: 6) {
@@ -482,8 +499,37 @@ struct SettingsView: View {
                 .foregroundStyle(isAllocationValid ? AppColors.textTertiary : AppColors.overspend)
 
                 if budgetEngine.monthlyIncome <= 0 {
-                    Text("Enter income above to calculate dollar targets.")
+                    Text("Enter income above to see dollar amounts.")
                         .foregroundStyle(AppColors.textTertiary)
+                }
+            }
+        }
+    }
+
+    private var dollarPreviewBar: some View {
+        VStack(spacing: 6) {
+            GeometryReader { geo in
+                HStack(spacing: 1) {
+                    ForEach(BudgetBucket.allCases) { bucket in
+                        let pct = draftPercentage(for: bucket)
+                        if pct > 0 {
+                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                .fill(bucket.color)
+                                .frame(width: max(geo.size.width * pct - 1, 0))
+                        }
+                    }
+                }
+            }
+            .frame(height: 6)
+            .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+
+            HStack {
+                ForEach(BudgetBucket.allCases) { bucket in
+                    if bucket != BudgetBucket.allCases.first { Spacer() }
+                    Text(draftBucketBudgetDisplay(for: bucket))
+                        .font(.system(size: 10))
+                        .foregroundStyle(bucket.color)
+                        .monospacedDigit()
                 }
             }
         }
@@ -735,6 +781,47 @@ struct SettingsView: View {
                 Text("Dark").tag("dark")
             }
             .pickerStyle(.menu)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("App Icon")
+                    .font(.subheadline)
+
+                HStack(spacing: 12) {
+                    ForEach(AppIconVariant.allCases) { variant in
+                        Button {
+                            setAppIcon(variant)
+                        } label: {
+                            VStack(spacing: 6) {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(variant.previewBackground)
+                                    .frame(width: 54, height: 54)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .strokeBorder(
+                                                selectedAppIcon == variant
+                                                    ? AppColors.accent
+                                                    : AppColors.border,
+                                                lineWidth: selectedAppIcon == variant ? 2 : 1
+                                            )
+                                    )
+                                    .overlay {
+                                        variant.previewContent
+                                    }
+
+                                Text(variant.label)
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(
+                                        selectedAppIcon == variant
+                                            ? AppColors.textPrimary
+                                            : AppColors.textTertiary
+                                    )
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
         } header: {
             Text("Appearance")
         }
@@ -1204,6 +1291,12 @@ struct SettingsView: View {
         )
     }
 
+    private func adjustPercentage(for bucket: BudgetBucket, by delta: Double) {
+        let current = draftPercentage(for: bucket)
+        let newValue = min(max(current + delta, 0), 1)
+        draftPercentages[bucket.rawValue] = newValue
+    }
+
     private func applySelectedPresetIfNeeded() {
         guard let values = selectedAllocationPreset.values else { return }
         draftPercentages = values
@@ -1274,6 +1367,7 @@ struct SettingsView: View {
     private enum AllocationPreset: String, CaseIterable, Identifiable {
         case fiftyThirtyTwenty
         case sixtyTwentyTwenty
+        case seventyTwentyTen
         case custom
 
         var id: String { rawValue }
@@ -1282,6 +1376,7 @@ struct SettingsView: View {
             switch self {
             case .fiftyThirtyTwenty: return "50/30/20"
             case .sixtyTwentyTwenty: return "60/20/20"
+            case .seventyTwentyTen:  return "70/20/10"
             case .custom: return "Custom"
             }
         }
@@ -1300,6 +1395,12 @@ struct SettingsView: View {
                     BudgetBucket.fun.rawValue: 0.20,
                     BudgetBucket.future.rawValue: 0.20
                 ]
+            case .seventyTwentyTen:
+                return [
+                    BudgetBucket.fundamentals.rawValue: 0.70,
+                    BudgetBucket.fun.rawValue: 0.20,
+                    BudgetBucket.future.rawValue: 0.10
+                ]
             case .custom:
                 return nil
             }
@@ -1309,7 +1410,7 @@ struct SettingsView: View {
             _ values: [String: Double],
             tolerance: Double = 0.0001
         ) -> AllocationPreset? {
-            for preset in [AllocationPreset.fiftyThirtyTwenty, .sixtyTwentyTwenty] {
+            for preset in [AllocationPreset.fiftyThirtyTwenty, .sixtyTwentyTwenty, .seventyTwentyTen] {
                 guard let presetValues = preset.values else { continue }
                 let isMatch = BudgetBucket.allCases.allSatisfy { bucket in
                     abs((values[bucket.rawValue] ?? 0) - (presetValues[bucket.rawValue] ?? 0)) <= tolerance
@@ -1452,4 +1553,83 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - App Icon
+
+    private func setAppIcon(_ variant: AppIconVariant) {
+        selectedAppIcon = variant
+        UIApplication.shared.setAlternateIconName(variant.iconName) { error in
+            if let error {
+                print("Failed to set app icon: \(error)")
+            }
+        }
+    }
+}
+
+// MARK: - App Icon Variant
+
+enum AppIconVariant: String, CaseIterable, Identifiable {
+    case whiteOnBlack
+    case colorOnWhite
+    case colorOnBlack
+    case blackOnWhite
+
+    var id: String { rawValue }
+
+    var iconName: String? {
+        switch self {
+        case .whiteOnBlack: return nil
+        case .colorOnWhite: return "AppIconColorOnWhite"
+        case .colorOnBlack: return "AppIconColorOnBlack"
+        case .blackOnWhite: return "AppIconBlackOnWhite"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .whiteOnBlack: return "Default"
+        case .colorOnWhite: return "Color"
+        case .colorOnBlack: return "Color Dark"
+        case .blackOnWhite: return "Classic"
+        }
+    }
+
+    var previewBackground: Color {
+        switch self {
+        case .whiteOnBlack: return .black
+        case .colorOnWhite: return .white
+        case .colorOnBlack: return .black
+        case .blackOnWhite: return .white
+        }
+    }
+
+    @ViewBuilder
+    var previewContent: some View {
+        switch self {
+        case .whiteOnBlack:
+            iconBars(colors: [.white, .white, .white])
+        case .colorOnWhite:
+            iconBars(colors: [AppColors.bucketFundamentals, AppColors.bucketFun, AppColors.bucketFuture])
+        case .colorOnBlack:
+            iconBars(colors: [AppColors.bucketFundamentals, AppColors.bucketFun, AppColors.bucketFuture])
+        case .blackOnWhite:
+            iconBars(colors: [.black, .black, .black])
+        }
+    }
+
+    private func iconBars(colors: [Color]) -> some View {
+        HStack(spacing: 3) {
+            ForEach(0..<3, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 1, style: .continuous)
+                    .fill(colors[i])
+                    .frame(width: 4, height: CGFloat(20 - i * 4))
+            }
+        }
+    }
+
+    static var current: AppIconVariant {
+        guard let name = UIApplication.shared.alternateIconName else {
+            return .whiteOnBlack
+        }
+        return allCases.first { $0.iconName == name } ?? .whiteOnBlack
+    }
 }

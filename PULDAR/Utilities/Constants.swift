@@ -7,20 +7,24 @@ enum AppColors {
     static let secondaryBg = Color(.secondarySystemBackground)
     static let tertiaryBg = Color(.tertiarySystemBackground)
 
-    // 3-Bucket colors — muted, premium tones
-    static let bucketFundamentals = Color(red: 0.35, green: 0.55, blue: 0.78)
-    static let bucketFun = Color(red: 0.55, green: 0.75, blue: 0.52)
-    static let bucketFuture = Color(red: 0.68, green: 0.52, blue: 0.82)
+    // 3-Bucket colors — the only non-monochrome colours in the app
+    static let bucketFundamentals = Color(red: 0.227, green: 0.361, blue: 0.678) // #3A5CAD
+    static let bucketFun = Color(red: 0.165, green: 0.502, blue: 0.337)          // #2A8056
+    static let bucketFuture = Color(red: 0.788, green: 0.412, blue: 0.141)       // #C96924
 
     // Semantic
-    static let overspend = Color(red: 0.92, green: 0.30, blue: 0.28)
+    static let overspend = Color(red: 0.753, green: 0.224, blue: 0.169) // #C0392B
+    static let success = Color(red: 0.153, green: 0.682, blue: 0.376)   // #27AE60
     static let searchHighlight = Color.yellow.opacity(0.40)
-    static let accent = Color(red: 0.30, green: 0.50, blue: 0.90)
+    static let accent = Color(.label)
 
     // Text
     static let textPrimary = Color(.label)
     static let textSecondary = Color(.secondaryLabel)
     static let textTertiary = Color(.tertiaryLabel)
+
+    // Hairline border
+    static let border = Color(red: 0.89, green: 0.88, blue: 0.85) // #E3E0D8
 }
 
 // MARK: - App-wide Constants

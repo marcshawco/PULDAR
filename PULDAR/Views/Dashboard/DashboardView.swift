@@ -47,6 +47,9 @@ struct DashboardView: View {
     @State private var isProcessing = false
     @State private var searchText = ""
     @State private var selectedBucketFilter: BudgetBucket?
+    @State private var expandedBucket: BudgetBucket?
+    @State private var recurringOpen = false
+    @State private var txOpen = true
     @State private var showPaywall = false
     @State private var showSettings = false
     @State private var showModelOnboarding = false
@@ -57,6 +60,12 @@ struct DashboardView: View {
     @State private var recurringSuggestion: RecurringSuggestion?
     @State private var showReceiptScanner = false
     @State private var composerFocusTrigger = 0
+    @State private var editingExpense: Expense?
+    @State private var editMerchant = ""
+    @State private var editAmount = ""
+    @State private var editCategory = ""
+    @State private var editBucket: BudgetBucket = .fun
+    @State private var editDate = Date.now
     @AppStorage("didCompleteModelOnboarding") private var didCompleteModelOnboarding = false
     @AppStorage("didRunCategoryConsistencyFixV2") private var didRunCategoryConsistencyFixV2 = false
     @AppStorage("didNormalizeMerchantsV1") private var didNormalizeMerchantsV1 = false
@@ -171,6 +180,32 @@ struct DashboardView: View {
                     }
                 }
             }
+            .sheet(item: $editingExpense) { _ in
+                NavigationStack {
+                    Form {
+                        TextField("Merchant", text: $editMerchant)
+                            .textInputAutocapitalization(.words)
+                        TextField("Amount", text: $editAmount)
+                            .keyboardType(.decimalPad)
+                        Picker("Bucket", selection: $editBucket) {
+                            ForEach(BudgetBucket.allCases) { bucket in
+                                Text(bucket.rawValue).tag(bucket)
+                            }
+                        }
+                        DatePicker("Date", selection: $editDate, displayedComponents: .date)
+                    }
+                    .navigationTitle("Edit Transaction")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { editingExpense = nil }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Save") { saveInlineEdit() }
+                        }
+                    }
+                }
+            }
             .alert(
                 "Make this recurring?",
                 isPresented: Binding(
@@ -220,64 +255,21 @@ struct DashboardView: View {
         }
     }
 
+    private var totalSpentAmount: Double {
+        budgetEngine.totalSpent(
+            expenses: expenses,
+            recurringExpenses: effectiveRecurringExpenses
+        )
+    }
+
+    private var remainingAmount: Double {
+        budgetEngine.monthlyIncome - totalSpentAmount
+    }
+
     @ViewBuilder
     private var dashboardContent: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 0) {
             modelStatusBanner
-
-            BucketDonutChart(
-                statuses: bucketStatuses,
-                selectedBucket: selectedBucketFilter,
-                onBucketSelected: { selectedBucketFilter = $0 }
-            )
-            .padding(.top, 4)
-
-            VStack(spacing: 10) {
-                ForEach(bucketStatuses) { status in
-                    bucketStatusRow(status)
-                }
-            }
-            .padding(.horizontal)
-
-            if monthlyOverspentAmount > 0 {
-                overspentSummaryRow(amount: monthlyOverspentAmount)
-                    .padding(.horizontal)
-            }
-            if monthlyUnderspentAmount > 0 {
-                underspentSummaryRow(
-                    amount: monthlyUnderspentAmount,
-                    total: monthlySpendCapacity
-                )
-                    .padding(.horizontal)
-            }
-
-            if recurringMonthlyTotal > 0 {
-                recurringSummaryRow(
-                    amount: recurringMonthlyTotal,
-                    count: recurringExpenses.filter(\.isActive).count
-                )
-                .padding(.horizontal)
-            }
-
-            if budgetEngine.monthlyIncome == 0 {
-                incomePrompt
-            }
-
-            Divider()
-                .padding(.horizontal, 24)
-
-            if let selectedBucketFilter {
-                HStack(spacing: 8) {
-                    Text("Showing \(selectedBucketFilter.rawValue)")
-                        .font(.caption)
-                        .foregroundStyle(AppColors.textSecondary)
-                    Button("Clear") {
-                        self.selectedBucketFilter = nil
-                    }
-                    .font(.caption.weight(.semibold))
-                }
-                .padding(.horizontal)
-            }
 
             if showError, let msg = errorMessage {
                 errorBanner(msg)
@@ -286,24 +278,238 @@ struct DashboardView: View {
                 overspentEntryBanner(message)
             }
 
-            if !expenses.isEmpty {
-                SearchBar(text: $searchText)
-                    .padding(.horizontal)
+            // Hero number
+            VStack(alignment: .leading, spacing: 0) {
+                Text(heroFormattedAmount)
+                    .font(.system(size: 56, weight: .ultraLight))
+                    .kerning(-2)
+                    .foregroundStyle(remainingAmount < 0 ? AppColors.overspend : AppColors.textPrimary)
+                    .monospacedDigit()
+
+                Text(remainingAmount < 0 ? "over budget" : "left this month")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(AppColors.textTertiary)
+                    .padding(.top, 8)
+
+                HStack(spacing: 8) {
+                    Text("\(totalSpentAmount.formattedCurrency(code: appPreferences.currencyCode)) spent")
+                        .font(.system(size: 11))
+                        .foregroundStyle(AppColors.textTertiary)
+                        .monospacedDigit()
+
+                    Circle()
+                        .fill(AppColors.border)
+                        .frame(width: 3, height: 3)
+
+                    Text("\(budgetEngine.monthlyIncome.formattedCurrency(code: appPreferences.currencyCode)) income")
+                        .font(.system(size: 11))
+                        .foregroundStyle(AppColors.textTertiary)
+                        .monospacedDigit()
+                }
+                .padding(.top, 5)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 22)
+            .padding(.bottom, 20)
+
+            Divider()
+
+            // Bucket rows with inline expand
+            VStack(spacing: 0) {
+                ForEach(bucketStatuses) { status in
+                    BucketSummaryRow(
+                        status: status,
+                        isSelected: expandedBucket == status.bucket,
+                        onTap: {
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                expandedBucket = expandedBucket == status.bucket ? nil : status.bucket
+                            }
+                        },
+                        items: expenses.filter { $0.budgetBucket == status.bucket },
+                        onEditExpense: { setEditingExp($0) }
+                    )
+                    Divider()
+                }
             }
 
-            if expenses.isEmpty {
-                EmptyStateView()
-            } else {
-                ExpenseListView(
-                    expenses: expenses,
-                    searchText: searchText,
-                    bucketFilter: selectedBucketFilter,
-                    onDeleteExpense: deleteExpense
-                )
-                .padding(.horizontal)
+            // Collapsible Recurring
+            if recurringMonthlyTotal > 0 {
+                collapsibleRecurringSection
+                Divider()
+            }
+
+            // Collapsible Transaction list
+            collapsibleTransactionSection
+
+            if budgetEngine.monthlyIncome == 0 {
+                incomePrompt
+                    .padding(.top, 16)
             }
 
             Spacer(minLength: 140)
+        }
+    }
+
+    private var heroFormattedAmount: String {
+        let value = abs(remainingAmount)
+        let formatted = value.formattedCurrency(code: appPreferences.currencyCode)
+        return remainingAmount < 0 ? "-\(formatted)" : formatted
+    }
+
+    private func setEditingExp(_ expense: Expense) {
+        editMerchant = expense.normalizedMerchant
+        editAmount = String(format: "%.2f", expense.amount)
+        editCategory = expense.category
+        editBucket = expense.budgetBucket
+        editDate = expense.date
+        editingExpense = expense
+    }
+
+    private func saveInlineEdit() {
+        guard let expense = editingExpense,
+              let amount = Double(editAmount), amount > 0 else { return }
+        expense.merchant = editMerchant
+        expense.amount = amount
+        expense.bucket = editBucket.rawValue
+        expense.date = editDate
+        try? modelContext.save()
+        budgetEngine.markDataChanged()
+        editingExpense = nil
+    }
+
+    // MARK: - Collapsible Recurring
+
+    private var collapsibleRecurringSection: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { recurringOpen.toggle() }
+            } label: {
+                HStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "repeat")
+                            .font(.system(size: 11))
+                            .foregroundStyle(AppColors.textTertiary)
+
+                        Text("Recurring · \(recurringExpenses.filter(\.isActive).count)")
+                            .font(.system(size: 10, weight: .bold))
+                            .kerning(1.2)
+                            .textCase(.uppercase)
+                            .foregroundStyle(AppColors.textTertiary)
+
+                        Text("\(recurringMonthlyTotal.formattedCurrency(code: appPreferences.currencyCode))/mo")
+                            .font(.system(size: 11))
+                            .foregroundStyle(AppColors.textTertiary)
+                            .monospacedDigit()
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppColors.textTertiary)
+                        .rotationEffect(.degrees(recurringOpen ? 180 : 0))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 20)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if recurringOpen {
+                Divider()
+                ForEach(Array(effectiveRecurringExpenses.enumerated()), id: \.element.id) { index, recurring in
+                    if index > 0 {
+                        Divider().padding(.leading, 34)
+                    }
+                    HStack(spacing: 10) {
+                        Circle()
+                            .fill(recurring.budgetBucket.color)
+                            .frame(width: 5, height: 5)
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(recurring.name)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(AppColors.textPrimary)
+                                .lineLimit(1)
+
+                            Text("Monthly · \(recurring.budgetBucket.rawValue)")
+                                .font(.system(size: 10))
+                                .foregroundStyle(AppColors.textTertiary)
+                        }
+
+                        Spacer()
+
+                        Text(recurring.safeAmount.formattedCurrency(code: appPreferences.currencyCode))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(AppColors.textSecondary)
+                            .monospacedDigit()
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 11)
+                }
+            }
+        }
+    }
+
+    // MARK: - Collapsible Transaction List
+
+    private var collapsibleTransactionSection: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { txOpen.toggle() }
+            } label: {
+                HStack {
+                    HStack(spacing: 8) {
+                        Image(systemName: "list.bullet")
+                            .font(.system(size: 11))
+                            .foregroundStyle(AppColors.textTertiary)
+
+                        Text("This Month · \(expenses.count)")
+                            .font(.system(size: 10, weight: .bold))
+                            .kerning(1.2)
+                            .textCase(.uppercase)
+                            .foregroundStyle(AppColors.textTertiary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppColors.textTertiary)
+                        .rotationEffect(.degrees(txOpen ? 180 : 0))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 20)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if txOpen {
+                if expenses.isEmpty {
+                    EmptyStateView()
+                        .padding(.bottom, 20)
+                } else {
+                    if !searchText.isEmpty || selectedBucketFilter != nil {
+                        Divider()
+                        SearchBar(text: $searchText)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 8)
+                    }
+
+                    Divider()
+
+                    ExpenseListView(
+                        expenses: expenses,
+                        searchText: searchText,
+                        bucketFilter: selectedBucketFilter,
+                        onDeleteExpense: deleteExpense
+                    )
+                    .padding(.horizontal)
+                }
+            }
+
+            Divider()
         }
     }
 

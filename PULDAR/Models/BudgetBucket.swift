@@ -8,12 +8,21 @@ enum BudgetBucket: String, Codable, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// Default share of monthly income.
+    /// Default share of monthly income (50/30/20).
     var defaultPercentage: Double {
         switch self {
         case .fundamentals: return 0.50
         case .fun:          return 0.30
         case .future:       return 0.20
+        }
+    }
+
+    /// Short label used in compact spaces.
+    var shortLabel: String {
+        switch self {
+        case .fundamentals: return "Needs"
+        case .fun:          return "Fun"
+        case .future:       return "Future"
         }
     }
 

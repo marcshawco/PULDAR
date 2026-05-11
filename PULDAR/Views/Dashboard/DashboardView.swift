@@ -694,26 +694,6 @@ struct DashboardView: View {
         .padding(.horizontal)
     }
 
-    private var usageIndicator: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<AppConstants.freeInputsPerMonth, id: \.self) { i in
-                Circle()
-                    .fill(
-                        i < usageTracker.currentCount
-                            ? AppColors.accent
-                            : Color(.systemGray4)
-                    )
-                    .frame(width: 6, height: 6)
-            }
-
-            Text("\(usageTracker.remainingFreeInputs) Monthly Entries Remaining")
-                .font(.caption2)
-                .foregroundStyle(AppColors.textTertiary)
-                .padding(.leading, 4)
-        }
-        .padding(.horizontal)
-    }
-
     private func errorBanner(_ message: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.circle")
@@ -785,9 +765,6 @@ struct DashboardView: View {
                 }
             )
 
-            if !storeKit.isPro {
-                usageIndicator
-            }
         }
         .padding(.top, 14)
         .padding(.bottom, 8)

@@ -154,53 +154,123 @@ struct HistoryView: View {
         filteredExpenses.reduce(0) { $0 + $1.amount }
     }
 
+    private var monthIndex: Int {
+        monthOptions.firstIndex(of: selectedMonth) ?? 0
+    }
+
     var body: some View {
         NavigationStack {
-            List {
-                Section("Month") {
-                    Picker("Selected month", selection: $selectedMonth) {
-                        ForEach(monthOptions, id: \.self) { month in
-                            Text(monthLabel(month)).tag(month)
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Month picker bar
+                    HStack {
+                        Button {
+                            let idx = monthIndex
+                            if idx < monthOptions.count - 1 {
+                                selectedMonth = monthOptions[idx + 1]
+                            }
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16))
+                                .foregroundStyle(monthIndex < monthOptions.count - 1 ? AppColors.textSecondary : AppColors.border)
                         }
-                    }
-                    .pickerStyle(.menu)
-                }
+                        .disabled(monthIndex >= monthOptions.count - 1)
 
-                Section("Summary") {
-                    LabeledContent("Total", value: selectedTotal.formattedCurrency(code: appPreferences.currencyCode))
-                    HStack(spacing: 8) {
-                        ForEach(selectedStatuses) { status in
-                            summaryCard(status)
+                        Spacer()
+
+                        Text(monthLabel(selectedMonth))
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(AppColors.textPrimary)
+
+                        Spacer()
+
+                        Button {
+                            let idx = monthIndex
+                            if idx > 0 {
+                                selectedMonth = monthOptions[idx - 1]
+                            }
+                        } label: {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 16))
+                                .foregroundStyle(monthIndex > 0 ? AppColors.textSecondary : AppColors.border)
                         }
+                        .disabled(monthIndex <= 0)
                     }
-                }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(AppColors.secondaryBg)
 
-                Section("Entries") {
-                    if filteredExpenses.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("No entries match your filters.")
+                    Divider()
+
+                    // Summary cards
+                    VStack(spacing: 0) {
+                        Text("Summary")
+                            .font(.system(size: 10, weight: .bold))
+                            .kerning(1.2)
+                            .textCase(.uppercase)
+                            .foregroundStyle(AppColors.textTertiary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.bottom, 12)
+
+                        HStack(spacing: 8) {
+                            ForEach(selectedStatuses) { status in
+                                summaryCard(status)
+                            }
+                        }
+
+                        HStack {
+                            Text("Total")
+                                .font(.system(size: 11, weight: .semibold))
+                                .kerning(0.8)
+                                .textCase(.uppercase)
                                 .foregroundStyle(AppColors.textTertiary)
-                            Button("Reset Filters") {
-                                resetFilters()
-                            }
-                            .font(.caption.weight(.semibold))
-                        }
-                    } else {
-                        ForEach(groupedExpenses) { group in
-                            Text(group.title)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(AppColors.textSecondary)
-                                .padding(.top, 2)
 
-                            ForEach(group.items) { expense in
-                                expenseRow(expense, showDate: groupingMode != .day)
+                            Spacer()
+
+                            Text(selectedTotal.formattedCurrency(code: appPreferences.currencyCode))
+                                .font(.system(size: 18, weight: .light))
+                                .foregroundStyle(AppColors.textPrimary)
+                                .monospacedDigit()
+                        }
+                        .padding(.top, 14)
+                    }
+                    .padding(20)
+
+                    Divider()
+
+                    // Entries section label
+                    Text("Entries")
+                        .font(.system(size: 10, weight: .bold))
+                        .kerning(1.2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AppColors.textTertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                        .padding(.bottom, 8)
+
+                    if filteredExpenses.isEmpty {
+                        VStack(spacing: 8) {
+                            Text("No entries for \(monthLabel(selectedMonth))")
+                                .font(.system(size: 13))
+                                .foregroundStyle(AppColors.textTertiary)
+                        }
+                        .padding(.vertical, 32)
+                    } else {
+                        LazyVStack(spacing: 0) {
+                            ForEach(filteredExpenses) { expense in
+                                expenseRow(expense, showDate: true)
+                                Divider()
                             }
                         }
                     }
+
+                    Spacer(minLength: 20)
                 }
+                .frame(maxWidth: contentMaxWidth)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
-            .frame(maxWidth: contentMaxWidth)
-            .frame(maxWidth: .infinity, alignment: .center)
+            .background(AppColors.background)
             .scrollDismissesKeyboard(.interactively)
             .simultaneousGesture(
                 TapGesture().onEnded {
@@ -209,8 +279,15 @@ struct HistoryView: View {
                     }
                 }
             )
-            .navigationTitle("History")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("History")
+                        .font(.system(size: 11, weight: .bold))
+                        .kerning(1.4)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AppColors.textTertiary)
+                }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
                         focusedField = nil
@@ -225,6 +302,8 @@ struct HistoryView: View {
                     }
                 }
             }
+            .toolbarBackground(AppColors.secondaryBg, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
                 if let first = monthOptions.first {
                     selectedMonth = first
@@ -354,30 +433,34 @@ struct HistoryView: View {
 
     @ViewBuilder
     private func summaryCard(_ status: BudgetEngine.BucketStatus) -> some View {
-        VStack(alignment: .center, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: status.bucket.icon)
-                Text(shortBucketTitle(status.bucket))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .allowsTightening(true)
-            }
-            .font(.caption2.weight(.semibold))
-            .frame(maxWidth: .infinity, alignment: .center)
+        VStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(status.bucket.color)
+                .frame(width: 24, height: 3)
 
             Text(status.spent.formattedCurrency(code: appPreferences.currencyCode))
-                .font(.caption.weight(.semibold))
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(status.isOverspent ? AppColors.overspend : AppColors.textPrimary)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-                .frame(maxWidth: .infinity, alignment: .center)
+
+            Text(shortBucketTitle(status.bucket))
+                .font(.system(size: 9, weight: .semibold))
+                .kerning(0.8)
+                .textCase(.uppercase)
+                .foregroundStyle(AppColors.textTertiary)
         }
-        .foregroundStyle(status.isOverspent ? AppColors.overspend : AppColors.textPrimary)
-        .frame(maxWidth: .infinity, alignment: .center)
-        .padding(8)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 8)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(AppColors.secondaryBg)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(AppColors.border, lineWidth: 1)
+                )
         )
     }
 

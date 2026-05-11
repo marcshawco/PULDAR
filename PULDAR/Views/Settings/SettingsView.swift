@@ -110,6 +110,8 @@ struct SettingsView: View {
                 dangerZoneSection
                 aboutSection
             }
+            .scrollContentBackground(.hidden)
+            .background(AppColors.background)
             .frame(maxWidth: contentMaxWidth)
             .frame(maxWidth: .infinity, alignment: .center)
             .scrollDismissesKeyboard(.interactively)
@@ -120,22 +122,18 @@ struct SettingsView: View {
                     }
                 }
             )
-            .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        if draftPercentage(for: .fun) <= 0.0001 {
-                            showZeroFunWarning = true
-                        } else {
-                            dismissActiveKeyboard()
-                            saveAndDismiss()
-                        }
-                    }
-                        .fontWeight(.medium)
-                        .disabled(!isAllocationValid)
+                ToolbarItem(placement: .principal) {
+                    Text("Settings")
+                        .font(.system(size: 11, weight: .bold))
+                        .kerning(1.4)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AppColors.textTertiary)
                 }
             }
+            .toolbarBackground(AppColors.secondaryBg, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
                 financeKitManager.refreshAvailability()
                 if !store.isPro, budgetEngine.rolloverEnabled {
@@ -161,6 +159,9 @@ struct SettingsView: View {
             }
             .onChange(of: draftPercentages) {
                 selectedAllocationPreset = AllocationPreset.matching(draftPercentages) ?? .custom
+                if isAllocationValid {
+                    saveAndDismiss()
+                }
             }
             .onChange(of: autoMonthlyCSVExportEnabled) {
                 runAutoMonthlyExportIfNeeded()
@@ -1311,12 +1312,6 @@ struct SettingsView: View {
         )
         if focusedIncomeField != nil {
             focusedIncomeField = nil
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(120))
-                dismiss()
-            }
-        } else {
-            dismiss()
         }
     }
 

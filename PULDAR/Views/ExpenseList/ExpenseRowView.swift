@@ -19,53 +19,46 @@ struct ExpenseRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // ── Primary row ────────────────────────────────────────────
-            HStack(alignment: .center, spacing: 10) {
-                // Bucket colour pip
+            HStack(alignment: .center, spacing: 11) {
                 Circle()
                     .fill(expense.budgetBucket.color)
-                    .frame(width: 8, height: 8)
+                    .frame(width: 6, height: 6)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    // Merchant (highlighted if searching)
+                VStack(alignment: .leading, spacing: 1) {
                     if highlightText.isEmpty {
                         Text(expense.normalizedMerchant)
-                            .font(.subheadline.weight(.medium))
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(AppColors.textPrimary)
                     } else {
                         Text(expense.normalizedMerchant.highlighted(matching: highlightText))
-                            .font(.subheadline.weight(.medium))
+                            .font(.system(size: 14, weight: .medium))
                     }
 
-                    Text(expense.date.shortRelative)
-                        .font(.caption2)
+                    Text(displayCategory.capitalized)
+                        .font(.system(size: 11))
                         .foregroundStyle(AppColors.textTertiary)
                 }
 
                 Spacer()
 
+                Text(expense.date.shortRelative)
+                    .font(.system(size: 12))
+                    .foregroundStyle(AppColors.textTertiary)
+
+                Text(expense.amount < 0 ? "+" : "")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(expense.amount < 0 ? AppColors.success : AppColors.textPrimary) +
                 Text(expense.amount.formattedCurrency(code: appPreferences.currencyCode))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(expense.amount < 0 ? .green : AppColors.textPrimary)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(expense.amount < 0 ? AppColors.success : AppColors.textPrimary)
 
                 if onEdit != nil {
-                    Button {
-                        HapticManager.light()
-                        onEdit?()
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(AppColors.accent)
-                            .padding(6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(AppColors.accent.opacity(0.14))
-                            )
-                    }
-                    .buttonStyle(.plain)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(AppColors.textTertiary)
                 }
             }
 
-            // ── Expanded detail ────────────────────────────────────────
             if isExpanded {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 10) {
@@ -99,7 +92,7 @@ struct ExpenseRowView: View {
                             .italic()
                     }
                 }
-                .padding(.leading, 18)   // Align under merchant text
+                .padding(.leading, 17)
                 .transition(
                     .asymmetric(
                         insertion: .opacity.combined(with: .move(edge: .top)),
@@ -108,17 +101,19 @@ struct ExpenseRowView: View {
                 )
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(AppColors.secondaryBg)
-        )
+        .padding(.horizontal, 20)
+        .padding(.vertical, 11)
+        .background(AppColors.secondaryBg)
         .contentShape(Rectangle())
         .onTapGesture {
-            HapticManager.light()
-            withAnimation(.spring(duration: 0.35, bounce: 0.2)) {
-                isExpanded.toggle()
+            if onEdit != nil {
+                HapticManager.light()
+                onEdit?()
+            } else {
+                HapticManager.light()
+                withAnimation(.spring(duration: 0.35, bounce: 0.2)) {
+                    isExpanded.toggle()
+                }
             }
         }
     }

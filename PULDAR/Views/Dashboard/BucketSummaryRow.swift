@@ -157,7 +157,7 @@ struct BucketSummaryRow: View {
                 }
             }
         }
-        .background(isSelected ? barColor.opacity(0.05) : Color.clear)
+        .background(isSelected ? barColor.opacity(0.05) : AppColors.secondaryBg)
         .onAppear {
             updateAnimatedProgress(duration: 0.7, bounce: 0.2)
         }

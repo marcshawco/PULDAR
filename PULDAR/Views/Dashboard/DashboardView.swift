@@ -51,7 +51,6 @@ struct DashboardView: View {
     @State private var recurringOpen = false
     @State private var txOpen = true
     @State private var showPaywall = false
-    @State private var showSettings = false
     @State private var showModelOnboarding = false
     @State private var errorMessage: String?
     @State private var showError = false
@@ -118,32 +117,38 @@ struct DashboardView: View {
 
     // MARK: - Body
 
+    private var currentMonthLabel: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter.string(from: Date())
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 dashboardContent
-                    .padding(.vertical)
                     .frame(maxWidth: dashboardMaxWidth)
                     .frame(maxWidth: .infinity, alignment: .center)
             }
+            .background(AppColors.background)
             .refreshable {
                 await refreshDashboard()
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle("PULDAR")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(currentMonthLabel)
+                        .font(.system(size: 11, weight: .bold))
+                        .kerning(1.4)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AppColors.textTertiary)
+                }
+            }
+            .toolbarBackground(AppColors.secondaryBg, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 inputDock
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        HapticManager.light()
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 16, weight: .thin))
-                    }
-                }
             }
             .fullScreenCover(isPresented: $showModelOnboarding) {
                 ModelDownloadOnboardingView {
@@ -155,15 +160,6 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
-                    .environment(storeKit)
-            }
-            .sheet(isPresented: $showSettings) {
-                SettingsView()
-                    .environment(budgetEngine)
-                    .environment(appPreferences)
-                    .environment(categoryManager)
-                    .environment(diagnosticLogger)
-                    .environment(financeKitManager)
                     .environment(storeKit)
             }
             .sheet(isPresented: $showReceiptScanner) {
@@ -182,30 +178,7 @@ struct DashboardView: View {
                 }
             }
             .sheet(item: $editingExpense) { _ in
-                NavigationStack {
-                    Form {
-                        TextField("Merchant", text: $editMerchant)
-                            .textInputAutocapitalization(.words)
-                        TextField("Amount", text: $editAmount)
-                            .keyboardType(.decimalPad)
-                        Picker("Bucket", selection: $editBucket) {
-                            ForEach(BudgetBucket.allCases) { bucket in
-                                Text(bucket.rawValue).tag(bucket)
-                            }
-                        }
-                        DatePicker("Date", selection: $editDate, displayedComponents: .date)
-                    }
-                    .navigationTitle("Edit Transaction")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancel") { editingExpense = nil }
-                        }
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Save") { saveInlineEdit() }
-                        }
-                    }
-                }
+                editExpenseSheet
             }
             .alert(
                 "Make this recurring?",
@@ -375,6 +348,140 @@ struct DashboardView: View {
         try? modelContext.save()
         budgetEngine.markDataChanged()
         editingExpense = nil
+    }
+
+    private var editExpenseSheet: some View {
+        VStack(spacing: 0) {
+            // Handle
+            Capsule()
+                .fill(AppColors.border)
+                .frame(width: 36, height: 4)
+                .padding(.top, 12)
+
+            // Header
+            HStack {
+                Button("Cancel") { editingExpense = nil }
+                    .font(.system(size: 14))
+                    .foregroundStyle(AppColors.textTertiary)
+                Spacer()
+                Text("Edit Entry")
+                    .font(.system(size: 13, weight: .bold))
+                    .kerning(0.4)
+                    .foregroundStyle(AppColors.textPrimary)
+                Spacer()
+                Button("Save") { saveInlineEdit() }
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(AppColors.textPrimary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            // Fields
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("Merchant")
+                        .font(.system(size: 10, weight: .bold))
+                        .kerning(1.2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AppColors.textTertiary)
+                    TextField("Merchant", text: $editMerchant)
+                        .font(.system(size: 17))
+                        .foregroundStyle(AppColors.textPrimary)
+                        .textInputAutocapitalization(.words)
+                    Divider()
+                }
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("Amount")
+                        .font(.system(size: 10, weight: .bold))
+                        .kerning(1.2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AppColors.textTertiary)
+                    HStack {
+                        Text("$")
+                            .font(.system(size: 17))
+                            .foregroundStyle(AppColors.textTertiary)
+                        TextField("0.00", text: $editAmount)
+                            .font(.system(size: 17))
+                            .foregroundStyle(AppColors.textPrimary)
+                            .keyboardType(.decimalPad)
+                            .monospacedDigit()
+                    }
+                    Divider()
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Budget")
+                        .font(.system(size: 10, weight: .bold))
+                        .kerning(1.2)
+                        .textCase(.uppercase)
+                        .foregroundStyle(AppColors.textTertiary)
+
+                    HStack(spacing: 8) {
+                        ForEach(BudgetBucket.allCases) { bucket in
+                            Button {
+                                editBucket = bucket
+                            } label: {
+                                VStack(spacing: 5) {
+                                    Circle()
+                                        .fill(bucket.color)
+                                        .frame(width: 7, height: 7)
+                                    Text(bucket == .fundamentals ? "NEEDS" : bucket == .fun ? "FUN" : "FUTURE")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .kerning(0.6)
+                                        .foregroundStyle(editBucket == bucket ? bucket.color : AppColors.textTertiary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(editBucket == bucket ? bucket.color.opacity(0.08) : Color.clear)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .stroke(editBucket == bucket ? bucket.color : AppColors.border, lineWidth: 1.5)
+                                        )
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+
+            Spacer()
+
+            // Delete button
+            Button {
+                if let expense = editingExpense {
+                    deleteExpense(expense)
+                    editingExpense = nil
+                }
+            } label: {
+                Text("Delete Entry")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(AppColors.overspend)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(AppColors.overspend.opacity(0.05))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(AppColors.overspend.opacity(0.19), lineWidth: 1)
+                            )
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 28)
+        }
+        .background(AppColors.secondaryBg)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.hidden)
     }
 
     // MARK: - Collapsible Recurring
@@ -674,7 +781,6 @@ struct DashboardView: View {
 
     private var incomePrompt: some View {
         Button {
-            showSettings = true
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "dollarsign.circle")
@@ -765,23 +871,12 @@ struct DashboardView: View {
             )
 
         }
-        .padding(.top, 14)
+        .padding(.top, 10)
         .padding(.bottom, 8)
         .background(
-            UnevenRoundedRectangle(
-                cornerRadii: .init(
-                    topLeading: 24,
-                    bottomLeading: 0,
-                    bottomTrailing: 0,
-                    topTrailing: 24
-                ),
-                style: .continuous
-            )
-                .fill(AppColors.secondaryBg)
+            AppColors.secondaryBg
                 .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.06))
-                        .frame(height: 1)
+                    AppColors.border.frame(height: 1)
                 }
                 .ignoresSafeArea()
         )

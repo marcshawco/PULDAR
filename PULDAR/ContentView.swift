@@ -15,6 +15,7 @@ struct ContentView: View {
     private enum RootTab: Hashable {
         case home
         case history
+        case settings
     }
 
     // MARK: - Services (owned at the root)
@@ -37,8 +38,24 @@ struct ContentView: View {
     init() {
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor.systemBackground
-        appearance.shadowColor = UIColor.separator.withAlphaComponent(0.12)
+        appearance.backgroundColor = UIColor(named: "surface") ?? UIColor.systemBackground
+        appearance.shadowColor = UIColor(named: "border")?.withAlphaComponent(0.5) ?? UIColor.separator.withAlphaComponent(0.12)
+
+        let normalAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 10, weight: .regular),
+            .foregroundColor: UIColor(named: "text3") ?? UIColor.tertiaryLabel,
+        ]
+        let selectedAttrs: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 10, weight: .semibold),
+            .foregroundColor: UIColor(named: "text1") ?? UIColor.label,
+        ]
+
+        for state in [appearance.stackedLayoutAppearance, appearance.inlineLayoutAppearance, appearance.compactInlineLayoutAppearance] {
+            state.normal.titleTextAttributes = normalAttrs
+            state.selected.titleTextAttributes = selectedAttrs
+            state.normal.iconColor = UIColor(named: "text3") ?? UIColor.tertiaryLabel
+            state.selected.iconColor = UIColor(named: "text1") ?? UIColor.label
+        }
 
         UITabBar.appearance().standardAppearance = appearance
         UITabBar.appearance().scrollEdgeAppearance = appearance
@@ -68,9 +85,22 @@ struct ContentView: View {
                 .environment(storeKitManager)
                 .environment(diagnosticLogger)
                 .tabItem {
-                    Label("History", systemImage: "clock.arrow.circlepath")
+                    Label("History", systemImage: "calendar")
                 }
                 .tag(RootTab.history)
+
+            SettingsView()
+                .environment(appPreferences)
+                .environment(budgetEngine)
+                .environment(categoryManager)
+                .environment(storeKitManager)
+                .environment(usageTracker)
+                .environment(diagnosticLogger)
+                .environment(financeKitManager)
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .tag(RootTab.settings)
         }
         .environment(llmService)
         .environment(budgetEngine)

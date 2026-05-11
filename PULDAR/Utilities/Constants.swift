@@ -1,30 +1,31 @@
 import SwiftUI
 
-// MARK: - Color Palette
+// MARK: - Color Palette (Warm monochrome + three bucket accents)
 
 enum AppColors {
-    static let background = Color(.systemBackground)
-    static let secondaryBg = Color(.secondarySystemBackground)
-    static let tertiaryBg = Color(.tertiarySystemBackground)
+    // Backgrounds
+    static let background = Color("bg")
+    static let secondaryBg = Color("surface")
+    static let tertiaryBg = Color("surf2")
 
     // 3-Bucket colors — the only non-monochrome colours in the app
-    static let bucketFundamentals = Color(red: 0.227, green: 0.361, blue: 0.678) // #3A5CAD
-    static let bucketFun = Color(red: 0.165, green: 0.502, blue: 0.337)          // #2A8056
-    static let bucketFuture = Color(red: 0.788, green: 0.412, blue: 0.141)       // #C96924
+    static let bucketFundamentals = Color("bucketFundamentals")
+    static let bucketFun = Color("bucketFun")
+    static let bucketFuture = Color("bucketFuture")
 
     // Semantic
-    static let overspend = Color(red: 0.753, green: 0.224, blue: 0.169) // #C0392B
-    static let success = Color(red: 0.153, green: 0.682, blue: 0.376)   // #27AE60
+    static let overspend = Color("danger")
+    static let success = Color("success")
     static let searchHighlight = Color.yellow.opacity(0.40)
-    static let accent = Color(.label)
+    static let accent = Color("text1")
 
     // Text
-    static let textPrimary = Color(.label)
-    static let textSecondary = Color(.secondaryLabel)
-    static let textTertiary = Color(.tertiaryLabel)
+    static let textPrimary = Color("text1")
+    static let textSecondary = Color("text2")
+    static let textTertiary = Color("text3")
 
     // Hairline border
-    static let border = Color(red: 0.89, green: 0.88, blue: 0.85) // #E3E0D8
+    static let border = Color("border")
 }
 
 // MARK: - App-wide Constants

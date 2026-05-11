@@ -517,25 +517,35 @@ struct AppOnboardingView: View {
     // MARK: - Bottom Button
 
     private var bottomButton: some View {
-        Button {
-            if step == totalSteps - 1 {
-                showPaywall = true
-            } else {
-                withAnimation(.easeInOut(duration: 0.25)) { step += 1 }
+        VStack(spacing: 0) {
+            Divider()
+            Button {
+                if step == totalSteps - 1 {
+                    showPaywall = true
+                } else {
+                    withAnimation(.easeInOut(duration: 0.25)) { step += 1 }
+                }
+            } label: {
+                Text(buttonLabel)
+                    .font(.system(size: 11, weight: .bold))
+                    .kerning(2.4)
+                    .textCase(.uppercase)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(AppColors.textPrimary)
+                    .foregroundStyle(AppColors.background)
             }
-        } label: {
-            Text(step == totalSteps - 1 ? "Get Started" : "Continue")
-                .font(.system(size: 15, weight: .semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(AppColors.accent)
-                )
-                .foregroundStyle(AppColors.background)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 18)
         }
-        .padding(.horizontal, 22)
-        .padding(.bottom, 12)
+    }
+
+    private var buttonLabel: String {
+        switch step {
+        case 0: return "Begin →"
+        case totalSteps - 1: return "Download & start →"
+        default: return "Continue →"
+        }
     }
 
     // MARK: - Presets

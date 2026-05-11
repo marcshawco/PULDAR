@@ -15,65 +15,63 @@ struct ExpenseInputView: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
-            Divider()
-
-            HStack(spacing: 10) {
-                TextField(
-                    isLocked ? "Free limit reached — upgrade to Pro" : "spent 45 at whole foods…",
-                    text: $inputText
-                )
-                .textFieldStyle(.plain)
-                .font(.system(size: 14))
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled(true)
-                .focused($isFocused)
-                .disabled(isLocked)
-                .submitLabel(.done)
-                .onSubmit { if !isLocked { handleSubmit() } }
-                .onChange(of: isFocused) {
-                    onFocusChange?(isFocused)
-                }
-
-                Button {
-                    if isLocked {
-                        handleLockedInteraction()
-                        return
-                    }
-                    isFocused = false
-                    onCameraTap?()
-                } label: {
-                    Image(systemName: "camera")
-                        .font(.system(size: 15, weight: .light))
-                        .foregroundStyle(isLocked ? AppColors.textTertiary : AppColors.textSecondary)
-                }
-                .buttonStyle(.plain)
-                .disabled(isProcessing)
-
-                Button(action: handleSubmit) {
-                    Group {
-                        if isProcessing {
-                            ProgressView()
-                                .tint(.white)
-                                .scaleEffect(0.7)
-                        } else {
-                            Image(systemName: showCheckmark ? "checkmark" : "arrow.up")
-                                .font(.system(size: 13, weight: .semibold))
-                                .contentTransition(.symbolEffect(.replace))
-                        }
-                    }
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(buttonColor))
-                    .foregroundStyle(.white)
-                }
-                .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isProcessing)
-                .scaleEffect(isProcessing ? 0.95 : 1.0)
-                .animation(.spring(duration: 0.3), value: isProcessing)
+        HStack(spacing: 8) {
+            TextField(
+                isLocked ? "Free limit reached — upgrade to Pro" : "spent 45 at whole foods…",
+                text: $inputText
+            )
+            .textFieldStyle(.plain)
+            .font(.system(size: 14))
+            .foregroundStyle(AppColors.textPrimary)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled(true)
+            .focused($isFocused)
+            .disabled(isLocked)
+            .submitLabel(.done)
+            .onSubmit { if !isLocked { handleSubmit() } }
+            .onChange(of: isFocused) {
+                onFocusChange?(isFocused)
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 10)
+
+            Button {
+                if isLocked {
+                    handleLockedInteraction()
+                    return
+                }
+                isFocused = false
+                onCameraTap?()
+            } label: {
+                Image(systemName: "camera")
+                    .font(.system(size: 18, weight: .light))
+                    .foregroundStyle(isLocked ? AppColors.textTertiary : AppColors.textTertiary)
+                    .padding(4)
+            }
+            .buttonStyle(.plain)
+            .disabled(isProcessing)
+
+            Button(action: handleSubmit) {
+                Group {
+                    if isProcessing {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(0.7)
+                    } else {
+                        Image(systemName: showCheckmark ? "checkmark" : "arrow.up")
+                            .font(.system(size: 12, weight: .semibold))
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                }
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(buttonColor))
+                .foregroundStyle(.white)
+            }
+            .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isProcessing)
+            .scaleEffect(showCheckmark ? 1.14 : 1.0)
+            .animation(.spring(duration: 0.3, bounce: 0.5), value: showCheckmark)
         }
-        .background(AppColors.background)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(AppColors.secondaryBg)
         .offset(x: shakeOffset)
         .contentShape(Rectangle())
         .onTapGesture {

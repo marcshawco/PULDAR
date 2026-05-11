@@ -2,39 +2,6 @@ import Foundation
 
 @MainActor
 enum ExpenseExportService {
-    struct ExpenseRecord: Codable {
-        let id: UUID
-        let date: Date
-        let merchant: String
-        let amount: Double
-        let category: String
-        let bucket: String
-        let isOverspent: Bool
-        let notes: String
-        let source: String
-        let externalTransactionID: String?
-        let externalAccountID: String?
-        let importedAt: Date?
-    }
-
-    struct RecurringRecord: Codable {
-        let id: UUID
-        let name: String
-        let amount: Double
-        let bucket: String
-        let isActive: Bool
-        let createdAt: Date
-    }
-
-    struct BackupPayload: Codable {
-        let createdAt: Date
-        let scope: String
-        let monthlyIncome: Double
-        let percentages: [String: Double]
-        let expenses: [ExpenseRecord]
-        let recurring: [RecurringRecord]
-    }
-
     static func writeExpenseCSV(
         expenses: [Expense],
         scope: String,
@@ -61,109 +28,12 @@ enum ExpenseExportService {
         return url
     }
 
-    static func writeExpenseJSON(
-        expenses: [Expense],
-        scope: String,
-        categoryDisplayName: (String) -> String
-    ) throws -> URL {
-        let payload = sortedExpenses(expenses).map {
-            expenseRecord(from: $0, category: categoryDisplayName($0.category))
-        }
-        let url = temporaryURL(prefix: "puldar", scope: scope, fileExtension: "json")
-        try encode(payload).write(to: url, options: .atomic)
-        return url
-    }
-
-    static func writeBackupJSON(
-        expenses: [Expense],
-        recurring: [RecurringExpense],
-        scope: String,
-        monthlyIncome: Double,
-        percentages: [String: Double],
-        filePrefix: String = "puldar"
-    ) throws -> URL {
-        let payload = BackupPayload(
-            createdAt: .now,
-            scope: scope,
-            monthlyIncome: safeAmount(monthlyIncome),
-            percentages: sanitizePercentages(percentages),
-            expenses: sortedExpenses(expenses).map {
-                expenseRecord(from: $0, category: $0.category)
-            },
-            recurring: recurring.sorted { $0.createdAt > $1.createdAt }.map {
-                recurringRecord(from: $0)
-            }
-        )
-        let url = temporaryURL(prefix: filePrefix, scope: scope, fileExtension: "json")
-        try encode(payload).write(to: url, options: .atomic)
-        return url
-    }
-
-    static func writeFullDeviceBackupJSON(
-        expenses: [Expense],
-        recurring: [RecurringExpense],
-        monthlyIncome: Double,
-        percentages: [String: Double]
-    ) throws -> URL {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("puldar_backup_\(Int(Date.now.timeIntervalSince1970)).json")
-        let payload = BackupPayload(
-            createdAt: .now,
-            scope: "full_device_backup",
-            monthlyIncome: safeAmount(monthlyIncome),
-            percentages: sanitizePercentages(percentages),
-            expenses: sortedExpenses(expenses).map {
-                expenseRecord(from: $0, category: $0.category)
-            },
-            recurring: recurring.sorted { $0.createdAt > $1.createdAt }.map {
-                recurringRecord(from: $0)
-            }
-        )
-        try encode(payload).write(to: url, options: .atomic)
-        return url
-    }
-
-    private static func expenseRecord(from expense: Expense, category: String) -> ExpenseRecord {
-        ExpenseRecord(
-            id: expense.id,
-            date: expense.date,
-            merchant: expense.merchant,
-            amount: safeAmount(expense.amount),
-            category: category,
-            bucket: expense.bucket,
-            isOverspent: expense.isOverspent,
-            notes: expense.notes,
-            source: expense.sourceKind.rawValue,
-            externalTransactionID: expense.externalTransactionID,
-            externalAccountID: expense.externalAccountID,
-            importedAt: expense.importedAt
-        )
-    }
-
-    private static func recurringRecord(from recurring: RecurringExpense) -> RecurringRecord {
-        RecurringRecord(
-            id: recurring.id,
-            name: recurring.name,
-            amount: recurring.safeAmount,
-            bucket: recurring.bucket,
-            isActive: recurring.isActive,
-            createdAt: recurring.createdAt
-        )
-    }
-
     private static func sortedExpenses(_ expenses: [Expense]) -> [Expense] {
         expenses.sorted { lhs, rhs in
             if lhs.date == rhs.date {
                 return lhs.merchant.localizedCaseInsensitiveCompare(rhs.merchant) == .orderedAscending
             }
             return lhs.date > rhs.date
-        }
-    }
-
-    private static func sanitizePercentages(_ percentages: [String: Double]) -> [String: Double] {
-        percentages.mapValues { value in
-            guard value.isFinite else { return 0 }
-            return min(max(value, 0), 1)
         }
     }
 
@@ -184,12 +54,5 @@ enum ExpenseExportService {
         let scopeComponent = safeScope.isEmpty ? "export" : safeScope
         return FileManager.default.temporaryDirectory
             .appendingPathComponent("\(prefix)_\(scopeComponent).\(fileExtension)")
-    }
-
-    private static func encode<T: Encodable>(_ value: T) throws -> Data {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        return try encoder.encode(value)
     }
 }

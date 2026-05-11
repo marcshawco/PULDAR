@@ -1,9 +1,8 @@
 import Foundation
 
-/// Metered paywall gate — tracks free inputs per month.
+/// Tracks local monthly input count for lightweight usage context.
 ///
 /// The counter resets automatically at the start of each calendar month (local time).
-/// Pro users bypass this entirely via `StoreKitManager.isPro`.
 ///
 /// Uses `UserDefaults` with `didSet` (not `@AppStorage`) so that
 /// `@Observable` can track mutations and SwiftUI views refresh correctly.

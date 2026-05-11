@@ -3,7 +3,6 @@ import SwiftData
 
 struct WidgetSnapshotSyncView: View {
     @Environment(BudgetEngine.self) private var budgetEngine
-    @Environment(StoreKitManager.self) private var storeKit
     @Environment(AppPreferences.self) private var appPreferences
     @Environment(\.scenePhase) private var scenePhase
 
@@ -13,7 +12,7 @@ struct WidgetSnapshotSyncView: View {
     private var recurringExpenses: [RecurringExpense]
 
     private var effectiveRecurringExpenses: [RecurringExpense] {
-        storeKit.isPro ? recurringExpenses : []
+        recurringExpenses
     }
 
     private var statuses: [BudgetEngine.BucketStatus] {
@@ -79,9 +78,6 @@ struct WidgetSnapshotSyncView: View {
                 publishSnapshot()
             }
             .onChange(of: budgetEngine.bucketPercentages) {
-                publishSnapshot()
-            }
-            .onChange(of: storeKit.isPro) {
                 publishSnapshot()
             }
             .onChange(of: appPreferences.currencyPreference) {

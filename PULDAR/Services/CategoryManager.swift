@@ -1,25 +1,12 @@
 import Foundation
 import SwiftUI
 
-/// User-customizable category names and custom category-to-bucket mappings.
+/// Canonical category naming and category-to-bucket resolution.
 @Observable
 @MainActor
 final class CategoryManager {
     private enum SyncKey {
         static let renamedCategories = "renamedCategories"
-        static let customCategories = "customCategories"
-    }
-
-    struct CustomCategory: Identifiable, Codable, Hashable {
-        var id: UUID
-        var key: String
-        var name: String
-        var bucketRawValue: String
-
-        var bucket: BudgetBucket {
-            get { BudgetBucket(rawValue: bucketRawValue) ?? .fun }
-            set { bucketRawValue = newValue.rawValue }
-        }
     }
 
     struct ResolvedCategory {
@@ -38,13 +25,8 @@ final class CategoryManager {
         didSet { persistRenamedCategories() }
     }
 
-    var customCategories: [CustomCategory] {
-        didSet { persistCustomCategories() }
-    }
-
     init() {
         renamedCategories = Self.loadRenamedCategories()
-        customCategories = Self.loadCustomCategories()
         configureCloudSync()
         syncFromCloud()
     }
@@ -78,10 +60,6 @@ final class CategoryManager {
             return displayName(forCanonicalKey: normalized)
         }
 
-        if let custom = customCategory(matching: normalized) {
-            return custom.name
-        }
-
         if let canonical = canonicalKey(forPromptLabel: normalized) {
             return displayName(forCanonicalKey: canonical)
         }
@@ -105,10 +83,6 @@ final class CategoryManager {
             appendCategory(displayName(forCanonicalKey: key))
         }
 
-        for custom in customCategories {
-            appendCategory(custom.name)
-        }
-
         if result.isEmpty {
             return canonicalCategoryKeys
         }
@@ -126,10 +100,6 @@ final class CategoryManager {
         let inferredFromContext = ExpenseCategory.keywordCategory(
             in: "\(normalized) \(normalizedContext)"
         )
-
-        if let custom = customCategory(matching: normalized) {
-            return ResolvedCategory(storageKey: custom.key, bucket: custom.bucket)
-        }
 
         if let canonical = canonicalKey(forPromptLabel: normalized) {
             let canonicalCategory = ExpenseCategory.resolve(canonical)
@@ -175,47 +145,6 @@ final class CategoryManager {
         }
     }
 
-    @discardableResult
-    func addCustomCategory(name: String, bucket: BudgetBucket) -> Bool {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let key = Self.normalize(trimmed)
-        guard !trimmed.isEmpty, !key.isEmpty else { return false }
-        guard !canonicalCategoryKeys.contains(key) else { return false }
-        guard !customCategories.contains(where: { $0.key == key }) else { return false }
-
-        customCategories.append(
-            CustomCategory(
-                id: UUID(),
-                key: key,
-                name: trimmed,
-                bucketRawValue: bucket.rawValue
-            )
-        )
-        return true
-    }
-
-    func updateCustomCategory(id: UUID, name: String? = nil, bucket: BudgetBucket? = nil) {
-        guard let index = customCategories.firstIndex(where: { $0.id == id }) else { return }
-        var updated = customCategories[index]
-
-        if let name {
-            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
-                updated.name = trimmed
-            }
-        }
-
-        if let bucket {
-            updated.bucket = bucket
-        }
-
-        customCategories[index] = updated
-    }
-
-    func removeCustomCategories(at offsets: IndexSet) {
-        customCategories.remove(atOffsets: offsets)
-    }
-
     private func canonicalKey(forPromptLabel normalizedLabel: String) -> String? {
         if canonicalCategoryKeys.contains(normalizedLabel) {
             return normalizedLabel
@@ -228,12 +157,6 @@ final class CategoryManager {
         return nil
     }
 
-    private func customCategory(matching normalizedLabel: String) -> CustomCategory? {
-        customCategories.first {
-            $0.key == normalizedLabel || Self.normalize($0.name) == normalizedLabel
-        }
-    }
-
     static func normalize(_ value: String) -> String {
         value
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -244,7 +167,6 @@ final class CategoryManager {
     }
 
     private static let renamedCategoriesKey = SyncKey.renamedCategories
-    private static let customCategoriesKey = SyncKey.customCategories
 
     private static func loadRenamedCategories() -> [String: String] {
         if let data = UserDefaults.standard.data(forKey: renamedCategoriesKey),
@@ -254,25 +176,10 @@ final class CategoryManager {
         return [:]
     }
 
-    private static func loadCustomCategories() -> [CustomCategory] {
-        if let data = UserDefaults.standard.data(forKey: customCategoriesKey),
-           let decoded = try? JSONDecoder().decode([CustomCategory].self, from: data) {
-            return decoded
-        }
-        return []
-    }
-
     private func persistRenamedCategories() {
         if let data = try? JSONEncoder().encode(renamedCategories) {
             defaults.set(data, forKey: Self.renamedCategoriesKey)
             scheduleCloudSync(for: SyncKey.renamedCategories)
-        }
-    }
-
-    private func persistCustomCategories() {
-        if let data = try? JSONEncoder().encode(customCategories) {
-            defaults.set(data, forKey: Self.customCategoriesKey)
-            scheduleCloudSync(for: SyncKey.customCategories)
         }
     }
 
@@ -293,10 +200,6 @@ final class CategoryManager {
         applyRemoteDataIfNewer(for: SyncKey.renamedCategories) { [weak self] data in
             guard let decoded = try? JSONDecoder().decode([String: String].self, from: data) else { return }
             self?.renamedCategories = decoded
-        }
-        applyRemoteDataIfNewer(for: SyncKey.customCategories) { [weak self] data in
-            guard let decoded = try? JSONDecoder().decode([CustomCategory].self, from: data) else { return }
-            self?.customCategories = decoded
         }
     }
 
@@ -320,9 +223,6 @@ final class CategoryManager {
             switch key {
             case SyncKey.renamedCategories:
                 guard let data = try? JSONEncoder().encode(renamedCategories) else { continue }
-                cloudStore.set(data, forKey: key)
-            case SyncKey.customCategories:
-                guard let data = try? JSONEncoder().encode(customCategories) else { continue }
                 cloudStore.set(data, forKey: key)
             default:
                 continue

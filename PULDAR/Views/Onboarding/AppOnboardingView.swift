@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct AppOnboardingView: View {
-    @Environment(StoreKitManager.self) private var store
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(AppPreferences.self) private var appPreferences
 
@@ -12,7 +11,6 @@ struct AppOnboardingView: View {
     @State private var draftAlloc: [String: Double] = [
         "Fundamentals": 0.50, "Fun": 0.30, "Future": 0.20
     ]
-    @State private var showPaywall = false
     @FocusState private var incomeFieldFocused: Bool
 
     private let totalSteps = 5
@@ -32,13 +30,6 @@ struct AppOnboardingView: View {
         }
         .background(AppColors.background.ignoresSafeArea())
         .interactiveDismissDisabled(true)
-        .sheet(isPresented: $showPaywall) {
-            PaywallView(context: .onboardingTrial) {
-                showPaywall = false
-                finalizeAndComplete()
-            }
-            .environment(store)
-        }
     }
 
     // MARK: - Top Bar
@@ -521,7 +512,7 @@ struct AppOnboardingView: View {
             Divider()
             Button {
                 if step == totalSteps - 1 {
-                    showPaywall = true
+                    finalizeAndComplete()
                 } else {
                     withAnimation(.easeInOut(duration: 0.25)) { step += 1 }
                 }

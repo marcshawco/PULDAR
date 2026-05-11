@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// Settings sheet — income, allocation, and category management.
+/// Settings sheet — income, allocation, recurring expenses, and data controls.
 struct SettingsView: View {
     private enum IncomeInputMode: String, CaseIterable, Identifiable {
         case monthly
@@ -20,8 +20,6 @@ struct SettingsView: View {
     @Environment(AppPreferences.self) private var appPreferences
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(DiagnosticLogger.self) private var diagnosticLogger
-    @Environment(FinanceKitManager.self) private var financeKitManager
-    @Environment(StoreKitManager.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -34,27 +32,19 @@ struct SettingsView: View {
     @State private var hourlyPayText: String = ""
     @State private var hoursPerWeekText: String = ""
     @FocusState private var focusedIncomeField: IncomeFocusField?
-    @State private var showAddCategorySheet = false
-    @State private var newCategoryName = ""
-    @State private var newCategoryBucket: BudgetBucket = .fun
-    @State private var addCategoryError: String?
     @State private var draftPercentages: [String: Double] = [:]
     @State private var showAddRecurringSheet = false
     @State private var newRecurringName = ""
     @State private var newRecurringAmount = ""
     @State private var newRecurringBucket: BudgetBucket = .fun
     @State private var addRecurringError: String?
-    @State private var showPaywall = false
     @State private var exportURL: URL?
-    @State private var backupURL: URL?
-    @State private var diagnosticURL: URL?
     @State private var selectedAllocationPreset: AllocationPreset = .custom
     @State private var showZeroFunWarning = false
     @State private var showDeleteAllConfirmation = false
     @State private var showDeleteAllAlert = false
     @State private var showBudgetAllocationInfo = false
     @State private var selectedBudgetInfoBucket: BudgetBucket?
-    @State private var financeKitNotice: FinanceKitManager.Notice?
     @AppStorage("appThemeMode") private var appThemeMode = "system"
     @State private var selectedAppIcon: AppIconVariant = .whiteOnBlack
     @AppStorage("didCompleteAppOnboarding") private var didCompleteAppOnboarding = false
@@ -95,18 +85,12 @@ struct SettingsView: View {
             Form {
                 incomeSection
                 bucketAllocationSection
-                proSection
                 recurringSection
                 rolloverSection
                 dataExportSection
-                localBackupSection
                 languageAndCurrencySection
                 appearanceSection
                 widgetsSection
-                appleWalletSyncSection
-                customCategoriesSection
-                accountSection
-                diagnosticsSection
                 dangerZoneSection
                 aboutSection
             }
@@ -135,10 +119,6 @@ struct SettingsView: View {
             .toolbarBackground(AppColors.secondaryBg, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
-                financeKitManager.refreshAvailability()
-                if !store.isPro, budgetEngine.rolloverEnabled {
-                    budgetEngine.rolloverEnabled = false
-                }
                 if budgetEngine.monthlyIncome > 0 {
                     incomeText = String(format: "%.0f", budgetEngine.monthlyIncome)
                 }
@@ -152,11 +132,6 @@ struct SettingsView: View {
                 runAutoMonthlyExportIfNeeded()
                 selectedAppIcon = AppIconVariant.current
             }
-            .onChange(of: store.isPro) {
-                if !store.isPro, budgetEngine.rolloverEnabled {
-                    budgetEngine.rolloverEnabled = false
-                }
-            }
             .onChange(of: draftPercentages) {
                 selectedAllocationPreset = AllocationPreset.matching(draftPercentages) ?? .custom
                 if isAllocationValid {
@@ -165,10 +140,6 @@ struct SettingsView: View {
             }
             .onChange(of: autoMonthlyCSVExportEnabled) {
                 runAutoMonthlyExportIfNeeded()
-            }
-            .task {
-                await store.loadProducts()
-                await store.checkEntitlement()
             }
             .sheet(isPresented: $showAddRecurringSheet) {
                 NavigationStack {
@@ -213,49 +184,6 @@ struct SettingsView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showAddCategorySheet) {
-                NavigationStack {
-                    Form {
-                        TextField("Category name", text: $newCategoryName)
-                            .textInputAutocapitalization(.words)
-
-                        Picker("Bucket", selection: $newCategoryBucket) {
-                            ForEach(BudgetBucket.allCases) { bucket in
-                                Text(bucket.rawValue).tag(bucket)
-                            }
-                        }
-
-                        if let addCategoryError {
-                            Text(addCategoryError)
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                    .simultaneousGesture(
-                        TapGesture().onEnded {
-                            dismissActiveKeyboard()
-                        }
-                    )
-                    .navigationTitle("New Category")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Cancel") {
-                                dismissActiveKeyboard()
-                                showAddCategorySheet = false
-                            }
-                        }
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Add") { addCustomCategory() }
-                        }
-                    }
-                }
-            }
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
-                    .environment(store)
-            }
             .alert("Fun is 0%", isPresented: $showZeroFunWarning) {
                 Button("Keep 0%") {
                     saveAndDismiss()
@@ -296,13 +224,6 @@ struct SettingsView: View {
                     dismissButton: .default(Text("Got it")) {
                         selectedBudgetInfoBucket = nil
                     }
-                )
-            }
-            .alert(item: $financeKitNotice) { notice in
-                Alert(
-                    title: Text(notice.title),
-                    message: Text(notice.message),
-                    dismissButton: .default(Text("OK"))
                 )
             }
         }
@@ -538,58 +459,46 @@ struct SettingsView: View {
 
     private var recurringSection: some View {
         Section {
-            if store.isPro {
-                if recurringExpenses.isEmpty {
-                    Text("No recurring expenses yet.")
-                        .foregroundStyle(AppColors.textTertiary)
-                } else {
-                    ForEach(recurringExpenses) { recurring in
-                        HStack(spacing: 10) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(recurring.name)
-                                    .font(.subheadline.weight(.medium))
-                                Text(recurringBucketLabel(recurring.budgetBucket))
-                                    .font(.caption2)
-                                    .foregroundStyle(AppColors.textTertiary)
-                            }
-
-                            Spacer()
-
-                            Text(recurring.safeAmount.formattedCurrency(code: appPreferences.currencyCode))
-                                .font(.subheadline.weight(.semibold))
-
-                            Toggle("", isOn: recurringActiveBinding(for: recurring.id))
-                                .labelsHidden()
-                        }
-                        .padding(.vertical, 2)
-                    }
-                    .onDelete(perform: deleteRecurringExpenses)
-                }
-
-                Button {
-                    newRecurringName = ""
-                    newRecurringAmount = ""
-                    newRecurringBucket = .fun
-                    addRecurringError = nil
-                    showAddRecurringSheet = true
-                } label: {
-                    Label("Add Recurring Expense", systemImage: "plus")
-                }
+            if recurringExpenses.isEmpty {
+                Text("No recurring expenses yet.")
+                    .foregroundStyle(AppColors.textTertiary)
             } else {
-                lockedProFeatureButton {
-                    Text("Recurring expenses are available on Pro.")
-                        .foregroundStyle(AppColors.textTertiary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                ForEach(recurringExpenses) { recurring in
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(recurring.name)
+                                .font(.subheadline.weight(.medium))
+                            Text(recurringBucketLabel(recurring.budgetBucket))
+                                .font(.caption2)
+                                .foregroundStyle(AppColors.textTertiary)
+                        }
+
+                        Spacer()
+
+                        Text(recurring.safeAmount.formattedCurrency(code: appPreferences.currencyCode))
+                            .font(.subheadline.weight(.semibold))
+
+                        Toggle("", isOn: recurringActiveBinding(for: recurring.id))
+                            .labelsHidden()
+                    }
+                    .padding(.vertical, 2)
                 }
+                .onDelete(perform: deleteRecurringExpenses)
+            }
+
+            Button {
+                newRecurringName = ""
+                newRecurringAmount = ""
+                newRecurringBucket = .fun
+                addRecurringError = nil
+                showAddRecurringSheet = true
+            } label: {
+                Label("Add Recurring Expense", systemImage: "plus")
             }
         } header: {
             Text("Recurring Expenses")
         } footer: {
-            Text(
-                store.isPro
-                ? "These are auto-accounted for every month."
-                : "Upgrade to Pro for recurring transactions and unlimited entries."
-            )
+            Text("Recurring expenses are automatically counted every month in budget totals, rollover calculations, and widgets.")
         }
     }
 
@@ -612,137 +521,45 @@ struct SettingsView: View {
         }
     }
 
-    private var appleWalletSyncSection: some View {
+    private var rolloverSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 8) {
-                LabeledContent("Status", value: financeKitManager.statusTitle)
+            Toggle("Enable Rollover Balances", isOn: rolloverBinding)
+                .tint(AppColors.accent)
 
-                Text(financeKitManager.detailText)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("How rollover works")
+                    .font(.subheadline.weight(.semibold))
+                Text("When enabled, unused Fundamentals and Fun money carries into the same bucket next month. Overspent buckets carry nothing forward. Future stays month-to-month so savings goals stay clean.")
                     .font(.caption)
                     .foregroundStyle(AppColors.textSecondary)
-
-                if let lastSyncError = financeKitManager.lastSyncError {
-                    Text(lastSyncError)
-                        .font(.caption)
-                        .foregroundStyle(AppColors.overspend)
-                }
-
-                if financeKitManager.lastImportedCount > 0 {
-                    Text("Last Apple Wallet import added \(financeKitManager.lastImportedCount) transaction(s).")
-                        .font(.caption2)
-                        .foregroundStyle(AppColors.textTertiary)
-                }
-
-                Button(financeKitManager.primaryActionTitle) {
-                    financeKitManager.refreshAvailability()
-                    financeKitNotice = financeKitManager.primaryActionNotice()
-                }
             }
             .padding(.vertical, 4)
         } header: {
-            Text("Apple Wallet Sync")
-        } footer: {
-            Text("When available, this will import Apple Card, Apple Cash, and Savings activity without using third-party aggregators. If it is unavailable, PULDAR falls back to manual entry, receipt scanning, and CSV/JSON portability.")
-        }
-    }
-
-    @ViewBuilder
-    private var proSection: some View {
-        if !store.isPro {
-            Section {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Unlock Premium Features")
-                        .font(.subheadline.weight(.semibold))
-                    Text("Start with a 14-day trial, then unlock unlimited entries, recurring expenses, rollover budgets, and CSV exports.")
-                        .font(.caption)
-                        .foregroundStyle(AppColors.textSecondary)
-                    Button {
-                        showPaywall = true
-                    } label: {
-                        Label("Start trial: \(AppConstants.proPrice)", systemImage: "sparkles")
-                    }
-                }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Puldar Pro")
-            }
-        }
-    }
-
-    private var rolloverSection: some View {
-        Section {
-            if store.isPro {
-                Toggle("Enable Rollover Balances", isOn: rolloverBinding)
-                    .tint(AppColors.accent)
-                Text("Unused Fundamentals and Fun money rolls into next month.")
-                    .font(.caption)
-                    .foregroundStyle(AppColors.textTertiary)
-            } else {
-                lockedProFeatureButton {
-                    Text("Rollover balances are available on Pro.")
-                        .foregroundStyle(AppColors.textTertiary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-        } header: {
             Text("Rollover Budgets")
+        } footer: {
+            Text("Allocation percentages and rollover preferences are stored locally and used by the budget engine whenever it calculates remaining balances.")
         }
     }
 
     private var dataExportSection: some View {
         Section {
-            if store.isPro {
-                Button("Export Current Month (CSV)") {
-                    exportCurrentMonthCSV()
-                }
-                Button("Export Current Month (JSON)") {
-                    exportCurrentMonthJSON()
-                }
-                Button("Export All Data (CSV)") {
-                    exportCSV(for: expenses, scope: "all_months")
-                }
-                Button("Export All Data (JSON)") {
-                    exportJSON(
-                        expenses: expenses,
-                        recurring: recurringExpenses,
-                        scope: "all_data"
-                    )
-                }
-                Toggle("Auto Monthly CSV Export", isOn: $autoMonthlyCSVExportEnabled)
-                    .tint(AppColors.accent)
-                if let exportURL {
-                    ShareLink(item: exportURL) {
-                        Label("Share Last Export", systemImage: "square.and.arrow.up")
-                    }
-                }
-            } else {
-                lockedProFeatureButton {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Exports are available on Pro.")
-                            .foregroundStyle(AppColors.textTertiary)
-                        lockedExportPreview
-                    }
+            Button("Export Current Month (CSV)") {
+                exportCurrentMonthCSV()
+            }
+            Button("Export All Data (CSV)") {
+                exportCSV(for: expenses, scope: "all_months")
+            }
+            Toggle("Auto Monthly CSV Export", isOn: $autoMonthlyCSVExportEnabled)
+                .tint(AppColors.accent)
+            if let exportURL {
+                ShareLink(item: exportURL) {
+                    Label("Share Last Export", systemImage: "square.and.arrow.up")
                 }
             }
         } header: {
             Text("Data Export")
-        }
-    }
-
-    private var localBackupSection: some View {
-        Section {
-            Button("Create Full Device Backup (JSON)") {
-                exportFullBackupJSON()
-            }
-            if let backupURL {
-                ShareLink(item: backupURL) {
-                    Label("Share Last Backup", systemImage: "square.and.arrow.up")
-                }
-            }
-        } header: {
-            Text("Local Backup")
         } footer: {
-            Text("Creates a raw on-device backup file you can transfer to another phone.")
+            Text("Exports are CSV only.")
         }
     }
 
@@ -828,62 +645,6 @@ struct SettingsView: View {
         }
     }
 
-    private var accountSection: some View {
-        Section {
-            HStack {
-                Text("Plan")
-                Spacer()
-                Text(store.isPro ? "Pro" : "Free")
-                    .foregroundStyle(
-                        store.isPro ? .green : AppColors.textSecondary
-                    )
-            }
-
-            if !store.isPro {
-                Button("Restore Purchases") {
-                    Task { await store.restorePurchases() }
-                }
-            }
-        } header: {
-            Text("Account")
-        }
-    }
-
-    private var diagnosticsSection: some View {
-        Section {
-            Toggle(
-                "Enable Local Diagnostic Logs",
-                isOn: Binding(
-                    get: { diagnosticLogger.isEnabled },
-                    set: { diagnosticLogger.setEnabled($0) }
-                )
-            )
-            .tint(AppColors.accent)
-
-            Button("Export Diagnostic Logs") {
-                exportDiagnosticLogs()
-            }
-            .disabled(!diagnosticLogger.isEnabled && diagnosticLogger.entries.isEmpty)
-
-            if let diagnosticURL {
-                ShareLink(item: diagnosticURL) {
-                    Label("Share Diagnostic File", systemImage: "envelope")
-                }
-            }
-
-            if !diagnosticLogger.entries.isEmpty {
-                Button("Clear Local Diagnostic Logs", role: .destructive) {
-                    diagnosticLogger.clear()
-                    diagnosticURL = nil
-                }
-            }
-        } header: {
-            Text("Diagnostics")
-        } footer: {
-            Text("Optional. Logs stay on this device and only include app events like budget changes, exports, purchases, and errors. Nothing is sent anywhere unless the user exports and shares the file.")
-        }
-    }
-
     private var dangerZoneSection: some View {
         Section {
             Button(role: .destructive) {
@@ -915,40 +676,6 @@ struct SettingsView: View {
             Text("About")
         } footer: {
             Text("PULDAR is not financial advice. Its on-device AI is only used to parse receipts and plain-English expense entries, then categorize them. It does not provide investment tips, debt strategies, or financial recommendations.")
-        }
-    }
-
-    private var customCategoriesSection: some View {
-        Section {
-            if categoryManager.customCategories.isEmpty {
-                Text("No custom categories yet.")
-                    .foregroundStyle(AppColors.textTertiary)
-            } else {
-                ForEach(categoryManager.customCategories) { custom in
-                    VStack(alignment: .leading, spacing: 8) {
-                        TextField("Category name", text: customNameBinding(for: custom.id))
-                        Picker("Bucket", selection: customBucketBinding(for: custom.id)) {
-                            ForEach(BudgetBucket.allCases) { bucket in
-                                Text(bucket.rawValue).tag(bucket)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
-                    .padding(.vertical, 4)
-                }
-                .onDelete(perform: categoryManager.removeCustomCategories)
-            }
-
-            Button {
-                newCategoryName = ""
-                newCategoryBucket = .fun
-                addCategoryError = nil
-                showAddCategorySheet = true
-            } label: {
-                Label("Add Category", systemImage: "plus")
-            }
-        } header: {
-            Text("Custom Categories")
         }
     }
 
@@ -1028,42 +755,6 @@ struct SettingsView: View {
         return values
     }
 
-    private func customNameBinding(for id: UUID) -> Binding<String> {
-        Binding(
-            get: {
-                categoryManager.customCategories.first(where: { $0.id == id })?.name ?? ""
-            },
-            set: { newName in
-                categoryManager.updateCustomCategory(id: id, name: newName)
-            }
-        )
-    }
-
-    private func customBucketBinding(for id: UUID) -> Binding<BudgetBucket> {
-        Binding(
-            get: {
-                categoryManager.customCategories.first(where: { $0.id == id })?.bucket ?? .fun
-            },
-            set: { newBucket in
-                categoryManager.updateCustomCategory(id: id, bucket: newBucket)
-            }
-        )
-    }
-
-    private func addCustomCategory() {
-        let ok = categoryManager.addCustomCategory(
-            name: newCategoryName,
-            bucket: newCategoryBucket
-        )
-
-        guard ok else {
-            addCategoryError = "This category already exists or is invalid."
-            return
-        }
-
-        showAddCategorySheet = false
-    }
-
     private func recurringBucketLabel(_ bucket: BudgetBucket) -> String {
         switch bucket {
         case .fundamentals: return "Need"
@@ -1085,21 +776,6 @@ struct SettingsView: View {
             calendar.isDate($0.date, equalTo: currentMonth, toGranularity: .month)
         }
         exportCSV(for: currentMonthExpenses, scope: monthLabel(currentMonth))
-    }
-
-    private func exportCurrentMonthJSON() {
-        let calendar = Calendar.current
-        let currentMonth = calendar.date(
-            from: calendar.dateComponents([.year, .month], from: .now)
-        ) ?? .now
-        let currentMonthExpenses = expenses.filter {
-            calendar.isDate($0.date, equalTo: currentMonth, toGranularity: .month)
-        }
-        exportJSON(
-            expenses: currentMonthExpenses,
-            recurring: [],
-            scope: monthLabel(currentMonth)
-        )
     }
 
     private func exportCSV(for items: [Expense], scope: String) {
@@ -1125,96 +801,8 @@ struct SettingsView: View {
         }
     }
 
-    private func exportJSON(
-        expenses: [Expense],
-        recurring: [RecurringExpense],
-        scope: String
-    ) {
-        do {
-            exportURL = try ExpenseExportService.writeBackupJSON(
-                expenses: expenses,
-                recurring: recurring,
-                scope: scope,
-                monthlyIncome: budgetEngine.monthlyIncome,
-                percentages: currentPercentagesSnapshot()
-            )
-            diagnosticLogger.record(
-                category: "export.json",
-                message: "Exported JSON from settings",
-                metadata: [
-                    "scope": scope,
-                    "expenses": "\(expenses.count)",
-                    "recurring": "\(recurring.count)"
-                ]
-            )
-        } catch {
-            print("Failed to export JSON in settings: \(error)")
-            diagnosticLogger.record(
-                level: .error,
-                category: "export.json",
-                message: "Failed JSON export from settings",
-                metadata: ["error": error.localizedDescription]
-            )
-        }
-    }
-
-    private func exportDiagnosticLogs() {
-        let calendar = Calendar.current
-        let currentMonth = calendar.date(
-            from: calendar.dateComponents([.year, .month], from: .now)
-        ) ?? .now
-
-        let state = DiagnosticLogger.SupportState(
-            monthlyIncome: budgetEngine.monthlyIncome,
-            rolloverEnabled: budgetEngine.rolloverEnabled,
-            percentages: currentPercentagesSnapshot(),
-            expenseCount: expenses.count,
-            recurringExpenseCount: recurringExpenses.count,
-            filteredMonth: monthLabel(currentMonth),
-            monthSpent: budgetEngine.totalSpent(
-                expenses: expenses,
-                recurringExpenses: recurringExpenses,
-                for: currentMonth
-            ),
-            monthCapacity: budgetEngine.monthSpendCapacity(
-                expenses: expenses,
-                recurringExpenses: recurringExpenses,
-                for: currentMonth
-            ),
-            buckets: budgetEngine.calculateStatus(
-                expenses: expenses,
-                recurringExpenses: recurringExpenses,
-                for: currentMonth
-            ).map {
-                DiagnosticLogger.SupportState.BucketState(
-                    name: $0.bucket.rawValue,
-                    budgeted: $0.budgeted,
-                    spent: $0.spent,
-                    remaining: $0.remaining,
-                    isOverspent: $0.isOverspent
-                )
-            }
-        )
-
-        do {
-            diagnosticURL = try diagnosticLogger.export(state: state)
-            diagnosticLogger.record(
-                category: "diagnostics.export",
-                message: "Exported diagnostic log bundle",
-                metadata: ["entries": "\(diagnosticLogger.entries.count)"]
-            )
-        } catch {
-            diagnosticLogger.record(
-                level: .error,
-                category: "diagnostics.export",
-                message: "Failed to export diagnostic log bundle",
-                metadata: ["error": error.localizedDescription]
-            )
-        }
-    }
-
     private func runAutoMonthlyExportIfNeeded() {
-        guard store.isPro, autoMonthlyCSVExportEnabled else { return }
+        guard autoMonthlyCSVExportEnabled else { return }
 
         let calendar = Calendar.current
         guard let previousMonth = calendar.date(byAdding: .month, value: -1, to: .now) else {
@@ -1248,10 +836,6 @@ struct SettingsView: View {
                 recurringExpenses.first(where: { $0.id == id })?.isActive ?? true
             },
             set: { isOn in
-                guard store.isPro else {
-                    showPaywall = true
-                    return
-                }
                 guard let recurring = recurringExpenses.first(where: { $0.id == id }) else { return }
                 recurring.isActive = isOn
                 recurring.touchUpdatedAt()
@@ -1282,13 +866,7 @@ struct SettingsView: View {
     private var rolloverBinding: Binding<Bool> {
         Binding(
             get: { budgetEngine.rolloverEnabled },
-            set: { isOn in
-                guard store.isPro else {
-                    showPaywall = true
-                    return
-                }
-                budgetEngine.rolloverEnabled = isOn
-            }
+            set: { budgetEngine.rolloverEnabled = $0 }
         )
     }
 
@@ -1312,50 +890,6 @@ struct SettingsView: View {
         )
         if focusedIncomeField != nil {
             focusedIncomeField = nil
-        }
-    }
-
-    private func lockedProFeatureButton<Content: View>(
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        Button {
-            showPaywall = true
-        } label: {
-            content()
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var lockedExportPreview: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Preview")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(AppColors.textSecondary)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("date,merchant,amount,category,bucket")
-                Text("2026-02-27,Whole Foods,45.00,Groceries,Fundamentals")
-                Text("2026-02-26,Bitcoin,200.00,Investments,Future")
-                Text("2026-02-25,Hulu,9.99,Subscriptions,Fun")
-            }
-            .font(.caption2.monospaced())
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(AppColors.tertiaryBg)
-            )
-            .blur(radius: 2.4)
-            .overlay(alignment: .center) {
-                Label("Pro Export Preview", systemImage: "lock.fill")
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(AppColors.background.opacity(0.92))
-                    )
-            }
         }
     }
 
@@ -1419,11 +953,6 @@ struct SettingsView: View {
     }
 
     private func addRecurringExpense() {
-        guard store.isPro else {
-            showPaywall = true
-            return
-        }
-
         let trimmedName = newRecurringName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
             addRecurringError = "Please enter a name."
@@ -1468,11 +997,6 @@ struct SettingsView: View {
     }
 
     private func deleteRecurringExpenses(at offsets: IndexSet) {
-        guard store.isPro else {
-            showPaywall = true
-            return
-        }
-
         for index in offsets {
             guard recurringExpenses.indices.contains(index) else { continue }
             modelContext.delete(recurringExpenses[index])
@@ -1516,33 +1040,6 @@ struct SettingsView: View {
                 level: .error,
                 category: "danger.clear_all",
                 message: "Failed to clear all expenses",
-                metadata: ["error": error.localizedDescription]
-            )
-        }
-    }
-
-    private func exportFullBackupJSON() {
-        do {
-            backupURL = try ExpenseExportService.writeFullDeviceBackupJSON(
-                expenses: expenses,
-                recurring: recurringExpenses,
-                monthlyIncome: budgetEngine.monthlyIncome,
-                percentages: currentPercentagesSnapshot()
-            )
-            diagnosticLogger.record(
-                category: "backup.json",
-                message: "Created full device backup",
-                metadata: [
-                    "expenses": "\(expenses.count)",
-                    "recurring": "\(recurringExpenses.count)"
-                ]
-            )
-        } catch {
-            print("Failed to create local backup: \(error)")
-            diagnosticLogger.record(
-                level: .error,
-                category: "backup.json",
-                message: "Failed to create full device backup",
                 metadata: ["error": error.localizedDescription]
             )
         }

@@ -17,7 +17,7 @@ struct ExpenseInputView: View {
     var body: some View {
         HStack(spacing: 8) {
             TextField(
-                isLocked ? "Free limit reached — upgrade to Pro" : "spent 45 at whole foods…",
+                "spent 45 at whole foods…",
                 text: $inputText
             )
             .textFieldStyle(.plain)

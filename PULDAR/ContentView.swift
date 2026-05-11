@@ -27,7 +27,6 @@ struct ContentView: View {
     @State private var usageTracker = UsageTracker()
     @State private var diagnosticLogger = DiagnosticLogger.shared
     @State private var appPreferences = AppPreferences()
-    @State private var didWarmModelThisLaunch = false
     @State private var selectedTab: RootTab = .home
     @State private var dashboardLaunchAction: DashboardLaunchAction?
     @State private var showAppOnboarding = false
@@ -114,14 +113,6 @@ struct ContentView: View {
                 .accessibilityHidden(true)
         }
         .preferredColorScheme(preferredColorScheme)
-        .task(id: didCompleteAppOnboarding) {
-            guard didCompleteAppOnboarding else { return }
-            guard !didWarmModelThisLaunch else { return }
-            didWarmModelThisLaunch = true
-            Task.detached(priority: .utility) {
-                await llmService.loadModel()
-            }
-        }
         .task {
             diagnosticLogger.record(
                 category: "app.lifecycle",

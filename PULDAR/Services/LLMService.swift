@@ -79,6 +79,10 @@ final class LLMService {
             return
         }
 
+        #if targetEnvironment(simulator)
+        loadState = .error("Local AI runs on a physical device. Continue to test the app UI in Simulator.")
+        return
+        #else
         // If we've already downloaded once, skip the noisy "downloading" state.
         loadState = hasDownloadedModel ? .loading : .downloading(progress: 0)
 
@@ -104,6 +108,7 @@ final class LLMService {
         } catch {
             self.loadState = .error(error.localizedDescription)
         }
+        #endif
     }
 
     // MARK: - Inference

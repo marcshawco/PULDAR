@@ -132,6 +132,9 @@ struct ModelDownloadOnboardingView: View {
         if case .ready = llmService.loadState {
             return "Continue"
         }
+        if case .error = llmService.loadState {
+            return "Continue"
+        }
         if !networkMonitor.isConnected {
             return "Waiting for internet"
         }
@@ -143,6 +146,9 @@ struct ModelDownloadOnboardingView: View {
 
     private var primaryButtonDisabled: Bool {
         if case .ready = llmService.loadState {
+            return false
+        }
+        if case .error = llmService.loadState {
             return false
         }
         return isBusy || !networkMonitor.isConnected
@@ -170,6 +176,10 @@ struct ModelDownloadOnboardingView: View {
 
     private func startDownloadTapped() {
         if case .ready = llmService.loadState {
+            onCompleted()
+            return
+        }
+        if case .error = llmService.loadState {
             onCompleted()
             return
         }

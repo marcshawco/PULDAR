@@ -27,9 +27,11 @@ struct ModelDownloadOnboardingView: View {
                 let compact = proxy.size.height < 760 || proxy.size.width < 390
 
                 ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: compact ? 16 : 20) {
+                    VStack(alignment: .center, spacing: compact ? 16 : 20) {
                         Text("Downloading Local AI")
                             .font(compact ? .title2.bold() : .largeTitle.bold())
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, alignment: .center)
 
                         Text("PULDAR runs AI fully on-device. We download a one-time model so your expense text never leaves your phone.")
                             .font(compact ? .callout : .body)
@@ -50,6 +52,7 @@ struct ModelDownloadOnboardingView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
 
                         modelStatus
+                            .frame(maxWidth: .infinity, alignment: .center)
 
                         Spacer(minLength: compact ? 12 : 20)
 
@@ -71,7 +74,9 @@ struct ModelDownloadOnboardingView: View {
                             .foregroundStyle(AppColors.textTertiary)
                             .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    .padding(compact ? 16 : 20)
+                    .padding(.horizontal, compact ? 16 : 20)
+                    .padding(.vertical, compact ? 24 : 32)
+                    .frame(minHeight: proxy.size.height, alignment: .center)
                 }
             }
             .interactiveDismissDisabled(true)

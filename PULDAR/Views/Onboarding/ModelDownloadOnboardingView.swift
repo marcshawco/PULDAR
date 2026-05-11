@@ -62,7 +62,7 @@ struct ModelDownloadOnboardingView: View {
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                                         .fill(buttonColor)
                                 )
-                                .foregroundStyle(.white)
+                                .foregroundStyle(buttonTextColor)
                         }
                         .disabled(primaryButtonDisabled)
 
@@ -145,6 +145,10 @@ struct ModelDownloadOnboardingView: View {
 
     private var buttonColor: Color {
         primaryButtonDisabled ? Color.gray.opacity(0.6) : AppColors.accent
+    }
+
+    private var buttonTextColor: Color {
+        primaryButtonDisabled ? AppColors.textTertiary : .black
     }
 
     private func infoRow(icon: String, text: String, compact: Bool) -> some View {

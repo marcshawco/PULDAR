@@ -25,8 +25,6 @@ struct HistoryView: View {
     @State private var showFiltersSheet = false
     @State private var showExportSheet = false
     @FocusState private var focusedField: FocusField?
-    @AppStorage("autoMonthlyCSVExportEnabled") private var autoMonthlyCSVExportEnabled = false
-    @AppStorage("lastAutoMonthlyCSVExportKey") private var lastAutoMonthlyCSVExportKey = ""
 
     private var contentMaxWidth: CGFloat {
         horizontalSizeClass == .regular ? 900 : .infinity
@@ -307,13 +305,9 @@ struct HistoryView: View {
                     selectedMonth = first
                 }
                 syncFiltersForSelectedMonth()
-                runAutoMonthlyExportIfNeeded()
             }
             .onChange(of: selectedMonth) {
                 syncFiltersForSelectedMonth()
-            }
-            .onChange(of: autoMonthlyCSVExportEnabled) {
-                runAutoMonthlyExportIfNeeded()
             }
             .sheet(isPresented: $showFiltersSheet) {
                 filtersSheet
@@ -553,8 +547,6 @@ struct HistoryView: View {
                     Button("Export All Data (CSV)") {
                         exportCSV(for: expenses, scope: "all_months")
                     }
-                    Toggle("Auto Monthly CSV Export", isOn: $autoMonthlyCSVExportEnabled)
-                        .tint(AppColors.accent)
                     if let exportURL {
                         ShareLink(item: exportURL) {
                             Label("Share Last Export", systemImage: "square.and.arrow.up")
@@ -623,35 +615,6 @@ struct HistoryView: View {
                 metadata: ["error": error.localizedDescription]
             )
         }
-    }
-
-    private func runAutoMonthlyExportIfNeeded() {
-        guard autoMonthlyCSVExportEnabled else { return }
-
-        let calendar = Calendar.current
-        guard let previousMonth = calendar.date(byAdding: .month, value: -1, to: .now) else {
-            return
-        }
-
-        let key = monthKey(previousMonth)
-        guard key != lastAutoMonthlyCSVExportKey else { return }
-
-        let previousMonthExpenses = expenses.filter {
-            calendar.isDate($0.date, equalTo: previousMonth, toGranularity: .month)
-        }
-
-        guard !previousMonthExpenses.isEmpty else {
-            lastAutoMonthlyCSVExportKey = key
-            return
-        }
-
-        exportCSV(for: previousMonthExpenses, scope: "auto_\(monthLabel(previousMonth))")
-        lastAutoMonthlyCSVExportKey = key
-    }
-
-    private func monthKey(_ date: Date) -> String {
-        let comps = Calendar.current.dateComponents([.year, .month], from: date)
-        return "\(comps.year ?? 0)-\(comps.month ?? 0)"
     }
 
     private struct ExpenseGroup: Identifiable {

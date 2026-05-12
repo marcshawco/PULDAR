@@ -603,8 +603,14 @@ struct SettingsView: View {
                         } label: {
                             VStack(spacing: 6) {
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(variant.previewBackground)
+                                    .fill(AppColors.tertiaryBg)
                                     .frame(width: 54, height: 54)
+                                    .overlay {
+                                        Image(variant.previewAssetName)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    }
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                                             .strokeBorder(
@@ -614,9 +620,6 @@ struct SettingsView: View {
                                                 lineWidth: selectedAppIcon == variant ? 2 : 1
                                             )
                                     )
-                                    .overlay {
-                                        variant.previewContent
-                                    }
 
                                 Text(variant.label)
                                     .font(.system(size: 9, weight: .medium))
@@ -1045,36 +1048,12 @@ enum AppIconVariant: String, CaseIterable, Identifiable {
         }
     }
 
-    var previewBackground: Color {
+    var previewAssetName: String {
         switch self {
-        case .whiteOnBlack: return .black
-        case .colorOnWhite: return .white
-        case .colorOnBlack: return .black
-        case .blackOnWhite: return .white
-        }
-    }
-
-    @ViewBuilder
-    var previewContent: some View {
-        switch self {
-        case .whiteOnBlack:
-            iconBars(colors: [.white, .white, .white])
-        case .colorOnWhite:
-            iconBars(colors: [AppColors.bucketFundamentals, AppColors.bucketFun, AppColors.bucketFuture])
-        case .colorOnBlack:
-            iconBars(colors: [AppColors.bucketFundamentals, AppColors.bucketFun, AppColors.bucketFuture])
-        case .blackOnWhite:
-            iconBars(colors: [.black, .black, .black])
-        }
-    }
-
-    private func iconBars(colors: [Color]) -> some View {
-        HStack(spacing: 3) {
-            ForEach(0..<3, id: \.self) { i in
-                RoundedRectangle(cornerRadius: 1, style: .continuous)
-                    .fill(colors[i])
-                    .frame(width: 4, height: CGFloat(20 - i * 4))
-            }
+        case .whiteOnBlack: return "AppIconPreview"
+        case .colorOnWhite: return "AppIconColorOnWhitePreview"
+        case .colorOnBlack: return "AppIconColorOnBlackPreview"
+        case .blackOnWhite: return "AppIconBlackOnWhitePreview"
         }
     }
 

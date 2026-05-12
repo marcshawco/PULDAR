@@ -10,7 +10,7 @@
 		905C2C592F4F3781002A4368 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = A1E2F3042F4B14A0005F8971 /* MLX */; };
 		905C2C5A2F4F3781002A4368 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = A1E2F3052F4B14A0005F8971 /* MLXLLM */; };
 		905C2C5B2F4F3781002A4368 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = A1E2F3062F4B14A0005F8971 /* MLXLMCommon */; };
-		B10000012F5A000100000001 /* PULDARWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B10000022F5A000100000001 /* PULDARWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B10000012F5A000100000001 /* PULDARWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B10000022F5A000100000001 /* PULDARWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -24,15 +24,15 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		B10000042F5A000100000001 /* Embed App Extensions */ = {
+		B10000042F5A000100000001 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				B10000012F5A000100000001 /* PULDARWidgets.appex in Embed App Extensions */,
+				B10000012F5A000100000001 /* PULDARWidgets.appex in Embed Foundation Extensions */,
 			);
-			name = "Embed App Extensions";
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -104,7 +104,7 @@
 				90DFF9222F4B13B1005F8971 /* Sources */,
 				90DFF9232F4B13B1005F8971 /* Frameworks */,
 				90DFF9242F4B13B1005F8971 /* Resources */,
-				B10000042F5A000100000001 /* Embed App Extensions */,
+				B10000042F5A000100000001 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);

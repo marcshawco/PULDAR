@@ -323,19 +323,26 @@ struct AppOnboardingView: View {
 
     private var mixStep: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Step 04 — Mix")
-                .font(.system(size: 11, weight: .bold))
-                .kerning(2.2)
-                .textCase(.uppercase)
-                .foregroundStyle(AppColors.textTertiary)
-                .padding(.top, 40)
-                .padding(.bottom, 28)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Step 04 — Mix")
+                    .font(.system(size: 10, weight: .bold))
+                    .kerning(2)
+                    .textCase(.uppercase)
+                    .foregroundStyle(AppColors.textTertiary)
 
-            Text("Choose\nyour mix.")
-                .font(.system(size: 38, weight: .ultraLight))
-                .tracking(-1)
-                .foregroundStyle(AppColors.textPrimary)
-                .padding(.bottom, 44)
+                Text("Choose your mix.")
+                    .font(.system(size: 32, weight: .ultraLight))
+                    .tracking(-0.8)
+                    .foregroundStyle(AppColors.textPrimary)
+
+                if draftIncome > 0 {
+                    Text("Based on \(draftIncome.formattedCurrency(code: appPreferences.currencyCode)) / month")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(AppColors.textTertiary)
+                        .monospacedDigit()
+                }
+            }
+            .padding(.bottom, 18)
 
             Divider()
 
@@ -372,14 +379,14 @@ struct AppOnboardingView: View {
                         Spacer()
 
                         if let values = preset.displayValues(alloc: draftAlloc, income: draftIncome) {
-                            HStack(spacing: 12) {
+                            HStack(spacing: 8) {
                                 presetColumn(pct: values.fundPct, amount: values.fundAmt, color: AppColors.bucketFundamentals)
                                 presetColumn(pct: values.funPct, amount: values.funAmt, color: AppColors.bucketFun)
                                 presetColumn(pct: values.futPct, amount: values.futAmt, color: AppColors.bucketFuture)
                             }
                         }
                     }
-                    .padding(.vertical, 18)
+                    .padding(.vertical, 12)
                 }
                 .buttonStyle(.plain)
 
@@ -387,7 +394,7 @@ struct AppOnboardingView: View {
             }
 
             if draftIncome > 0 {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
                     Text("You'll start with")
                         .font(.system(size: 10, weight: .bold))
                         .kerning(2)
@@ -410,7 +417,7 @@ struct AppOnboardingView: View {
                     .frame(height: 8)
                     .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 }
-                .padding(.top, 32)
+                .padding(.top, 18)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -424,12 +431,14 @@ struct AppOnboardingView: View {
                 .monospacedDigit()
             if amount > 0 {
                 Text(amount.formattedCurrency(code: appPreferences.currencyCode))
-                    .font(.system(size: 9))
-                    .foregroundStyle(AppColors.textTertiary)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(AppColors.textSecondary)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         }
-        .frame(width: 60, alignment: .trailing)
+        .frame(width: 68, alignment: .trailing)
     }
 
     // MARK: Step 4 — Privacy

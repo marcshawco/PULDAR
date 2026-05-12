@@ -602,8 +602,6 @@ struct DashboardView: View {
                     .padding(.horizontal)
                 }
             }
-
-            Divider()
         }
     }
 

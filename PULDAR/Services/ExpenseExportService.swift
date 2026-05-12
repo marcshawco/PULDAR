@@ -2,25 +2,50 @@ import Foundation
 
 @MainActor
 enum ExpenseExportService {
+    struct ExpenseRow: Sendable {
+        let date: Date
+        let merchant: String
+        let amount: Double
+        let categoryDisplay: String
+        let bucket: String
+        let isOverspent: Bool
+        let notes: String
+    }
+
     static func writeExpenseCSV(
         expenses: [Expense],
         scope: String,
         categoryDisplayName: (String) -> String
     ) throws -> URL {
+        let rows = expenses.map { expense in
+            ExpenseRow(
+                date: expense.date,
+                merchant: expense.merchant,
+                amount: expense.amount,
+                categoryDisplay: categoryDisplayName(expense.category),
+                bucket: expense.bucket,
+                isOverspent: expense.isOverspent,
+                notes: expense.notes
+            )
+        }
+        return try writeCSV(rows: rows, scope: scope)
+    }
+
+    nonisolated static func writeCSV(rows: [ExpenseRow], scope: String) throws -> URL {
         let formatter = ISO8601DateFormatter()
         var csv = "date,merchant,amount,category,bucket,isOverspent,notes\n"
 
-        for expense in sortedExpenses(expenses) {
-            let row = [
-                csvEscape(formatter.string(from: expense.date)),
-                csvEscape(expense.merchant),
-                csvEscape(String(format: "%.2f", safeAmount(expense.amount))),
-                csvEscape(categoryDisplayName(expense.category)),
-                csvEscape(expense.bucket),
-                csvEscape(expense.isOverspent ? "true" : "false"),
-                csvEscape(expense.notes)
+        for row in sortedRows(rows) {
+            let line = [
+                csvEscape(formatter.string(from: row.date)),
+                csvEscape(row.merchant),
+                csvEscape(String(format: "%.2f", safeAmount(row.amount))),
+                csvEscape(row.categoryDisplay),
+                csvEscape(row.bucket),
+                csvEscape(row.isOverspent ? "true" : "false"),
+                csvEscape(row.notes)
             ].joined(separator: ",")
-            csv += row + "\n"
+            csv += line + "\n"
         }
 
         let url = temporaryURL(prefix: "puldar", scope: scope, fileExtension: "csv")
@@ -28,8 +53,8 @@ enum ExpenseExportService {
         return url
     }
 
-    private static func sortedExpenses(_ expenses: [Expense]) -> [Expense] {
-        expenses.sorted { lhs, rhs in
+    nonisolated private static func sortedRows(_ rows: [ExpenseRow]) -> [ExpenseRow] {
+        rows.sorted { lhs, rhs in
             if lhs.date == rhs.date {
                 return lhs.merchant.localizedCaseInsensitiveCompare(rhs.merchant) == .orderedAscending
             }
@@ -37,16 +62,16 @@ enum ExpenseExportService {
         }
     }
 
-    private static func safeAmount(_ amount: Double) -> Double {
+    nonisolated private static func safeAmount(_ amount: Double) -> Double {
         amount.isFinite ? amount : 0
     }
 
-    private static func csvEscape(_ value: String) -> String {
+    nonisolated private static func csvEscape(_ value: String) -> String {
         let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
         return "\"\(escaped)\""
     }
 
-    private static func temporaryURL(prefix: String, scope: String, fileExtension: String) -> URL {
+    nonisolated private static func temporaryURL(prefix: String, scope: String, fileExtension: String) -> URL {
         let safeScope = scope
             .replacingOccurrences(of: "[^a-zA-Z0-9_]+", with: "_", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: "_"))

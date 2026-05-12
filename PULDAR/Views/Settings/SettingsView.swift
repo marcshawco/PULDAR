@@ -41,7 +41,19 @@ struct SettingsView: View {
     @State private var newRecurringBucket: BudgetBucket = .fun
     @State private var addRecurringError: String?
     @State private var exportURL: URL?
-    @State private var showExportShareSheet = false
+    @State private var activeInfoSheet: InfoSheet?
+
+    private enum InfoSheet: Identifiable {
+        case exportShare(URL)
+        case privacyPolicy
+
+        var id: String {
+            switch self {
+            case .exportShare(let url): return "export:\(url.absoluteString)"
+            case .privacyPolicy: return "privacy"
+            }
+        }
+    }
     @State private var selectedAllocationPreset: AllocationPreset = .custom
     @State private var showZeroFunWarning = false
     @State private var showDeleteAllConfirmation = false
@@ -49,7 +61,6 @@ struct SettingsView: View {
     @State private var showBudgetAllocationInfo = false
     @State private var selectedBudgetInfoBucket: BudgetBucket?
     @State private var showOnboardingReplay = false
-    @State private var showPrivacyPolicy = false
     @AppStorage("appThemeMode") private var appThemeMode = "system"
     @State private var selectedAppIcon: AppIconVariant = .whiteOnBlack
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
@@ -182,16 +193,16 @@ struct SettingsView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showExportShareSheet, onDismiss: {
+            .sheet(item: $activeInfoSheet, onDismiss: {
                 exportURL = nil
-            }) {
-                if let exportURL {
-                    ExportShareSheet(url: exportURL)
+            }) { sheet in
+                switch sheet {
+                case .exportShare(let url):
+                    ExportShareSheet(url: url)
+                case .privacyPolicy:
+                    SafariView(url: Self.privacyPolicyURL)
+                        .ignoresSafeArea()
                 }
-            }
-            .sheet(isPresented: $showPrivacyPolicy) {
-                SafariView(url: Self.privacyPolicyURL)
-                    .ignoresSafeArea()
             }
             .alert("Fun is 0%", isPresented: $showZeroFunWarning) {
                 Button("Keep 0%") {
@@ -684,7 +695,7 @@ struct SettingsView: View {
             LabeledContent("Receipt OCR", value: "English Only")
 
             Button {
-                showPrivacyPolicy = true
+                activeInfoSheet = .privacyPolicy
             } label: {
                 Text("Privacy Policy")
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -806,28 +817,42 @@ struct SettingsView: View {
     }
 
     private func exportCSV(for items: [Expense], scope: String) {
-        do {
-            exportURL = try ExpenseExportService.writeExpenseCSV(
-                expenses: items,
-                scope: scope,
-                categoryDisplayName: categoryManager.displayName(forStoredCategory:)
+        let rows = items.map { expense in
+            ExpenseExportService.ExpenseRow(
+                date: expense.date,
+                merchant: expense.merchant,
+                amount: expense.amount,
+                categoryDisplay: categoryManager.displayName(forStoredCategory: expense.category),
+                bucket: expense.bucket,
+                isOverspent: expense.isOverspent,
+                notes: expense.notes
             )
-            diagnosticLogger.record(
-                category: "export.csv",
-                message: "Exported CSV from settings",
-                metadata: ["scope": scope, "rows": "\(items.count)"]
-            )
-            DispatchQueue.main.async {
-                showExportShareSheet = true
+        }
+        let rowCount = items.count
+
+        Task.detached(priority: .userInitiated) {
+            do {
+                let url = try ExpenseExportService.writeCSV(rows: rows, scope: scope)
+                await MainActor.run {
+                    exportURL = url
+                    diagnosticLogger.record(
+                        category: "export.csv",
+                        message: "Exported CSV from settings",
+                        metadata: ["scope": scope, "rows": "\(rowCount)"]
+                    )
+                    activeInfoSheet = .exportShare(url)
+                }
+            } catch {
+                await MainActor.run {
+                    print("Failed to export CSV in settings: \(error)")
+                    diagnosticLogger.record(
+                        level: .error,
+                        category: "export.csv",
+                        message: "Failed CSV export from settings",
+                        metadata: ["error": error.localizedDescription]
+                    )
+                }
             }
-        } catch {
-            print("Failed to export CSV in settings: \(error)")
-            diagnosticLogger.record(
-                level: .error,
-                category: "export.csv",
-                message: "Failed CSV export from settings",
-                metadata: ["error": error.localizedDescription]
-            )
         }
     }
 

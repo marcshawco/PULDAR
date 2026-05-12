@@ -40,6 +40,7 @@ struct SettingsView: View {
     @State private var newRecurringBucket: BudgetBucket = .fun
     @State private var addRecurringError: String?
     @State private var exportURL: URL?
+    @State private var showExportShareSheet = false
     @State private var selectedAllocationPreset: AllocationPreset = .custom
     @State private var showZeroFunWarning = false
     @State private var showDeleteAllConfirmation = false
@@ -177,6 +178,13 @@ struct SettingsView: View {
                             Button("Add") { addRecurringExpense() }
                         }
                     }
+                }
+            }
+            .sheet(isPresented: $showExportShareSheet, onDismiss: {
+                exportURL = nil
+            }) {
+                if let exportURL {
+                    ExportShareSheet(url: exportURL)
                 }
             }
             .alert("Fun is 0%", isPresented: $showZeroFunWarning) {
@@ -549,11 +557,6 @@ struct SettingsView: View {
             Button("Export All Data (CSV)") {
                 exportCSV(for: expenses, scope: "all_months")
             }
-            if let exportURL {
-                ShareLink(item: exportURL) {
-                    Label("Share Last Export", systemImage: "square.and.arrow.up")
-                }
-            }
         } header: {
             Text("Data Export")
         } footer: {
@@ -799,6 +802,7 @@ struct SettingsView: View {
                 message: "Exported CSV from settings",
                 metadata: ["scope": scope, "rows": "\(items.count)"]
             )
+            showExportShareSheet = true
         } catch {
             print("Failed to export CSV in settings: \(error)")
             diagnosticLogger.record(
@@ -1035,6 +1039,16 @@ struct SettingsView: View {
             }
         }
     }
+}
+
+private struct ExportShareSheet: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - App Icon Variant

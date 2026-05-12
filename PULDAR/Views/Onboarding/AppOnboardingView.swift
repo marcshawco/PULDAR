@@ -98,7 +98,7 @@ struct AppOnboardingView: View {
                 .frame(
                     maxWidth: .infinity,
                     minHeight: shouldCenterStepContent ? proxy.size.height : 0,
-                    alignment: shouldCenterStepContent ? .leading : .topLeading
+                    alignment: shouldCenterStepContent ? .center : .topLeading
                 )
             }
         }
@@ -106,7 +106,7 @@ struct AppOnboardingView: View {
     }
 
     private var shouldCenterStepContent: Bool {
-        step == 2
+        [0, 2, 3].contains(step)
     }
 
     // MARK: Step 0 — Welcome
@@ -341,10 +341,8 @@ struct AppOnboardingView: View {
 
             ForEach(presets) { preset in
                 Button {
-                    if let values = preset.allocValues {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            draftAlloc = values
-                        }
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        draftAlloc = preset.allocationValues(current: draftAlloc)
                     }
                 } label: {
                     HStack(alignment: .center, spacing: 14) {
@@ -400,10 +398,11 @@ struct AppOnboardingView: View {
                         HStack(spacing: 2) {
                             ForEach(BudgetBucket.allCases) { bucket in
                                 let pct = draftAlloc[bucket.rawValue] ?? 0
+                                let totalPct = max(BudgetBucket.allCases.reduce(0) { $0 + (draftAlloc[$1.rawValue] ?? 0) }, 1)
                                 if pct > 0 {
                                     RoundedRectangle(cornerRadius: 3, style: .continuous)
                                         .fill(bucket.color)
-                                        .frame(width: max(geo.size.width * pct - 1, 0))
+                                        .frame(width: max(geo.size.width * pct / totalPct - 1, 0))
                                 }
                             }
                         }
@@ -559,6 +558,7 @@ struct AppOnboardingView: View {
         let id = UUID()
         let name: String
         let allocValues: [String: Double]?
+        let customStartValues: [String: Double]?
 
         struct DisplayValues {
             let fundPct: Int, funPct: Int, futPct: Int
@@ -566,7 +566,7 @@ struct AppOnboardingView: View {
         }
 
         func displayValues(alloc: [String: Double], income: Double) -> DisplayValues? {
-            let vals = allocValues ?? alloc
+            let vals = allocationValues(current: alloc)
             let f = vals["Fundamentals"] ?? 0
             let fu = vals["Fun"] ?? 0
             let ft = vals["Future"] ?? 0
@@ -579,18 +579,25 @@ struct AppOnboardingView: View {
                 futAmt: income * ft
             )
         }
+
+        func allocationValues(current: [String: Double]) -> [String: Double] {
+            allocValues ?? customStartValues ?? current
+        }
     }
 
     private let presets: [OnboardingPreset] = [
-        .init(name: "Classic", allocValues: ["Fundamentals": 0.50, "Fun": 0.30, "Future": 0.20]),
-        .init(name: "Saver", allocValues: ["Fundamentals": 0.50, "Fun": 0.20, "Future": 0.30]),
-        .init(name: "Lean", allocValues: ["Fundamentals": 0.60, "Fun": 0.20, "Future": 0.20]),
-        .init(name: "Custom", allocValues: nil),
+        .init(name: "Classic", allocValues: ["Fundamentals": 0.50, "Fun": 0.30, "Future": 0.20], customStartValues: nil),
+        .init(name: "Saver", allocValues: ["Fundamentals": 0.50, "Fun": 0.20, "Future": 0.30], customStartValues: nil),
+        .init(name: "Lean", allocValues: ["Fundamentals": 0.60, "Fun": 0.20, "Future": 0.20], customStartValues: nil),
+        .init(name: "Custom", allocValues: nil, customStartValues: ["Fundamentals": 0.80, "Fun": 0.20, "Future": 0.20]),
     ]
 
     private func isPresetSelected(_ preset: OnboardingPreset) -> Bool {
         guard let values = preset.allocValues else {
-            return !presets.compactMap(\.allocValues).contains(where: { vals in
+            let customValues = preset.allocationValues(current: draftAlloc)
+            return BudgetBucket.allCases.allSatisfy {
+                abs((draftAlloc[$0.rawValue] ?? 0) - (customValues[$0.rawValue] ?? 0)) < 0.001
+            } || !presets.compactMap(\.allocValues).contains(where: { vals in
                 BudgetBucket.allCases.allSatisfy { abs((draftAlloc[$0.rawValue] ?? 0) - (vals[$0.rawValue] ?? 0)) < 0.001 }
             })
         }

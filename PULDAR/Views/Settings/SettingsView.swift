@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import SafariServices
 
 /// Settings sheet — income, allocation, recurring expenses, and data controls.
 struct SettingsView: View {
@@ -48,6 +49,7 @@ struct SettingsView: View {
     @State private var showBudgetAllocationInfo = false
     @State private var selectedBudgetInfoBucket: BudgetBucket?
     @State private var showOnboardingReplay = false
+    @State private var showPrivacyPolicy = false
     @AppStorage("appThemeMode") private var appThemeMode = "system"
     @State private var selectedAppIcon: AppIconVariant = .whiteOnBlack
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
@@ -186,6 +188,10 @@ struct SettingsView: View {
                 if let exportURL {
                     ExportShareSheet(url: exportURL)
                 }
+            }
+            .sheet(isPresented: $showPrivacyPolicy) {
+                SafariView(url: Self.privacyPolicyURL)
+                    .ignoresSafeArea()
             }
             .alert("Fun is 0%", isPresented: $showZeroFunWarning) {
                 Button("Keep 0%") {
@@ -551,11 +557,18 @@ struct SettingsView: View {
 
     private var dataExportSection: some View {
         Section {
-            Button("Export Current Month (CSV)") {
+            Button {
                 exportCurrentMonthCSV()
+            } label: {
+                Text("Export Current Month (CSV)")
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Button("Export All Data (CSV)") {
+
+            Button {
                 exportCSV(for: expenses, scope: "all_months")
+            } label: {
+                Text("Export All Data (CSV)")
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         } header: {
             Text("Data Export")
@@ -670,7 +683,9 @@ struct SettingsView: View {
             LabeledContent("AI Use", value: "Expense Parsing Only")
             LabeledContent("Receipt OCR", value: "English Only")
 
-            Link(destination: Self.privacyPolicyURL) {
+            Button {
+                showPrivacyPolicy = true
+            } label: {
                 Text("Privacy Policy")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -802,7 +817,9 @@ struct SettingsView: View {
                 message: "Exported CSV from settings",
                 metadata: ["scope": scope, "rows": "\(items.count)"]
             )
-            showExportShareSheet = true
+            DispatchQueue.main.async {
+                showExportShareSheet = true
+            }
         } catch {
             print("Failed to export CSV in settings: \(error)")
             diagnosticLogger.record(
@@ -1049,6 +1066,16 @@ private struct ExportShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+private struct SafariView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        SFSafariViewController(url: url)
+    }
+
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
 
 // MARK: - App Icon Variant

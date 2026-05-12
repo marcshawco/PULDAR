@@ -25,7 +25,6 @@ struct AppOnboardingView: View {
             topBar
             progressHairline
             stepContent
-            Spacer(minLength: 0)
             bottomButton
         }
         .background(AppColors.background.ignoresSafeArea())
@@ -83,20 +82,31 @@ struct AppOnboardingView: View {
 
     @ViewBuilder
     private var stepContent: some View {
-        ScrollView {
-            Group {
-                switch step {
-                case 0: welcomeStep
-                case 1: incomeStep
-                case 2: ruleStep
-                case 3: mixStep
-                case 4: privacyStep
-                default: EmptyView()
+        GeometryReader { proxy in
+            ScrollView {
+                Group {
+                    switch step {
+                    case 0: welcomeStep
+                    case 1: incomeStep
+                    case 2: ruleStep
+                    case 3: mixStep
+                    case 4: privacyStep
+                    default: EmptyView()
+                    }
                 }
+                .padding(.horizontal, 28)
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: shouldCenterStepContent ? proxy.size.height : 0,
+                    alignment: shouldCenterStepContent ? .leading : .topLeading
+                )
             }
-            .padding(.horizontal, 28)
         }
         .scrollDismissesKeyboard(.interactively)
+    }
+
+    private var shouldCenterStepContent: Bool {
+        step == 2
     }
 
     // MARK: Step 0 — Welcome

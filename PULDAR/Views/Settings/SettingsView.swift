@@ -27,8 +27,6 @@ struct SettingsView: View {
     @Query(sort: \RecurringExpense.createdAt, order: .reverse)
     private var recurringExpenses: [RecurringExpense]
 
-    let onReplayOnboarding: () -> Void
-
     @State private var incomeText: String = ""
     @State private var hourlyPayText: String = ""
     @State private var hoursPerWeekText: String = ""
@@ -46,6 +44,7 @@ struct SettingsView: View {
     @State private var showDeleteAllAlert = false
     @State private var showBudgetAllocationInfo = false
     @State private var selectedBudgetInfoBucket: BudgetBucket?
+    @State private var showOnboardingReplay = false
     @AppStorage("appThemeMode") private var appThemeMode = "system"
     @State private var selectedAppIcon: AppIconVariant = .whiteOnBlack
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
@@ -219,6 +218,11 @@ struct SettingsView: View {
                         selectedBudgetInfoBucket = nil
                     }
                 )
+            }
+        }
+        .fullScreenCover(isPresented: $showOnboardingReplay) {
+            AppOnboardingView {
+                showOnboardingReplay = false
             }
         }
     }
@@ -661,9 +665,14 @@ struct SettingsView: View {
             LabeledContent("AI Use", value: "Expense Parsing Only")
             LabeledContent("Receipt OCR", value: "English Only")
 
-            Button("View Onboarding Again") {
-                onReplayOnboarding()
-            }
+            Text("View Onboarding Again")
+                .foregroundStyle(.blue)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    showOnboardingReplay = true
+                }
+                .accessibilityAddTraits(.isButton)
         } header: {
             Text("About")
         } footer: {

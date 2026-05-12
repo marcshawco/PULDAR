@@ -3,6 +3,8 @@ import SwiftData
 
 /// Settings sheet — income, allocation, recurring expenses, and data controls.
 struct SettingsView: View {
+    private static let privacyPolicyURL = URL(string: "https://shawhause.com/puldar-privacy.html")!
+
     private enum IncomeInputMode: String, CaseIterable, Identifiable {
         case monthly
         case hourly
@@ -664,6 +666,12 @@ struct SettingsView: View {
             LabeledContent("Processing", value: "100% On-Device")
             LabeledContent("AI Use", value: "Expense Parsing Only")
             LabeledContent("Receipt OCR", value: "English Only")
+
+            Link(destination: Self.privacyPolicyURL) {
+                Text("Privacy Policy")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .foregroundStyle(.blue)
 
             Text("View Onboarding Again")
                 .foregroundStyle(.blue)

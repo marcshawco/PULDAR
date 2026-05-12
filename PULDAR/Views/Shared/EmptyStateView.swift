@@ -3,7 +3,7 @@ import SwiftUI
 /// Empty state shown when no expenses are logged.
 struct EmptyStateView: View {
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(alignment: .center, spacing: 6) {
             Text("No expenses yet")
                 .font(.headline.weight(.medium))
                 .foregroundStyle(AppColors.textSecondary)
@@ -16,11 +16,11 @@ struct EmptyStateView: View {
                 .font(.subheadline)
                 .italic()
                 .foregroundStyle(AppColors.accent.opacity(0.7))
-                .multilineTextAlignment(.center)
         }
-        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity, minHeight: 150, alignment: .center)
         .padding(.horizontal, 20)
-        .padding(.vertical, 28)
+        .padding(.vertical, 12)
     }
 }
 

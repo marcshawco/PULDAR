@@ -285,6 +285,7 @@ struct DashboardView: View {
                             }
                         },
                         items: expenses.filter { $0.budgetBucket == status.bucket },
+                        recurringItems: effectiveRecurringExpenses.filter { $0.budgetBucket == status.bucket },
                         onEditExpense: { setEditingExp($0) }
                     )
                     Divider()

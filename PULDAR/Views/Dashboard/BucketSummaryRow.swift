@@ -6,6 +6,7 @@ struct BucketSummaryRow: View {
     var isSelected: Bool = false
     var onTap: (() -> Void)? = nil
     var items: [Expense] = []
+    var recurringItems: [RecurringExpense] = []
     var onEditExpense: ((Expense) -> Void)? = nil
     @State private var animatedProgress: Double = 0
 
@@ -25,7 +26,7 @@ struct BucketSummaryRow: View {
                                 .textCase(.uppercase)
                                 .foregroundStyle(textColor)
 
-                            Text("· \(items.count)")
+                            Text("· \(entryCount)")
                                 .font(.system(size: 10))
                                 .foregroundStyle(AppColors.textTertiary)
                                 .monospacedDigit()
@@ -91,7 +92,7 @@ struct BucketSummaryRow: View {
             if isSelected {
                 Divider()
 
-                if items.isEmpty {
+                if entryCount == 0 {
                     Text("No entries yet")
                         .font(.system(size: 12))
                         .foregroundStyle(AppColors.textTertiary)
@@ -133,6 +134,38 @@ struct BucketSummaryRow: View {
                             .buttonStyle(.plain)
                         }
 
+                        ForEach(Array(recurringItems.enumerated()), id: \.element.persistentModelID) { index, recurring in
+                            if !items.isEmpty || index > 0 {
+                                Divider().padding(.leading, 34)
+                            }
+                            HStack(spacing: 10) {
+                                Circle()
+                                    .fill(recurring.budgetBucket.color)
+                                    .frame(width: 5, height: 5)
+
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(recurring.name)
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(AppColors.textPrimary)
+                                        .lineLimit(1)
+
+                                    Text("Recurring monthly · \(recurring.budgetBucket.rawValue)")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(AppColors.textTertiary)
+                                }
+
+                                Spacer()
+
+                                Text(recurring.safeAmount.formattedCurrency(code: appPreferences.currencyCode))
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(AppColors.textPrimary)
+                                    .monospacedDigit()
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.leading, 14)
+                            .padding(.vertical, 10)
+                        }
+
                         // Subtotal
                         Divider()
                         HStack {
@@ -144,7 +177,7 @@ struct BucketSummaryRow: View {
 
                             Spacer()
 
-                            Text(items.reduce(0) { $0 + $1.amount }.formattedCurrency(code: appPreferences.currencyCode))
+                            Text(entrySubtotal.formattedCurrency(code: appPreferences.currencyCode))
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(AppColors.textPrimary)
                                 .monospacedDigit()
@@ -175,6 +208,14 @@ struct BucketSummaryRow: View {
 
     private var textColor: Color {
         status.isOverspent ? AppColors.overspend : AppColors.textSecondary
+    }
+
+    private var entryCount: Int {
+        items.count + recurringItems.count
+    }
+
+    private var entrySubtotal: Double {
+        items.reduce(0) { $0 + $1.amount } + recurringItems.reduce(0) { $0 + $1.safeAmount }
     }
 
     private var safeSpent: Double {

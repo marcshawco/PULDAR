@@ -210,7 +210,11 @@ final class BudgetEngine {
         recurringExpenses: [RecurringExpense] = [],
         for month: Date = .now
     ) -> [BucketStatus] {
-        let cacheKey = makeStatusCacheKey(month: month)
+        let cacheKey = makeStatusCacheKey(
+            month: month,
+            expenses: expenses,
+            recurringExpenses: recurringExpenses
+        )
         if let cached = monthlyStatusCache[cacheKey] {
             return cached
         }
@@ -410,7 +414,11 @@ final class BudgetEngine {
     private static let bucketPercentageKey = "bucketPercentages"
     private let maxMonthlyCacheEntries = 36
 
-    private func makeStatusCacheKey(month: Date) -> String {
+    private func makeStatusCacheKey(
+        month: Date,
+        expenses: [Expense],
+        recurringExpenses: [RecurringExpense]
+    ) -> String {
         let calendar = Calendar.current
         let monthKey = calendar.dateComponents([.year, .month], from: month)
         let monthStamp = "\(monthKey.year ?? 0)-\(monthKey.month ?? 0)"
@@ -418,13 +426,40 @@ final class BudgetEngine {
             "\(bucket.rawValue):\(percentage(for: bucket))"
         }
         .joined(separator: "|")
+        let expenseStamp = filterToMonth(expenses, month: month)
+            .map { expense in
+                [
+                    expense.id.uuidString,
+                    String(format: "%.2f", expense.amount),
+                    expense.bucket,
+                    expense.category,
+                    "\(expense.date.timeIntervalSinceReferenceDate)",
+                    "\(expense.updatedAt?.timeIntervalSinceReferenceDate ?? 0)"
+                ].joined(separator: ":")
+            }
+            .sorted()
+            .joined(separator: "|")
+        let recurringStamp = recurringExpenses
+            .map { recurring in
+                [
+                    recurring.id.uuidString,
+                    String(format: "%.2f", recurring.safeAmount),
+                    recurring.bucket,
+                    recurring.isActive ? "active" : "inactive",
+                    "\(recurring.updatedAt?.timeIntervalSinceReferenceDate ?? 0)"
+                ].joined(separator: ":")
+            }
+            .sorted()
+            .joined(separator: "|")
 
         return [
             monthStamp,
             "dataRevision:\(dataRevision)",
             "income:\(monthlyIncome)",
             "rollover:\(rolloverEnabled)",
-            percentagesStamp
+            percentagesStamp,
+            "expenses:\(expenseStamp)",
+            "recurring:\(recurringStamp)"
         ].joined(separator: "||")
     }
 

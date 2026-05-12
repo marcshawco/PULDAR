@@ -113,7 +113,7 @@ struct ExpenseInputView: View {
     private var buttonColor: Color {
         if isLocked { return AppColors.textTertiary.opacity(0.5) }
         if showCheckmark { return AppColors.success }
-        return AppColors.accent
+        return Color.blue
     }
 
     private func handleLockedInteraction() {

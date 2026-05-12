@@ -302,7 +302,8 @@ struct DashboardView: View {
 
             if budgetEngine.monthlyIncome == 0 {
                 incomePrompt
-                    .padding(.top, 16)
+                    .padding(.top, 20)
+                    .padding(.bottom, 12)
             }
 
             Spacer(minLength: 140)

@@ -3,26 +3,6 @@
     {
       "filename" : "icon_1024_light.png",
       "idiom" : "universal"
-    },
-    {
-      "appearances" : [
-        {
-          "appearance" : "luminosity",
-          "value" : "dark"
-        }
-      ],
-      "filename" : "icon_1024_dark.png",
-      "idiom" : "universal"
-    },
-    {
-      "appearances" : [
-        {
-          "appearance" : "luminosity",
-          "value" : "tinted"
-        }
-      ],
-      "filename" : "icon_1024_tinted.png",
-      "idiom" : "universal"
     }
   ],
   "info" : {

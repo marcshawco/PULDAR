@@ -356,11 +356,15 @@ struct AppOnboardingView: View {
                             .font(.system(size: 15, weight: .medium))
                             .tracking(-0.1)
                             .foregroundStyle(AppColors.textPrimary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .frame(minWidth: 72, alignment: .leading)
+                            .layoutPriority(1)
 
                         Spacer()
 
                         if let values = preset.displayValues(alloc: draftAlloc, income: draftIncome) {
-                            HStack(spacing: 14) {
+                            HStack(spacing: 12) {
                                 presetColumn(pct: values.fundPct, amount: values.fundAmt, color: AppColors.bucketFundamentals)
                                 presetColumn(pct: values.funPct, amount: values.funAmt, color: AppColors.bucketFun)
                                 presetColumn(pct: values.futPct, amount: values.futAmt, color: AppColors.bucketFuture)

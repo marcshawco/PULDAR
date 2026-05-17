@@ -334,7 +334,8 @@ struct HistoryView: View {
             }
             .font(.caption)
         }
-        .padding(.vertical, 2)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
                 deleteExpense(expense)

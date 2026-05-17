@@ -371,7 +371,7 @@ struct SettingsView: View {
 
                     HStack(spacing: 8) {
                         Button {
-                            adjustPercentage(for: bucket, by: -0.05)
+                            adjustPercentage(for: bucket, by: -0.01)
                         } label: {
                             Image(systemName: "minus")
                                 .font(.system(size: 12, weight: .semibold))
@@ -380,7 +380,7 @@ struct SettingsView: View {
                                 .foregroundStyle(AppColors.textSecondary)
                         }
                         .buttonStyle(.plain)
-                        .disabled(draftPercentage(for: bucket) < 0.05)
+                        .disabled(draftPercentage(for: bucket) < 0.01)
 
                         Text("\(Int(draftPercentage(for: bucket) * 100))%")
                             .font(.system(size: 15, weight: .semibold))
@@ -388,7 +388,7 @@ struct SettingsView: View {
                             .frame(minWidth: 36)
 
                         Button {
-                            adjustPercentage(for: bucket, by: 0.05)
+                            adjustPercentage(for: bucket, by: 0.01)
                         } label: {
                             Image(systemName: "plus")
                                 .font(.system(size: 12, weight: .semibold))
@@ -875,8 +875,8 @@ struct SettingsView: View {
 
     private func adjustPercentage(for bucket: BudgetBucket, by delta: Double) {
         let current = draftPercentage(for: bucket)
-        let newValue = min(max(current + delta, 0), 1)
-        draftPercentages[bucket.rawValue] = newValue
+        let snapped = (round((current + delta) * 100) / 100)
+        draftPercentages[bucket.rawValue] = min(max(snapped, 0), 1)
     }
 
     private func applySelectedPresetIfNeeded() {

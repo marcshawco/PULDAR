@@ -26,7 +26,9 @@ struct ModelDownloadOnboardingView: View {
             GeometryReader { proxy in
                 let compact = proxy.size.height < 760 || proxy.size.width < 390
 
-                ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+
                     VStack(alignment: .center, spacing: compact ? 16 : 20) {
                         Text("Downloading Local AI")
                             .font(compact ? .title2.bold() : .largeTitle.bold())
@@ -53,9 +55,11 @@ struct ModelDownloadOnboardingView: View {
 
                         modelStatus
                             .frame(maxWidth: .infinity, alignment: .center)
+                    }
 
-                        Spacer(minLength: compact ? 12 : 20)
+                    Spacer(minLength: 0)
 
+                    VStack(spacing: compact ? 10 : 14) {
                         Button(action: startDownloadTapped) {
                             Text(primaryButtonTitle)
                                 .font(.headline)
@@ -72,12 +76,13 @@ struct ModelDownloadOnboardingView: View {
                         Text("If you continue on cellular data, charges may apply.")
                             .font(.caption)
                             .foregroundStyle(AppColors.textTertiary)
+                            .multilineTextAlignment(.center)
                             .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    .padding(.horizontal, compact ? 16 : 20)
-                    .padding(.vertical, compact ? 24 : 32)
-                    .frame(minHeight: proxy.size.height, alignment: .center)
                 }
+                .padding(.horizontal, compact ? 16 : 20)
+                .padding(.vertical, compact ? 24 : 32)
+                .frame(width: proxy.size.width, height: proxy.size.height)
             }
             .interactiveDismissDisabled(true)
             .confirmationDialog(
@@ -155,7 +160,7 @@ struct ModelDownloadOnboardingView: View {
     }
 
     private var buttonColor: Color {
-        primaryButtonDisabled ? Color.gray.opacity(0.6) : AppColors.accent
+        primaryButtonDisabled ? AppColors.textPrimary.opacity(0.45) : AppColors.textPrimary
     }
 
     private var buttonTextColor: Color {

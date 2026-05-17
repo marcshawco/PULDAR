@@ -268,13 +268,6 @@ struct HistoryView: View {
             }
             .background(AppColors.background)
             .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(
-                TapGesture().onEnded {
-                    if focusedField != nil {
-                        focusedField = nil
-                    }
-                }
-            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -512,13 +505,6 @@ struct HistoryView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(
-                TapGesture().onEnded {
-                    if focusedField != nil {
-                        focusedField = nil
-                    }
-                }
-            )
             .navigationTitle("Filters & Sort")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

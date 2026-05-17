@@ -180,21 +180,21 @@ struct ExpenseListView: View {
             ZStack(alignment: .trailing) {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color.red.opacity(0.9))
-                    .overlay(alignment: .trailing) {
-                        Button(role: .destructive) {
-                            onDelete()
-                            withAnimation(.easeOut(duration: 0.18)) {
-                                offsetX = 0
-                                isDeleteRevealed = false
-                            }
-                        } label: {
-                            Image(systemName: "trash.fill")
-                                .font(.system(size: 16, weight: .semibold))
-                                .frame(width: revealWidth, height: 56)
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.white)
+
+                Button {
+                    onDelete()
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        offsetX = 0
+                        isDeleteRevealed = false
                     }
+                } label: {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: revealWidth, height: 56)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
 
                 content
                     .offset(x: offsetX)

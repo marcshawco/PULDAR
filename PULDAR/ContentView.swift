@@ -24,7 +24,6 @@ struct ContentView: View {
     @State private var budgetEngine = BudgetEngine()
     @State private var categoryManager = CategoryManager()
     @State private var networkMonitor = NetworkMonitor()
-    @State private var usageTracker = UsageTracker()
     @State private var diagnosticLogger = DiagnosticLogger.shared
     @State private var appPreferences = AppPreferences()
     @State private var selectedTab: RootTab = .home
@@ -67,7 +66,6 @@ struct ContentView: View {
                 .environment(appPreferences)
                 .environment(budgetEngine)
                 .environment(categoryManager)
-                .environment(usageTracker)
                 .environment(diagnosticLogger)
                 .tabItem {
                     Label("Home", systemImage: "house")
@@ -88,7 +86,6 @@ struct ContentView: View {
                 .environment(appPreferences)
                 .environment(budgetEngine)
                 .environment(categoryManager)
-                .environment(usageTracker)
                 .environment(diagnosticLogger)
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")
@@ -99,7 +96,6 @@ struct ContentView: View {
         .environment(budgetEngine)
         .environment(categoryManager)
         .environment(networkMonitor)
-        .environment(usageTracker)
         .environment(diagnosticLogger)
         .environment(appPreferences)
         .overlay {
@@ -115,6 +111,7 @@ struct ContentView: View {
                 category: "app.lifecycle",
                 message: "App launched"
             )
+            await prewarmLLMIfReady()
         }
         .fullScreenCover(
             isPresented: Binding(
@@ -138,6 +135,18 @@ struct ContentView: View {
         .onOpenURL { url in
             handleIncomingURL(url)
         }
+    }
+
+    /// Begin loading the local model in the background once the user has already
+    /// completed model onboarding, so the first parse doesn't pay the cold-load cost.
+    private func prewarmLLMIfReady() async {
+        guard didCompleteAppOnboarding else { return }
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: "didCompleteModelOnboarding")
+                || defaults.bool(forKey: "didDownloadLocalModel") else {
+            return
+        }
+        await llmService.loadModel()
     }
 
     private var preferredColorScheme: ColorScheme? {

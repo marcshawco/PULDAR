@@ -59,7 +59,7 @@ PULDAR is built around three jobs:
   - direct monthly income
   - hourly pay + hours/week estimate
 - enforced `100%` allocation before saving
-- rollover budgeting for Pro users
+- rollover budgeting
 - overspend and remaining-state visibility
 
 ### Daily Utility
@@ -205,7 +205,6 @@ without collecting user data by default.
 - `BudgetEngine` — financial math, allocation, rollover, cached month state
 - `CategoryManager` — canonical/custom category mapping
 - `FinanceKitManager` — Apple Wallet import gating, import preview, deduplication scaffolding, fallback messaging
-- `UsageTracker` — usage tracking
 - `DiagnosticLogger` — optional local support logging
 - `WidgetBudgetSnapshotStore` — widget snapshot publishing
 

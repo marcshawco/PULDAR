@@ -31,7 +31,6 @@ enum AppColors {
 // MARK: - App-wide Constants
 
 enum AppConstants {
-    static let freeInputsPerMonth = 10
     static let modelID = "mlx-community/Qwen2.5-0.5B-Instruct-4bit"
     static let gpuCacheLimitBytes = 128 * 1024 * 1024 // 128 MB
 }

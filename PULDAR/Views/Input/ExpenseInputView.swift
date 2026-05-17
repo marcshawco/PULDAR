@@ -2,16 +2,13 @@ import SwiftUI
 
 struct ExpenseInputView: View {
     let isProcessing: Bool
-    let isLocked: Bool
     let onSubmit: (String) async -> Bool
     var focusTrigger: Int = 0
-    var onLockedTap: (() -> Void)? = nil
     var onCameraTap: (() -> Void)? = nil
     var onFocusChange: ((Bool) -> Void)? = nil
 
     @State private var inputText = ""
     @State private var showCheckmark = false
-    @State private var shakeOffset: CGFloat = 0
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -26,24 +23,19 @@ struct ExpenseInputView: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled(true)
             .focused($isFocused)
-            .disabled(isLocked)
             .submitLabel(.done)
-            .onSubmit { if !isLocked { handleSubmit() } }
+            .onSubmit { handleSubmit() }
             .onChange(of: isFocused) {
                 onFocusChange?(isFocused)
             }
 
             Button {
-                if isLocked {
-                    handleLockedInteraction()
-                    return
-                }
                 isFocused = false
                 onCameraTap?()
             } label: {
                 Image(systemName: "camera")
                     .font(.system(size: 18, weight: .light))
-                    .foregroundStyle(isLocked ? AppColors.textTertiary : AppColors.textTertiary)
+                    .foregroundStyle(AppColors.textTertiary)
                     .padding(4)
             }
             .buttonStyle(.plain)
@@ -72,13 +64,7 @@ struct ExpenseInputView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
         .background(AppColors.secondaryBg)
-        .offset(x: shakeOffset)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if isLocked { handleLockedInteraction() }
-        }
         .onChange(of: focusTrigger) {
-            guard !isLocked else { return }
             isFocused = true
         }
     }
@@ -86,11 +72,6 @@ struct ExpenseInputView: View {
     private func handleSubmit() {
         let rawInput = inputText.trimmingCharacters(in: .whitespaces)
         guard !rawInput.isEmpty else { return }
-
-        if isLocked {
-            handleLockedInteraction()
-            return
-        }
 
         inputText = ""
         Task {
@@ -111,22 +92,7 @@ struct ExpenseInputView: View {
     }
 
     private var buttonColor: Color {
-        if isLocked { return AppColors.textTertiary.opacity(0.5) }
         if showCheckmark { return AppColors.success }
         return Color.blue
-    }
-
-    private func handleLockedInteraction() {
-        Task { @MainActor in
-            let steps: [CGFloat] = [8, -8, 6, -6, 0]
-            for value in steps {
-                withAnimation(.easeInOut(duration: 0.045)) {
-                    shakeOffset = value
-                }
-                try? await Task.sleep(for: .milliseconds(45))
-            }
-        }
-        HapticManager.warning()
-        onLockedTap?()
     }
 }

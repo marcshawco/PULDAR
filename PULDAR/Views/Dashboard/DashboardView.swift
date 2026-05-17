@@ -2,6 +2,35 @@ import SwiftUI
 import SwiftData
 import VisionKit
 
+/// Isolated input dock subview so keystrokes in the composer don't invalidate
+/// the entire `DashboardView` body.
+private struct DashboardInputDock: View {
+    let isProcessing: Bool
+    let focusTrigger: Int
+    let onSubmit: (String) async -> Bool
+    let onCameraTap: () -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ExpenseInputView(
+                isProcessing: isProcessing,
+                onSubmit: onSubmit,
+                focusTrigger: focusTrigger,
+                onCameraTap: onCameraTap
+            )
+        }
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+        .background(
+            AppColors.secondaryBg
+                .overlay(alignment: .top) {
+                    AppColors.border.frame(height: 1)
+                }
+                .ignoresSafeArea()
+        )
+    }
+}
+
 /// The main screen — orchestrates the entire expense-tracking flow.
 ///
 /// Layout (top-to-bottom, Notion-style):
@@ -28,7 +57,6 @@ struct DashboardView: View {
     @Environment(BudgetEngine.self) private var budgetEngine
     @Environment(CategoryManager.self) private var categoryManager
     @Environment(NetworkMonitor.self) private var networkMonitor
-    @Environment(UsageTracker.self) private var usageTracker
     @Environment(DiagnosticLogger.self) private var diagnosticLogger
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -200,9 +228,6 @@ struct DashboardView: View {
             }
             .task {
                 await scheduleStartupMaintenance()
-            }
-            .onChange(of: expenses.count) {
-                usageTracker.reconcile(with: expenses)
             }
             .onAppear {
                 consumeLaunchActionIfNeeded()
@@ -668,7 +693,6 @@ struct DashboardView: View {
                 ]
             )
 
-            usageTracker.recordInput()
             recurringSuggestion = recurringSuggestionCandidate(for: expense)
 
             if crossedIntoOverspent {
@@ -814,34 +838,21 @@ struct DashboardView: View {
     }
 
     private var inputDock: some View {
-        VStack(spacing: 8) {
-            ExpenseInputView(
-                isProcessing: isProcessing,
-                isLocked: false,
-                onSubmit: { text in
-                    await submitExpense(text)
-                },
-                focusTrigger: composerFocusTrigger,
-                onCameraTap: {
-                    if !VNDocumentCameraViewController.isSupported {
-                        presentTransientError(
-                            ReceiptScannerError.unavailable.localizedDescription
-                        )
-                        return
-                    }
-                    showReceiptScanner = true
+        DashboardInputDock(
+            isProcessing: isProcessing,
+            focusTrigger: composerFocusTrigger,
+            onSubmit: { text in
+                await submitExpense(text)
+            },
+            onCameraTap: {
+                if !VNDocumentCameraViewController.isSupported {
+                    presentTransientError(
+                        ReceiptScannerError.unavailable.localizedDescription
+                    )
+                    return
                 }
-            )
-
-        }
-        .padding(.top, 10)
-        .padding(.bottom, 8)
-        .background(
-            AppColors.secondaryBg
-                .overlay(alignment: .top) {
-                    AppColors.border.frame(height: 1)
-                }
-                .ignoresSafeArea()
+                showReceiptScanner = true
+            }
         )
     }
 
@@ -1094,45 +1105,29 @@ struct DashboardView: View {
         }
     }
 
-    private func runStartupMaintenanceIfNeeded() {
+    private func scheduleStartupMaintenance() async {
         guard !didRunStartupMaintenance else { return }
         didRunStartupMaintenance = true
 
-        usageTracker.reconcile(with: expenses)
-        migrateCategoryConsistencyIfNeeded()
-        migrateMerchantCapitalizationIfNeeded()
-    }
-
-    private func scheduleStartupMaintenance() async {
-        guard !didRunStartupMaintenance else { return }
         // Let first paint and first interactions (keyboard tap) win.
         try? await Task.sleep(for: .milliseconds(900))
-        await MainActor.run {
-            runStartupMaintenanceIfNeeded()
+
+        await runMigrationsInChunks()
+    }
+
+    private func runMigrationsInChunks() async {
+        if !didRunCategoryConsistencyFixV2 {
+            await migrateCategoryConsistencyChunked()
+        }
+        if !didNormalizeMerchantsV1 {
+            await migrateMerchantCapitalizationChunked()
         }
     }
 
-    private func refreshDashboard() async {
-        await MainActor.run {
-            budgetEngine.markDataChanged()
-            usageTracker.reconcile(with: expenses)
-
-            if !didRunCategoryConsistencyFixV2 {
-                migrateCategoryConsistencyIfNeeded()
-            }
-            if !didNormalizeMerchantsV1 {
-                migrateMerchantCapitalizationIfNeeded()
-            }
-
-            HapticManager.light()
-        }
-    }
-
-    private func migrateCategoryConsistencyIfNeeded() {
-        guard !didRunCategoryConsistencyFixV2 else { return }
-        guard !expenses.isEmpty else { return }
-
+    private func migrateCategoryConsistencyChunked() async {
+        let chunkSize = 50
         var didMutate = false
+        var processed = 0
 
         for expense in expenses {
             let context = "\(expense.category) \(expense.merchant) \(expense.notes)"
@@ -1143,11 +1138,15 @@ struct DashboardView: View {
                 expense.touchUpdatedAt()
                 didMutate = true
             }
-
             if expense.bucket != resolved.bucket.rawValue {
                 expense.bucket = resolved.bucket.rawValue
                 expense.touchUpdatedAt()
                 didMutate = true
+            }
+
+            processed += 1
+            if processed % chunkSize == 0 {
+                await Task.yield()
             }
         }
 
@@ -1156,7 +1155,6 @@ struct DashboardView: View {
                 try modelContext.save()
                 budgetEngine.markDataChanged()
             } catch {
-                print("Failed category consistency migration: \(error)")
                 diagnosticLogger.record(
                     level: .error,
                     category: "maintenance.category",
@@ -1169,17 +1167,22 @@ struct DashboardView: View {
         didRunCategoryConsistencyFixV2 = true
     }
 
-    private func migrateMerchantCapitalizationIfNeeded() {
-        guard !didNormalizeMerchantsV1 else { return }
-        guard !expenses.isEmpty else { return }
-
+    private func migrateMerchantCapitalizationChunked() async {
+        let chunkSize = 50
         var didMutate = false
+        var processed = 0
+
         for expense in expenses {
             let normalized = expense.merchant.normalizedMerchantName()
             if normalized != expense.merchant {
                 expense.merchant = normalized
                 expense.touchUpdatedAt()
                 didMutate = true
+            }
+
+            processed += 1
+            if processed % chunkSize == 0 {
+                await Task.yield()
             }
         }
 
@@ -1188,7 +1191,6 @@ struct DashboardView: View {
                 try modelContext.save()
                 budgetEngine.markDataChanged()
             } catch {
-                print("Failed merchant capitalization migration: \(error)")
                 diagnosticLogger.record(
                     level: .error,
                     category: "maintenance.merchant",
@@ -1199,6 +1201,12 @@ struct DashboardView: View {
         }
 
         didNormalizeMerchantsV1 = true
+    }
+
+    private func refreshDashboard() async {
+        budgetEngine.markDataChanged()
+        await runMigrationsInChunks()
+        HapticManager.light()
     }
 
     private func consumeLaunchActionIfNeeded() {

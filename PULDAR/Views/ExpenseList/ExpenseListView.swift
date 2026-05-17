@@ -178,8 +178,9 @@ struct ExpenseListView: View {
 
         var body: some View {
             ZStack(alignment: .trailing) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.red.opacity(0.9))
+                Color.red.opacity(0.9)
+                    .frame(width: revealWidth)
+                    .frame(maxHeight: .infinity)
 
                 Button {
                     onDelete()

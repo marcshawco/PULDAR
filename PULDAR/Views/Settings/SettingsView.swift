@@ -47,7 +47,7 @@ struct SettingsView: View {
     @State private var selectedBudgetInfoBucket: BudgetBucket?
     @State private var showOnboardingReplay = false
     @AppStorage("appThemeMode") private var appThemeMode = "system"
-    @State private var selectedAppIcon: AppIconVariant = .whiteOnBlack
+    @State private var selectedAppIcon: AppIconVariant = .colorOnWhite
     @State private var shareSheetURL: SharedFile?
     @Environment(\.openURL) private var openURL
     @AppStorage("incomeInputMode") private var incomeInputModeRaw = IncomeInputMode.monthly.rawValue
@@ -1067,7 +1067,6 @@ private struct ShareSheet: UIViewControllerRepresentable {
 // MARK: - App Icon Variant
 
 enum AppIconVariant: String, CaseIterable, Identifiable {
-    case whiteOnBlack
     case colorOnWhite
     case colorOnBlack
     case blackOnWhite
@@ -1075,10 +1074,11 @@ enum AppIconVariant: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Returns `nil` for the ship icon (`colorOnWhite`), since the main
+    /// AppIcon.appiconset already carries the color-on-white artwork.
     var iconName: String? {
         switch self {
-        case .whiteOnBlack: return nil
-        case .colorOnWhite: return "AppIconColorOnWhite"
+        case .colorOnWhite: return nil
         case .colorOnBlack: return "AppIconColorOnBlack"
         case .blackOnWhite: return "AppIconBlackOnWhite"
         case .tinted: return "AppIconTinted"
@@ -1087,7 +1087,6 @@ enum AppIconVariant: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .whiteOnBlack: return "Default"
         case .colorOnWhite: return "Color"
         case .colorOnBlack: return "Color Dark"
         case .blackOnWhite: return "Classic"
@@ -1097,7 +1096,6 @@ enum AppIconVariant: String, CaseIterable, Identifiable {
 
     var previewAssetName: String {
         switch self {
-        case .whiteOnBlack: return "AppIconPreview"
         case .colorOnWhite: return "AppIconColorOnWhitePreview"
         case .colorOnBlack: return "AppIconColorOnBlackPreview"
         case .blackOnWhite: return "AppIconBlackOnWhitePreview"
@@ -1107,8 +1105,8 @@ enum AppIconVariant: String, CaseIterable, Identifiable {
 
     static var current: AppIconVariant {
         guard let name = UIApplication.shared.alternateIconName else {
-            return .whiteOnBlack
+            return .colorOnWhite
         }
-        return allCases.first { $0.iconName == name } ?? .whiteOnBlack
+        return allCases.first { $0.iconName == name } ?? .colorOnWhite
     }
 }

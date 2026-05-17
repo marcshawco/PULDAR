@@ -2,6 +2,25 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
+// MARK: - Brand
+
+private enum WidgetBrand {
+    static let fundamentals = Color(red: 0.227, green: 0.361, blue: 0.678) // #3A5CAD
+    static let fun          = Color(red: 0.165, green: 0.502, blue: 0.337) // #2A8056
+    static let future       = Color(red: 0.788, green: 0.412, blue: 0.141) // #C96924
+
+    static func color(for bucketID: String) -> Color {
+        switch bucketID.lowercased() {
+        case "fundamentals": return fundamentals
+        case "fun":          return fun
+        case "future":       return future
+        default:             return .primary
+        }
+    }
+}
+
+// MARK: - Snapshot model & reader
+
 private struct WidgetBudgetSnapshot: Codable {
     struct Bucket: Codable, Identifiable {
         let id: String
@@ -38,6 +57,8 @@ private enum WidgetBudgetSnapshotReader {
     }
 }
 
+// MARK: - Budget widget configuration
+
 private enum BudgetWidgetMode: String, AppEnum {
     case remaining
     case spending
@@ -45,7 +66,7 @@ private enum BudgetWidgetMode: String, AppEnum {
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Budget Widget Mode")
     static let caseDisplayRepresentations: [BudgetWidgetMode: DisplayRepresentation] = [
         .remaining: DisplayRepresentation(title: "Remaining"),
-        .spending: DisplayRepresentation(title: "Spending")
+        .spending:  DisplayRepresentation(title: "Spending")
     ]
 }
 
@@ -62,6 +83,8 @@ private struct BudgetWidgetConfigurationIntent: WidgetConfigurationIntent {
         mode = .remaining
     }
 }
+
+// MARK: - Budget timeline
 
 private struct PULDARBudgetEntry: TimelineEntry {
     let date: Date
@@ -81,9 +104,9 @@ private struct PULDARBudgetProvider: AppIntentTimelineProvider {
                 totalBudget: 5000,
                 totalSpent: 1820,
                 buckets: [
-                    .init(id: "fundamentals", name: "Fundamentals", subtitle: "Needs", remaining: 624, budgeted: 3000, spent: 2376, isOverspent: false),
-                    .init(id: "fun", name: "Fun", subtitle: "Wants", remaining: 706, budgeted: 1000, spent: 294, isOverspent: false),
-                    .init(id: "future", name: "Future", subtitle: "Savings & Debt", remaining: 350, budgeted: 1000, spent: 650, isOverspent: false),
+                    .init(id: "fundamentals", name: "Fundamentals", subtitle: "Needs",          remaining: 624, budgeted: 3000, spent: 2376, isOverspent: false),
+                    .init(id: "fun",          name: "Fun",          subtitle: "Wants",          remaining: 706, budgeted: 1000, spent: 294,  isOverspent: false),
+                    .init(id: "future",       name: "Future",       subtitle: "Savings & Debt", remaining: 350, budgeted: 1000, spent: 650,  isOverspent: false),
                 ]
             )
         )
@@ -105,6 +128,8 @@ private struct PULDARBudgetProvider: AppIntentTimelineProvider {
     }
 }
 
+// MARK: - Budget widget view
+
 private struct PULDARBudgetWidgetEntryView: View {
     @Environment(\.widgetFamily) private var family
     let entry: PULDARBudgetEntry
@@ -117,10 +142,8 @@ private struct PULDARBudgetWidgetEntryView: View {
         Group {
             if let snapshot = entry.snapshot {
                 switch family {
-                case .systemSmall:
-                    smallWidget(snapshot: snapshot)
-                default:
-                    mediumWidget(snapshot: snapshot)
+                case .systemSmall: smallBudget(snapshot)
+                default:           mediumBudget(snapshot)
                 }
             } else {
                 emptyState
@@ -129,112 +152,165 @@ private struct PULDARBudgetWidgetEntryView: View {
         .containerBackground(.fill.tertiary, for: .widget)
     }
 
-    private func smallWidget(snapshot: WidgetBudgetSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("PULDAR")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+    // MARK: Small
+
+    private func smallBudget(_ snapshot: WidgetBudgetSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            KickerLabel(text: "PULDAR")
+
+            Spacer(minLength: 6)
 
             Text(primaryTotal(for: snapshot), format: .currency(code: snapshot.currencyCode))
-                .font(.title3.weight(.bold))
-                .minimumScaleFactor(0.75)
+                .font(.system(size: 22, weight: .bold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
 
-            Text(selectedMode == .remaining ? "Remaining this month" : "Spent this month")
-                .font(.caption2)
+            Text(selectedMode == .remaining ? "left this month" : "spent this month")
+                .font(.system(size: 10))
                 .foregroundStyle(.secondary)
 
-            VStack(spacing: 6) {
+            Spacer(minLength: 10)
+
+            stackedBucketBars(snapshot.buckets)
+
+            Spacer(minLength: 6)
+
+            HStack(spacing: 6) {
                 ForEach(snapshot.buckets.prefix(3)) { bucket in
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(color(for: bucket.id))
-                            .frame(width: 7, height: 7)
-                        Text(bucket.name)
-                            .font(.caption2.weight(.medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                        Spacer(minLength: 4)
-                        Text(displayAmount(for: bucket, currencyCode: snapshot.currencyCode))
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(bucket.isOverspent && selectedMode == .remaining ? .red : .primary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
+                    bucketChip(bucket)
                 }
             }
         }
         .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .widgetURL(URL(string: "puldar://quick-add"))
     }
 
-    private func mediumWidget(snapshot: WidgetBudgetSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(selectedMode == .remaining ? "Budget Remaining" : "Budget Spending")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text(primaryTotal(for: snapshot), format: .currency(code: snapshot.currencyCode))
-                        .font(.title2.weight(.bold))
+    private func stackedBucketBars(_ buckets: [WidgetBudgetSnapshot.Bucket]) -> some View {
+        GeometryReader { geo in
+            HStack(spacing: 2) {
+                ForEach(buckets.prefix(3)) { bucket in
+                    let share = totalShare(for: bucket, in: buckets)
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(WidgetBrand.color(for: bucket.id).opacity(bucket.isOverspent ? 0.5 : 1))
+                        .frame(width: max(4, geo.size.width * share))
                 }
+                Spacer(minLength: 0)
+            }
+        }
+        .frame(height: 4)
+    }
+
+    private func bucketChip(_ bucket: WidgetBudgetSnapshot.Bucket) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(WidgetBrand.color(for: bucket.id))
+                .frame(width: 5, height: 5)
+            Text(bucket.name.prefix(4))
+                .font(.system(size: 9, weight: .semibold))
+                .kerning(0.4)
+                .textCase(.uppercase)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    // MARK: Medium
+
+    private func mediumBudget(_ snapshot: WidgetBudgetSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                KickerLabel(text: "PULDAR")
                 Spacer()
-                Text(selectedMode == .remaining ? "Allocation view" : "Spending view")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                KickerLabel(text: selectedMode == .remaining ? "REMAINING" : "SPENDING")
             }
 
-            VStack(spacing: 10) {
+            Spacer(minLength: 6)
+
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(primaryTotal(for: snapshot), format: .currency(code: snapshot.currencyCode))
+                    .font(.system(size: 26, weight: .bold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+
+                Text(selectedMode == .remaining ? "of \(snapshot.totalBudget.formatted(.currency(code: snapshot.currencyCode)))"
+                                                : "of \(snapshot.totalBudget.formatted(.currency(code: snapshot.currencyCode)))")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+
+            Spacer(minLength: 14)
+
+            VStack(spacing: 9) {
                 ForEach(snapshot.buckets.prefix(3)) { bucket in
-                    HStack(spacing: 10) {
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(color(for: bucket.id))
-                            .frame(width: 6)
-
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(bucket.name)
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.85)
-                            Text(bucket.subtitle)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.85)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing, spacing: 1) {
-                            Text(displayAmount(for: bucket, currencyCode: snapshot.currencyCode))
-                                .font(.subheadline.weight(.bold))
-                                .foregroundStyle(bucket.isOverspent && selectedMode == .remaining ? .red : .primary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                            Text(secondaryLabel(for: bucket, currencyCode: snapshot.currencyCode))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                        }
-                    }
+                    bucketMediumRow(bucket, currencyCode: snapshot.currencyCode)
                 }
             }
         }
-        .padding(16)
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .widgetURL(URL(string: "puldar://quick-add"))
     }
+
+    private func bucketMediumRow(_ bucket: WidgetBudgetSnapshot.Bucket, currencyCode: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(WidgetBrand.color(for: bucket.id))
+                    .frame(width: 6, height: 6)
+
+                Text(bucket.name)
+                    .font(.system(size: 10, weight: .bold))
+                    .kerning(1.0)
+                    .textCase(.uppercase)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 4)
+
+                Text(displayAmount(for: bucket, currencyCode: currencyCode))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(bucket.isOverspent && selectedMode == .remaining ? .red : .primary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(Color.primary.opacity(0.08))
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(WidgetBrand.color(for: bucket.id).opacity(bucket.isOverspent ? 0.45 : 1))
+                        .frame(width: max(2, geo.size.width * progress(for: bucket)))
+                }
+            }
+            .frame(height: 3)
+        }
+    }
+
+    // MARK: Empty
 
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("PULDAR")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            KickerLabel(text: "PULDAR")
             Text("Open the app to load your budget snapshot.")
-                .font(.caption)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .lineLimit(3)
+                .multilineTextAlignment(.leading)
         }
-        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(14)
         .widgetURL(URL(string: "puldar://quick-add"))
     }
+
+    // MARK: Helpers
 
     private func primaryTotal(for snapshot: WidgetBudgetSnapshot) -> Double {
         selectedMode == .remaining ? snapshot.totalRemaining : snapshot.totalSpent
@@ -245,24 +321,39 @@ private struct PULDARBudgetWidgetEntryView: View {
         return value.formatted(.currency(code: currencyCode))
     }
 
-    private func secondaryLabel(for bucket: WidgetBudgetSnapshot.Bucket, currencyCode: String) -> String {
-        if selectedMode == .remaining {
-            return "\(bucket.spent.formatted(.currency(code: currencyCode))) spent"
-        }
-        return "\(bucket.remaining.formatted(.currency(code: currencyCode))) left"
+    private func progress(for bucket: WidgetBudgetSnapshot.Bucket) -> Double {
+        guard bucket.budgeted > 0 else { return 0 }
+        let raw = selectedMode == .remaining
+            ? max(0, bucket.remaining) / bucket.budgeted
+            : bucket.spent / bucket.budgeted
+        return min(1, max(0, raw))
     }
 
-    private func color(for bucketID: String) -> Color {
-        switch bucketID {
-        case "fundamentals":
-            return Color(red: 0.35, green: 0.55, blue: 0.78)
-        case "fun":
-            return Color(red: 0.55, green: 0.75, blue: 0.52)
-        default:
-            return Color(red: 0.68, green: 0.52, blue: 0.82)
-        }
+    private func totalShare(for bucket: WidgetBudgetSnapshot.Bucket, in buckets: [WidgetBudgetSnapshot.Bucket]) -> Double {
+        let denominator = selectedMode == .remaining
+            ? buckets.reduce(0) { $0 + max(0, $1.remaining) }
+            : buckets.reduce(0) { $0 + max(0, $1.spent) }
+        guard denominator > 0 else { return 1.0 / Double(max(buckets.count, 1)) }
+        let value = selectedMode == .remaining
+            ? max(0, bucket.remaining)
+            : max(0, bucket.spent)
+        return value / denominator
     }
 }
+
+private struct KickerLabel: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 9, weight: .bold))
+            .kerning(1.4)
+            .textCase(.uppercase)
+            .foregroundStyle(.secondary)
+    }
+}
+
+// MARK: - Budget widget
 
 private struct PULDARBudgetWidget: Widget {
     let kind = "PULDARBudgetWidget"
@@ -280,6 +371,8 @@ private struct PULDARBudgetWidget: Widget {
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
+
+// MARK: - Quick Add
 
 private struct QuickAddEntry: TimelineEntry {
     let date: Date
@@ -310,10 +403,8 @@ private struct PULDARQuickAddWidgetView: View {
     var body: some View {
         Group {
             switch family {
-            case .systemSmall:
-                smallQuickAdd
-            default:
-                mediumQuickAdd
+            case .systemSmall: smallQuickAdd
+            default:           mediumQuickAdd
             }
         }
         .containerBackground(.fill.tertiary, for: .widget)
@@ -321,163 +412,96 @@ private struct PULDARQuickAddWidgetView: View {
 
     private var smallQuickAdd: some View {
         Link(destination: deepLink("puldar://quick-add")) {
-            VStack(alignment: .leading, spacing: 10) {
-                Image(systemName: "plus.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.blue)
+            VStack(alignment: .leading, spacing: 0) {
+                KickerLabel(text: "PULDAR")
 
-                Text("Quick Add")
-                    .font(.headline.weight(.semibold))
+                Spacer(minLength: 12)
+
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.primary.opacity(0.08))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "plus")
+                        .font(.system(size: 22, weight: .light))
+                        .foregroundStyle(.primary)
+                }
+
+                Spacer(minLength: 10)
+
+                Text("Add expense")
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-
-                Text("Open PULDAR and start typing an expense right away.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(3)
-                    .minimumScaleFactor(0.85)
 
                 if let snapshot = entry.snapshot {
                     Text("\(snapshot.totalRemaining.formatted(.currency(code: snapshot.currencyCode))) left")
-                        .font(.caption2)
+                        .font(.system(size: 10))
                         .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(14)
         }
     }
 
     private var mediumQuickAdd: some View {
-        ViewThatFits(in: .vertical) {
-            mediumQuickAddExpanded
-            mediumQuickAddCompact
+        VStack(alignment: .leading, spacing: 0) {
+            KickerLabel(text: "PULDAR · QUICK ADD")
+
+            Spacer(minLength: 8)
+
+            if let snapshot = entry.snapshot {
+                Text(snapshot.totalRemaining, format: .currency(code: snapshot.currencyCode))
+                    .font(.system(size: 22, weight: .bold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+
+                Text("left this month")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Log an expense in one tap.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 12)
+
+            HStack(spacing: 10) {
+                quickActionTile(url: "puldar://quick-add",   title: "Type", icon: "text.cursor")
+                quickActionTile(url: "puldar://scan-receipt", title: "Scan", icon: "camera.fill")
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(14)
     }
 
-    private var mediumQuickAddExpanded: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Quick Add")
-                .font(.headline.weight(.semibold))
-                .lineLimit(1)
-
-            Text("Jump straight into typing or scan a receipt in the app.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-
-            HStack(spacing: 10) {
-                quickAddLink(
-                    url: "puldar://quick-add",
-                    title: "Type Expense",
-                    subtitle: "Focus composer",
-                    systemImage: "text.cursor"
-                )
-
-                quickAddLink(
-                    url: "puldar://scan-receipt",
-                    title: "Scan Receipt",
-                    subtitle: "Open camera",
-                    systemImage: "camera"
-                )
-            }
-
-            if let snapshot = entry.snapshot {
-                Text("\(snapshot.totalRemaining.formatted(.currency(code: snapshot.currencyCode))) left this month")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-            }
-        }
-    }
-
-    private var mediumQuickAddCompact: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Quick Add")
-                    .font(.headline.weight(.semibold))
-                    .lineLimit(1)
-
-                Text("Type or scan in one tap.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                if let snapshot = entry.snapshot {
-                    Text("\(snapshot.totalRemaining.formatted(.currency(code: snapshot.currencyCode))) left")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                }
-            }
-
-            Spacer(minLength: 0)
-
-            HStack(spacing: 8) {
-                quickAddLink(
-                    url: "puldar://quick-add",
-                    title: "Type",
-                    subtitle: "",
-                    systemImage: "text.cursor"
-                )
-
-                quickAddLink(
-                    url: "puldar://scan-receipt",
-                    title: "Scan",
-                    subtitle: "",
-                    systemImage: "camera"
-                )
-            }
-            .frame(maxWidth: 150)
-        }
-    }
-
-    private func quickAddLink(
-        url: String,
-        title: String,
-        subtitle: String,
-        systemImage: String
-    ) -> some View {
+    private func quickActionTile(url: String, title: String, icon: String) -> some View {
         Link(destination: deepLink(url)) {
-            quickActionCard(
-                title: title,
-                subtitle: subtitle.isEmpty ? nil : subtitle,
-                systemImage: systemImage
+            HStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.primary)
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.primary.opacity(0.08))
             )
         }
     }
 
     private func deepLink(_ urlString: String) -> URL {
         URL(string: urlString) ?? URL(fileURLWithPath: "/")
-    }
-
-    private func quickActionCard(title: String, subtitle: String?, systemImage: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: systemImage)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.blue)
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-            if let subtitle {
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.14))
-        )
     }
 }
 
@@ -493,6 +517,8 @@ private struct PULDARQuickAddWidget: Widget {
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
+
+// MARK: - Bundle
 
 @main
 struct PULDARWidgetsBundle: WidgetBundle {

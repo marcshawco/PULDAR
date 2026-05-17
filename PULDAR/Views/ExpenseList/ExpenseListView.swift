@@ -199,17 +199,20 @@ struct ExpenseListView: View {
                 .buttonStyle(.plain)
 
                 content
-                    .offset(x: offsetX)
+                    .offset(x: offsetX.isFinite ? offsetX : 0)
                     .simultaneousGesture(
                         DragGesture(minimumDistance: 10)
                             .onChanged { value in
+                                let translation = value.translation.width.isFinite ? value.translation.width : 0
                                 let base = isDeleteRevealed ? -revealWidth : 0
-                                let candidate = base + value.translation.width
+                                let candidate = base + translation
                                 offsetX = min(0, max(-revealWidth, candidate))
                             }
                             .onEnded { value in
-                                let velocity = value.predictedEndTranslation.width - value.translation.width
-                                let shouldReveal = (value.translation.width + velocity * 0.2) < -36
+                                let translation = value.translation.width.isFinite ? value.translation.width : 0
+                                let predicted = value.predictedEndTranslation.width.isFinite ? value.predictedEndTranslation.width : translation
+                                let velocity = predicted - translation
+                                let shouldReveal = (translation + velocity * 0.2) < -36
                                 withAnimation(.spring(duration: 0.28, bounce: 0.1)) {
                                     isDeleteRevealed = shouldReveal
                                     offsetX = shouldReveal ? -revealWidth : 0

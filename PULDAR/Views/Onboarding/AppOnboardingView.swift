@@ -37,6 +37,7 @@ struct AppOnboardingView: View {
         HStack {
             if step > 0 {
                 Button {
+                    HapticManager.light()
                     withAnimation(.easeInOut(duration: 0.25)) { step -= 1 }
                 } label: {
                     Text("← Back")
@@ -537,8 +538,10 @@ struct AppOnboardingView: View {
             Divider()
             Button {
                 if step == totalSteps - 1 {
+                    HapticManager.success()
                     finalizeAndComplete()
                 } else {
+                    HapticManager.light()
                     withAnimation(.easeInOut(duration: 0.25)) { step += 1 }
                 }
             } label: {

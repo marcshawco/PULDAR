@@ -98,6 +98,9 @@ struct ContentView: View {
         .environment(networkMonitor)
         .environment(diagnosticLogger)
         .environment(appPreferences)
+        .onChange(of: selectedTab) {
+            HapticManager.selection()
+        }
         .overlay {
             WidgetSnapshotSyncView()
                 .environment(budgetEngine)

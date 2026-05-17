@@ -164,6 +164,7 @@ struct HistoryView: View {
                             let idx = monthIndex
                             if idx < monthOptions.count - 1 {
                                 selectedMonth = monthOptions[idx + 1]
+                                HapticManager.light()
                             }
                         } label: {
                             Image(systemName: "chevron.left")
@@ -184,6 +185,7 @@ struct HistoryView: View {
                             let idx = monthIndex
                             if idx > 0 {
                                 selectedMonth = monthOptions[idx - 1]
+                                HapticManager.light()
                             }
                         } label: {
                             Image(systemName: "chevron.right")

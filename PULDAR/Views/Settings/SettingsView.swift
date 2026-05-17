@@ -325,6 +325,7 @@ struct SettingsView: View {
             .pickerStyle(.segmented)
             .onChange(of: selectedAllocationPreset) {
                 applySelectedPresetIfNeeded()
+                HapticManager.selection()
             }
 
             if budgetEngine.monthlyIncome > 0 {
@@ -719,7 +720,9 @@ struct SettingsView: View {
         Binding(
             get: { incomeInputMode },
             set: { newValue in
+                guard newValue.rawValue != incomeInputModeRaw else { return }
                 incomeInputModeRaw = newValue.rawValue
+                HapticManager.selection()
                 if newValue == .hourly {
                     recalculateMonthlyIncomeFromHourlyInputs()
                 }
@@ -858,14 +861,20 @@ struct SettingsView: View {
     private var rolloverBinding: Binding<Bool> {
         Binding(
             get: { budgetEngine.rolloverEnabled },
-            set: { budgetEngine.rolloverEnabled = $0 }
+            set: {
+                budgetEngine.rolloverEnabled = $0
+                HapticManager.selection()
+            }
         )
     }
 
     private func adjustPercentage(for bucket: BudgetBucket, by delta: Double) {
         let current = draftPercentage(for: bucket)
         let snapped = (round((current + delta) * 100) / 100)
-        draftPercentages[bucket.rawValue] = min(max(snapped, 0), 1)
+        let clamped = min(max(snapped, 0), 1)
+        guard clamped != current else { return }
+        draftPercentages[bucket.rawValue] = clamped
+        HapticManager.selection()
     }
 
     private func applySelectedPresetIfNeeded() {
@@ -966,6 +975,7 @@ struct SettingsView: View {
         do {
             try modelContext.save()
             budgetEngine.markDataChanged()
+            HapticManager.success()
             showAddRecurringSheet = false
             diagnosticLogger.record(
                 category: "recurring.create",
@@ -1040,7 +1050,9 @@ struct SettingsView: View {
     // MARK: - App Icon
 
     private func setAppIcon(_ variant: AppIconVariant) {
+        guard variant != selectedAppIcon else { return }
         selectedAppIcon = variant
+        HapticManager.selection()
         UIApplication.shared.setAlternateIconName(variant.iconName) { error in
             if let error {
                 print("Failed to set app icon: \(error)")

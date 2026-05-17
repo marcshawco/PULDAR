@@ -305,6 +305,7 @@ struct DashboardView: View {
                         status: status,
                         isSelected: expandedBucket == status.bucket,
                         onTap: {
+                            HapticManager.light()
                             withAnimation(.easeInOut(duration: 0.22)) {
                                 expandedBucket = expandedBucket == status.bucket ? nil : status.bucket
                             }

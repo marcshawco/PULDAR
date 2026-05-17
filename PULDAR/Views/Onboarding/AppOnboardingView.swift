@@ -106,7 +106,7 @@ struct AppOnboardingView: View {
     }
 
     private var shouldCenterStepContent: Bool {
-        [0, 2, 3].contains(step)
+        [0, 2, 3, 4].contains(step)
     }
 
     // MARK: Step 0 — Welcome
@@ -352,7 +352,7 @@ struct AppOnboardingView: View {
                         draftAlloc = preset.allocationValues(current: draftAlloc)
                     }
                 } label: {
-                    HStack(alignment: .center, spacing: 14) {
+                    HStack(alignment: .center, spacing: 10) {
                         Circle()
                             .strokeBorder(
                                 isPresetSelected(preset) ? AppColors.textPrimary : AppColors.border,
@@ -373,17 +373,17 @@ struct AppOnboardingView: View {
                             .foregroundStyle(AppColors.textPrimary)
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
-                            .frame(minWidth: 72, alignment: .leading)
                             .layoutPriority(1)
 
-                        Spacer()
+                        Spacer(minLength: 6)
 
                         if let values = preset.displayValues(alloc: draftAlloc, income: draftIncome) {
-                            HStack(spacing: 8) {
+                            HStack(spacing: 6) {
                                 presetColumn(pct: values.fundPct, amount: values.fundAmt, color: AppColors.bucketFundamentals)
                                 presetColumn(pct: values.funPct, amount: values.funAmt, color: AppColors.bucketFun)
                                 presetColumn(pct: values.futPct, amount: values.futAmt, color: AppColors.bucketFuture)
                             }
+                            .layoutPriority(2)
                         }
                     }
                     .padding(.vertical, 12)
@@ -429,16 +429,19 @@ struct AppOnboardingView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(color)
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             if amount > 0 {
                 Text(amount.formattedCurrency(code: appPreferences.currencyCode))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(AppColors.textSecondary)
                     .monospacedDigit()
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.6)
             }
         }
-        .frame(width: 68, alignment: .trailing)
+        .frame(minWidth: 52, idealWidth: 60, maxWidth: 64, alignment: .trailing)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: Step 4 — Privacy
@@ -450,61 +453,61 @@ struct AppOnboardingView: View {
                 .kerning(2.2)
                 .textCase(.uppercase)
                 .foregroundStyle(AppColors.textTertiary)
-                .padding(.top, 56)
-                .padding(.bottom, 28)
+                .padding(.top, 18)
+                .padding(.bottom, 14)
 
             Text("On device.")
-                .font(.system(size: 52, weight: .ultraLight))
-                .tracking(-1.8)
+                .font(.system(size: 40, weight: .ultraLight))
+                .tracking(-1.4)
                 .foregroundStyle(AppColors.textPrimary)
             Text("Always.")
-                .font(.system(size: 52, weight: .ultraLight))
-                .tracking(-1.8)
+                .font(.system(size: 40, weight: .ultraLight))
+                .tracking(-1.4)
                 .foregroundStyle(AppColors.textTertiary)
-                .padding(.bottom, 36)
+                .padding(.bottom, 16)
 
             Divider()
-                .padding(.bottom, 28)
+                .padding(.bottom, 14)
 
             Text("PULDAR parses your entries with a small language model that runs entirely on your phone. Your data never leaves the device.")
-                .font(.system(size: 16, weight: .light))
+                .font(.system(size: 14, weight: .light))
                 .foregroundStyle(AppColors.textSecondary)
-                .lineSpacing(5)
-                .padding(.bottom, 40)
+                .lineSpacing(3)
+                .padding(.bottom, 18)
 
             ForEach(Array(privacyPillars.enumerated()), id: \.element.key) { index, pillar in
                 if index > 0 { Divider() }
-                HStack(alignment: .firstTextBaseline, spacing: 18) {
+                HStack(alignment: .firstTextBaseline, spacing: 16) {
                     Text(pillar.num)
                         .font(.system(size: 11, weight: .semibold))
                         .kerning(1.4)
                         .foregroundStyle(AppColors.textTertiary)
-                        .frame(width: 24)
+                        .frame(width: 22)
 
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(pillar.key)
-                            .font(.system(size: 18, weight: .medium))
+                            .font(.system(size: 16, weight: .medium))
                             .tracking(-0.3)
                             .foregroundStyle(AppColors.textPrimary)
                         Text(pillar.value)
-                            .font(.system(size: 13, weight: .light))
+                            .font(.system(size: 12, weight: .light))
                             .foregroundStyle(AppColors.textSecondary)
                     }
                 }
-                .padding(.vertical, 20)
+                .padding(.vertical, 12)
             }
 
             Divider()
 
             HStack {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Includes")
                         .font(.system(size: 9, weight: .bold))
                         .kerning(2)
                         .textCase(.uppercase)
                         .foregroundStyle(AppColors.textTertiary)
                     Text("PULDAR Mini · 1.2 GB")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .tracking(-0.1)
                         .foregroundStyle(AppColors.textPrimary)
                 }
@@ -515,8 +518,8 @@ struct AppOnboardingView: View {
                     .textCase(.uppercase)
                     .foregroundStyle(AppColors.textTertiary)
             }
-            .padding(.top, 32)
-            .padding(.bottom, 8)
+            .padding(.top, 14)
+            .padding(.bottom, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

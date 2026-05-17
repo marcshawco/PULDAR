@@ -40,20 +40,6 @@ struct SettingsView: View {
     @State private var newRecurringAmount = ""
     @State private var newRecurringBucket: BudgetBucket = .fun
     @State private var addRecurringError: String?
-    @State private var exportURL: URL?
-    @State private var activeInfoSheet: InfoSheet?
-
-    private enum InfoSheet: Identifiable {
-        case exportShare(URL)
-        case privacyPolicy
-
-        var id: String {
-            switch self {
-            case .exportShare(let url): return "export:\(url.absoluteString)"
-            case .privacyPolicy: return "privacy"
-            }
-        }
-    }
     @State private var selectedAllocationPreset: AllocationPreset = .custom
     @State private var showZeroFunWarning = false
     @State private var showDeleteAllConfirmation = false
@@ -193,17 +179,10 @@ struct SettingsView: View {
                     }
                 }
             }
-            .sheet(item: $activeInfoSheet, onDismiss: {
-                exportURL = nil
-            }) { sheet in
-                switch sheet {
-                case .exportShare(let url):
-                    ExportShareSheet(url: url)
-                case .privacyPolicy:
-                    SafariView(url: Self.privacyPolicyURL)
-                        .ignoresSafeArea()
-                }
-            }
+            // CSV share and Safari are presented via UIKit directly (see
+            // ModalPresenter) — SwiftUI's `.sheet { UIViewControllerRepresentable }`
+            // adds noticeable latency on top of the already-slow cold-start of
+            // UIActivityViewController and SFSafariViewController.
             .alert("Fun is 0%", isPresented: $showZeroFunWarning) {
                 Button("Keep 0%") {
                     saveAndDismiss()
@@ -695,7 +674,7 @@ struct SettingsView: View {
             LabeledContent("Receipt OCR", value: "English Only")
 
             Button {
-                activeInfoSheet = .privacyPolicy
+                ModalPresenter.presentSafari(url: Self.privacyPolicyURL)
             } label: {
                 Text("Privacy Policy")
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -834,17 +813,15 @@ struct SettingsView: View {
             do {
                 let url = try ExpenseExportService.writeCSV(rows: rows, scope: scope)
                 await MainActor.run {
-                    exportURL = url
                     diagnosticLogger.record(
                         category: "export.csv",
                         message: "Exported CSV from settings",
                         metadata: ["scope": scope, "rows": "\(rowCount)"]
                     )
-                    activeInfoSheet = .exportShare(url)
+                    ModalPresenter.presentShare(items: [url])
                 }
             } catch {
                 await MainActor.run {
-                    print("Failed to export CSV in settings: \(error)")
                     diagnosticLogger.record(
                         level: .error,
                         category: "export.csv",
@@ -1083,24 +1060,49 @@ struct SettingsView: View {
     }
 }
 
-private struct ExportShareSheet: UIViewControllerRepresentable {
-    let url: URL
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+/// Present `UIActivityViewController` / `SFSafariViewController` at the UIKit
+/// layer instead of through a SwiftUI sheet — eliminates the wrapper-rebuild
+/// + sheet-state-diff overhead that compounded with these controllers' already
+/// slow cold starts.
+private enum ModalPresenter {
+    @MainActor
+    static func presentShare(items: [Any]) {
+        guard let root = topViewController() else { return }
+        let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        if let pop = vc.popoverPresentationController {
+            pop.sourceView = root.view
+            pop.sourceRect = CGRect(x: root.view.bounds.midX, y: root.view.bounds.maxY - 40, width: 1, height: 1)
+            pop.permittedArrowDirections = []
+        }
+        root.present(vc, animated: true)
     }
 
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-
-private struct SafariView: UIViewControllerRepresentable {
-    let url: URL
-
-    func makeUIViewController(context: Context) -> SFSafariViewController {
-        SFSafariViewController(url: url)
+    @MainActor
+    static func presentSafari(url: URL) {
+        guard let root = topViewController() else { return }
+        let vc = SFSafariViewController(url: url)
+        vc.modalPresentationStyle = .formSheet
+        root.present(vc, animated: true)
     }
 
-    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
+    @MainActor
+    private static func topViewController() -> UIViewController? {
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+            ?? UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first
+        guard let rootVC = scene?.windows.first(where: \.isKeyWindow)?.rootViewController
+                ?? scene?.windows.first?.rootViewController else {
+            return nil
+        }
+        var top = rootVC
+        while let presented = top.presentedViewController {
+            top = presented
+        }
+        return top
+    }
 }
 
 // MARK: - App Icon Variant
@@ -1110,6 +1112,7 @@ enum AppIconVariant: String, CaseIterable, Identifiable {
     case colorOnWhite
     case colorOnBlack
     case blackOnWhite
+    case tinted
 
     var id: String { rawValue }
 
@@ -1119,6 +1122,7 @@ enum AppIconVariant: String, CaseIterable, Identifiable {
         case .colorOnWhite: return "AppIconColorOnWhite"
         case .colorOnBlack: return "AppIconColorOnBlack"
         case .blackOnWhite: return "AppIconBlackOnWhite"
+        case .tinted: return "AppIconTinted"
         }
     }
 
@@ -1128,6 +1132,7 @@ enum AppIconVariant: String, CaseIterable, Identifiable {
         case .colorOnWhite: return "Color"
         case .colorOnBlack: return "Color Dark"
         case .blackOnWhite: return "Classic"
+        case .tinted: return "Tinted"
         }
     }
 
@@ -1137,6 +1142,7 @@ enum AppIconVariant: String, CaseIterable, Identifiable {
         case .colorOnWhite: return "AppIconColorOnWhitePreview"
         case .colorOnBlack: return "AppIconColorOnBlackPreview"
         case .blackOnWhite: return "AppIconBlackOnWhitePreview"
+        case .tinted: return "AppIconTintedPreview"
         }
     }
 

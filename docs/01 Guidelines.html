@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PULDAR — Brand Guidelines v1.0</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:      #F5F4F0;
+    --paper:   #FFFFFF;
+    --ink:     #0F0E0B;
+    --ink2:    #4A4945;
+    --ink3:    #8A8780;
+    --ink4:    #BDB9AF;
+    --border:  #E3E0D8;
+    --rule:    #D7D3C9;
+    --fund: #3A5CAD;
+    --fun:  #2A8056;
+    --fut:  #C96924;
+  }
+  html, body {
+    background: var(--bg); color: var(--ink);
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.55;
+  }
+
+  .page {
+    max-width: 1024px; margin: 0 auto;
+    background: var(--paper);
+    padding: 88px 96px;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    min-height: 100vh;
+  }
+
+  /* Typography scale */
+  h1, h2, h3, h4 { font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+  h1 { font-size: 84px; font-weight: 200; letter-spacing: -0.04em; line-height: 0.95; }
+  h2 { font-size: 36px; letter-spacing: -0.03em; line-height: 1.1; margin-bottom: 8px; }
+  h3 { font-size: 18px; line-height: 1.25; margin-bottom: 14px; }
+  h4 { font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink3); margin-bottom: 14px; }
+  p  { font-size: 15px; color: var(--ink2); max-width: 64ch; }
+  p + p { margin-top: 14px; }
+  p b, p strong { color: var(--ink); font-weight: 600; }
+  em { font-style: italic; }
+
+  .eyebrow {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--ink3);
+  }
+
+  /* Cover */
+  .cover {
+    min-height: calc(100vh - 176px);
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .cover-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .cover-mark { width: 96px; height: 96px; }
+  .cover-doc-meta { text-align: right; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink3); font-weight: 700; line-height: 1.9; }
+  .cover-doc-meta b { display: block; color: var(--ink); }
+  .cover-mid h1 { font-size: 124px; margin-top: 32px; }
+  .cover-mid .lede {
+    font-size: 22px; line-height: 1.4; font-weight: 300; letter-spacing: -0.01em;
+    color: var(--ink); max-width: 26ch; margin-top: 28px;
+  }
+  .cover-mid .lede em { font-weight: 400; }
+  .cover-bot { display: flex; justify-content: space-between; align-items: baseline; padding-top: 24px; border-top: 1px solid var(--border); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink3); font-weight: 600; }
+
+  /* Section */
+  .section { padding: 88px 0; border-top: 1px solid var(--border); }
+  .section:first-of-type { border-top: 0; }
+  .section-head { display: flex; align-items: baseline; gap: 18px; margin-bottom: 48px; }
+  .section-num {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--ink); font-variant-numeric: tabular-nums;
+  }
+  .section-title { font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink3); }
+
+  /* TOC */
+  .toc { display: flex; flex-direction: column; }
+  .toc-row {
+    display: grid; grid-template-columns: 60px 1fr 80px;
+    align-items: baseline;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--border);
+    font-variant-numeric: tabular-nums;
+  }
+  .toc-row:first-of-type { border-top: 1px solid var(--border); }
+  .toc-num   { font-size: 11px; font-weight: 700; letter-spacing: 0.18em; color: var(--ink); }
+  .toc-title { font-size: 22px; font-weight: 400; letter-spacing: -0.015em; color: var(--ink); }
+  .toc-sub   { font-size: 13px; color: var(--ink3); margin-top: 2px; }
+  .toc-page  { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; color: var(--ink3); text-align: right; }
+
+  /* Two-up */
+  .two-up { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
+  .three-up { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+
+  /* Card */
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+  }
+  .card.tight { padding: 24px; }
+  .card.center { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 280px; }
+  .card.dark { background: var(--ink); color: #F2F1ED; border-color: #1A1917; }
+  .card.dark h3, .card.dark h4 { color: #F2F1ED; }
+  .card.dark p { color: #BDB9AF; }
+
+  /* Story */
+  .story-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 56px; }
+  .story-grid .principle {
+    padding: 28px 0; border-top: 1px solid var(--border);
+  }
+  .story-grid .principle:last-child { border-bottom: 1px solid var(--border); }
+  .story-grid .principle h3 { display: flex; align-items: baseline; gap: 12px; }
+  .story-grid .principle .pnum { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--ink3); font-variant-numeric: tabular-nums; }
+
+  /* Mark visuals */
+  .mark-frame {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 48px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Bar mark inline svg helpers */
+  .bar-mark { display: block; }
+
+  /* Construction diagram */
+  .construct {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 48px;
+  }
+  .construct-svg { display: block; margin: 0 auto; }
+  .construct-table {
+    width: 100%; margin-top: 32px;
+    font-size: 12px; font-variant-numeric: tabular-nums;
+  }
+  .construct-table th, .construct-table td {
+    text-align: left; padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .construct-table th { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink3); font-weight: 700; }
+  .construct-table td { color: var(--ink2); }
+  .construct-table .col-dot { width: 10px; }
+  .construct-table .col-dot span {
+    display: inline-block; width: 8px; height: 8px; border-radius: 2px;
+  }
+
+  /* Clear space diagram */
+  .clear-space {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+    padding: 56px; display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Do / Don't */
+  .dodont { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .dodont .item {
+    background: var(--paper);
+    border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden;
+  }
+  .dodont .item-vis {
+    aspect-ratio: 1;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    position: relative;
+  }
+  .dodont .item-meta { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 4px; }
+  .dodont .item-meta .verdict {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dodont .verdict.no  { color: #B43A2A; }
+  .dodont .verdict.yes { color: var(--fun); }
+  .dodont .verdict::before {
+    content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 5px;
+  }
+  .dodont .verdict.no::before  { background: #B43A2A; }
+  .dodont .verdict.yes::before { background: var(--fun); }
+  .dodont .item-meta .copy { font-size: 12px; color: var(--ink2); line-height: 1.45; }
+
+  /* Colors */
+  .swatch {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .swatch-block { height: 200px; }
+  .swatch-body { padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+  .swatch-name { display: flex; justify-content: space-between; align-items: baseline; }
+  .swatch-name b { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .swatch-name span { font-size: 11px; font-weight: 700; color: var(--ink3); letter-spacing: 0.12em; text-transform: uppercase; }
+  .swatch-values { font-size: 11.5px; color: var(--ink2); font-variant-numeric: tabular-nums; line-height: 1.85; letter-spacing: 0.02em; }
+  .swatch-values b { display: inline-block; min-width: 36px; color: var(--ink3); font-weight: 700; letter-spacing: 0.1em; font-size: 10px; text-transform: uppercase; }
+
+  .neutrals {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    margin-top: 24px;
+  }
+  .neutrals .n {
+    aspect-ratio: 1; padding: 16px;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    font-size: 11px; line-height: 1.4;
+  }
+  .neutrals .n b { display: block; font-size: 12px; font-weight: 600; }
+
+  /* Type spec */
+  .type-spec {
+    background: var(--paper); border: 1px solid var(--border); border-radius: 12px;
+    padding: 40px; display: grid; grid-template-columns: 1fr 200px; align-items: end; gap: 32px;
+  }
+  .type-spec .sample {
+    font-family: 'Helvetica Neue', Helvetica, sans-serif;
+    color: var(--ink); line-height: 0.95; letter-spacing: -0.04em;
+  }
+  .type-spec .info { font-size: 11px; line-height: 1.85; color: var(--ink2); }
+  .type-spec .info b { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink3); margin-bottom: 4px; }
+
+  .type-scale {
+    background: var(--paper); border: 1px solid var(--border); border-radius: 12px;
+    padding: 40px; margin-top: 16px;
+  }
+  .type-scale-row {
+    display: grid; grid-template-columns: 80px 1fr 140px;
+    align-items: baseline; padding: 18px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .type-scale-row:last-child { border-bottom: 0; }
+  .type-scale-row .label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink3);
+  }
+  .type-scale-row .sample { color: var(--ink); }
+  .type-scale-row .meta { font-size: 11px; color: var(--ink3); text-align: right; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+
+  /* Voice */
+  .voice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .voice {
+    background: var(--paper); border: 1px solid var(--border); border-radius: 12px;
+    padding: 28px;
+  }
+  .voice h4 { margin-bottom: 14px; }
+  .voice .line {
+    padding: 14px 0; border-top: 1px solid var(--border);
+    display: flex; gap: 12px; align-items: baseline;
+    font-size: 13px;
+  }
+  .voice .line:first-of-type { border-top: 0; padding-top: 0; }
+  .voice .tag {
+    flex-shrink: 0; width: 18px; font-size: 14px; font-weight: 700;
+  }
+  .voice.yes .tag { color: var(--fun); }
+  .voice.no  .tag { color: #B43A2A; }
+  .voice .line span { color: var(--ink); }
+
+  /* Footer */
+  .footer-doc {
+    padding: 32px 0;
+    border-top: 1px solid var(--border); margin-top: 56px;
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink3); font-weight: 600;
+  }
+
+  /* Print */
+  @media print {
+    body { background: var(--paper); }
+    .page { box-shadow: none; border: 0; padding: 56px 64px; max-width: none; }
+    .section { page-break-inside: avoid; }
+    .cover { page-break-after: always; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Reusable bar mark symbol -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="mark" viewBox="0 0 100 100">
+      <rect x="14" y="15" width="22" height="70" rx="3" fill="#3A5CAD"/>
+      <rect x="42" y="43" width="22" height="42" rx="3" fill="#2A8056"/>
+      <rect x="70" y="57" width="22" height="28" rx="3" fill="#C96924"/>
+    </symbol>
+    <symbol id="mark-mono" viewBox="0 0 100 100">
+      <rect x="14" y="15" width="22" height="70" rx="3" fill="currentColor"/>
+      <rect x="42" y="43" width="22" height="42" rx="3" fill="currentColor"/>
+      <rect x="70" y="57" width="22" height="28" rx="3" fill="currentColor"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="page">
+
+  <!-- ─────────────── COVER ─────────────── -->
+  <section class="cover">
+    <div class="cover-top">
+      <svg class="cover-mark"><use href="#mark"/></svg>
+      <div class="cover-doc-meta">
+        <b>Brand Guidelines</b>
+        Version 1.0<br/>
+        May 2026<br/>
+        Internal &amp; partner use
+      </div>
+    </div>
+
+    <div class="cover-mid">
+      <div class="eyebrow">PULDAR · Personal Finance · Identity System</div>
+      <h1>PULDAR</h1>
+      <p class="lede">A budget made visible. Three bars. Three priorities. <em>Less, but better.</em></p>
+    </div>
+
+    <div class="cover-bot">
+      <span>Brand Guidelines · v1.0</span>
+      <span>01 of 08</span>
+    </div>
+  </section>
+
+  <!-- ─────────────── TOC ─────────────── -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">00</span>
+      <span class="section-title">Contents</span>
+    </div>
+
+    <div class="toc">
+      <div class="toc-row">
+        <span class="toc-num">01</span>
+        <span>
+          <div class="toc-title">The Idea</div>
+          <div class="toc-sub">What PULDAR stands for and why it looks the way it does.</div>
+        </span>
+        <span class="toc-page">p. 03</span>
+      </div>
+      <div class="toc-row">
+        <span class="toc-num">02</span>
+        <span>
+          <div class="toc-title">The Mark</div>
+          <div class="toc-sub">Construction, geometry, clear space, scale.</div>
+        </span>
+        <span class="toc-page">p. 04</span>
+      </div>
+      <div class="toc-row">
+        <span class="toc-num">03</span>
+        <span>
+          <div class="toc-title">Lockups &amp; Variations</div>
+          <div class="toc-sub">Approved configurations of mark and wordmark.</div>
+        </span>
+        <span class="toc-page">p. 06</span>
+      </div>
+      <div class="toc-row">
+        <span class="toc-num">04</span>
+        <span>
+          <div class="toc-title">Do &amp; Don't</div>
+          <div class="toc-sub">How not to break the mark.</div>
+        </span>
+        <span class="toc-page">p. 07</span>
+      </div>
+      <div class="toc-row">
+        <span class="toc-num">05</span>
+        <span>
+          <div class="toc-title">Colour</div>
+          <div class="toc-sub">The trinity palette plus the neutral system.</div>
+        </span>
+        <span class="toc-page">p. 08</span>
+      </div>
+      <div class="toc-row">
+        <span class="toc-num">06</span>
+        <span>
+          <div class="toc-title">Typography</div>
+          <div class="toc-sub">Helvetica Neue, set tight. Hierarchy and usage.</div>
+        </span>
+        <span class="toc-page">p. 10</span>
+      </div>
+      <div class="toc-row">
+        <span class="toc-num">07</span>
+        <span>
+          <div class="toc-title">Voice</div>
+          <div class="toc-sub">How PULDAR sounds. Plain, direct, dry.</div>
+        </span>
+        <span class="toc-page">p. 11</span>
+      </div>
+      <div class="toc-row">
+        <span class="toc-num">08</span>
+        <span>
+          <div class="toc-title">Applications</div>
+          <div class="toc-sub">App icon, splash, springboard, store listing.</div>
+        </span>
+        <span class="toc-page">p. 12</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── 01 · THE IDEA ─────────────── -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">01</span>
+      <span class="section-title">The Idea</span>
+    </div>
+
+    <h2 style="max-width: 18ch; margin-bottom: 32px">A budget made visible.</h2>
+    <p style="font-size: 17px; line-height: 1.6; max-width: 56ch; color: var(--ink)">
+      Most money apps look like dashboards. PULDAR looks like a doctrine. It takes a 100-year-old idea — split your income into three buckets and live inside the split — and turns it into a brand, a product, and a discipline.
+    </p>
+
+    <div class="story-grid" style="margin-top: 48px">
+      <div>
+        <h4>The principles</h4>
+        <div class="principle">
+          <h3><span class="pnum">i.</span>Three buckets. No others.</h3>
+          <p>Fundamentals (50%), Fun (30%), Future (20%). Every dollar lives in one of three places. The product never invents a fourth.</p>
+        </div>
+        <div class="principle">
+          <h3><span class="pnum">ii.</span>Discipline is the feature.</h3>
+          <p>PULDAR doesn't gamify saving. It removes friction from the right choice and exposes the cost of the wrong one. The brand should feel calm, slightly stern, and on your side.</p>
+        </div>
+        <div class="principle">
+          <h3><span class="pnum">iii.</span>Less, but better.</h3>
+          <p>Dieter Rams &gt; Duolingo. We remove rather than add. One graph. One tap. One number. The mark itself shows what we kept.</p>
+        </div>
+      </div>
+
+      <div>
+        <h4>The mark, in one line</h4>
+        <div class="card center" style="margin-bottom: 16px; padding: 48px">
+          <svg style="width: 160px; height: 160px"><use href="#mark"/></svg>
+        </div>
+        <p style="font-size: 13px; color: var(--ink2)">
+          Three bars sized to a 50 / 30 / 20 split. The math is the logo. The space above the bars — the <b>headroom</b> — is what you keep.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── 02 · THE MARK ─────────────── -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">02</span>
+      <span class="section-title">The Mark · Construction</span>
+    </div>
+
+    <p style="margin-bottom: 40px">The mark is drawn on a 100-unit square. Three bars of equal width sit on a shared baseline. The heights are not decorative — they encode the default budget split.</p>
+
+    <div class="construct">
+      <svg class="construct-svg" width="420" height="420" viewBox="-4 -4 108 108">
+        <!-- Frame -->
+        <rect x="0" y="0" width="100" height="100" fill="none" stroke="#D7D3C9" stroke-width="0.25"/>
+        <!-- Construction grid -->
+        <g stroke="#E3E0D8" stroke-width="0.25" stroke-dasharray="0.6 0.6">
+          <line x1="0" y1="15" x2="100" y2="15"/>
+          <line x1="0" y1="43" x2="100" y2="43"/>
+          <line x1="0" y1="57" x2="100" y2="57"/>
+          <line x1="0" y1="85" x2="100" y2="85"/>
+          <line x1="14" y1="0" x2="14" y2="100"/>
+          <line x1="36" y1="0" x2="36" y2="100"/>
+          <line x1="42" y1="0" x2="42" y2="100"/>
+          <line x1="64" y1="0" x2="64" y2="100"/>
+          <line x1="70" y1="0" x2="70" y2="100"/>
+          <line x1="92" y1="0" x2="92" y2="100"/>
+        </g>
+        <!-- Bars -->
+        <rect x="14" y="15" width="22" height="70" rx="3" fill="#3A5CAD"/>
+        <rect x="42" y="43" width="22" height="42" rx="3" fill="#2A8056"/>
+        <rect x="70" y="57" width="22" height="28" rx="3" fill="#C96924"/>
+        <!-- Labels -->
+        <g font-family="Helvetica Neue" font-size="3" fill="#706E69" font-weight="600">
+          <text x="25" y="11" text-anchor="middle">h = 70</text>
+          <text x="53" y="39" text-anchor="middle">h = 42</text>
+          <text x="81" y="53" text-anchor="middle">h = 28</text>
+          <!-- Side -->
+          <text x="-2" y="86" text-anchor="end">y = 85</text>
+          <!-- Bar width -->
+          <text x="25" y="103" text-anchor="middle">w = 22</text>
+          <text x="53" y="103" text-anchor="middle">w = 22</text>
+          <text x="81" y="103" text-anchor="middle">w = 22</text>
+        </g>
+        <!-- Gap markers -->
+        <g stroke="#8A8780" stroke-width="0.2">
+          <line x1="36" y1="91" x2="42" y2="91"/>
+          <line x1="36" y1="90" x2="36" y2="92"/>
+          <line x1="42" y1="90" x2="42" y2="92"/>
+        </g>
+        <text x="39" y="96" font-family="Helvetica Neue" font-size="2.5" fill="#706E69" text-anchor="middle">gap = 6</text>
+      </svg>
+
+      <table class="construct-table">
+        <thead>
+          <tr>
+            <th class="col-dot"></th>
+            <th>Bar</th>
+            <th>x</th>
+            <th>y</th>
+            <th>w</th>
+            <th>h</th>
+            <th>Radius</th>
+            <th>Fill</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-dot"><span style="background:var(--fund)"></span></td>
+            <td>Fundamentals (50%)</td>
+            <td>14</td><td>15</td><td>22</td><td>70</td><td>3</td><td>#3A5CAD</td>
+          </tr>
+          <tr>
+            <td class="col-dot"><span style="background:var(--fun)"></span></td>
+            <td>Fun (30%)</td>
+            <td>42</td><td>43</td><td>22</td><td>42</td><td>3</td><td>#2A8056</td>
+          </tr>
+          <tr>
+            <td class="col-dot"><span style="background:var(--fut)"></span></td>
+            <td>Future (20%)</td>
+            <td>70</td><td>57</td><td>22</td><td>28</td><td>3</td><td>#C96924</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top: 16px; font-size: 12px; color: var(--ink3); letter-spacing: 0.04em">
+      Bars are bottom-aligned. Inner padding is 14 units left, 8 right. Corner radius is 3 — present, not soft.
+    </div>
+  </section>
+
+  <!-- ─────────────── Clear space ─────────────── -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">02·b</span>
+      <span class="section-title">The Mark · Clear Space &amp; Minimum Size</span>
+    </div>
+
+    <div class="two-up">
+      <div class="clear-space">
+        <svg width="320" height="320" viewBox="-30 -30 160 160">
+          <!-- guides -->
+          <rect x="-22" y="-22" width="144" height="144" fill="none" stroke="#8A8780" stroke-width="0.3" stroke-dasharray="2 2"/>
+          <!-- bar mark -->
+          <rect x="14" y="15" width="22" height="70" rx="3" fill="#3A5CAD"/>
+          <rect x="42" y="43" width="22" height="42" rx="3" fill="#2A8056"/>
+          <rect x="70" y="57" width="22" height="28" rx="3" fill="#C96924"/>
+          <!-- x = width of one bar -->
+          <g stroke="#0F0E0B" stroke-width="0.4">
+            <line x1="14" y1="-8" x2="36" y2="-8"/>
+            <line x1="14" y1="-10" x2="14" y2="-6"/>
+            <line x1="36" y1="-10" x2="36" y2="-6"/>
+          </g>
+          <text x="25" y="-12" text-anchor="middle" font-family="Helvetica Neue" font-size="5" fill="#0F0E0B" font-weight="700">X</text>
+          <text x="50" y="105" text-anchor="middle" font-family="Helvetica Neue" font-size="4" fill="#706E69">Clear space = 1 X on all sides</text>
+        </svg>
+      </div>
+
+      <div>
+        <h3>Clear space</h3>
+        <p>Reserve a margin equal to <b>1 bar-width</b> (one X) around the mark. Nothing — no type, no edge, no other graphic — sits inside this zone.</p>
+
+        <h3 style="margin-top: 32px">Minimum size</h3>
+        <p>The mark holds together down to <b>16 px</b> on screen and <b>8 mm</b> in print. Below that, switch to the monogram or fall back to the wordmark alone.</p>
+
+        <div style="display: flex; gap: 24px; align-items: flex-end; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border)">
+          <div style="text-align: center">
+            <svg width="80" height="80"><use href="#mark"/></svg>
+            <div style="font-size: 10px; color: var(--ink3); margin-top: 8px; letter-spacing: 0.1em; text-transform: uppercase">Default · 80 px</div>
+          </div>
+          <div style="text-align: center">
+            <svg width="40" height="40"><use href="#mark"/></svg>
+            <div style="font-size: 10px; color: var(--ink3); margin-top: 8px; letter-spacing: 0.1em; text-transform: uppercase">Tab · 40 px</div>
+          </div>
+          <div style="text-align: center">
+            <svg width="16" height="16"><use href="#mark"/></svg>
+            <div style="font-size: 10px; color: var(--ink3); margin-top: 8px; letter-spacing: 0.1em; text-transform: uppercase">Min · 16 px</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── 03 · LOCKUPS ─────────────── -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">03</span>
+      <span class="section-title">Lockups &amp; Variations</span>
+    </div>
+
+    <div class="two-up" style="gap: 16px">
+      <div class="card center">
+        <div style="display: flex; align-items: center; gap: 18px">
+          <svg style="width: 72px; height: 72px"><use href="#mark"/></svg>
+          <div style="font-size: 64px; font-weight: 700; letter-spacing: -0.04em">PULDAR</div>
+        </div>
+        <div style="margin-top: 32px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink3); font-weight: 700">Horizontal lockup · Primary</div>
+      </div>
+
+      <div class="card center">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 18px">
+          <svg style="width: 80px; height: 80px"><use href="#mark"/></svg>
+          <div style="font-size: 36px; font-weight: 700; letter-spacing: -0.025em">PULDAR</div>
+        </div>
+        <div style="margin-top: 32px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink3); font-weight: 700">Vertical lockup · Centred</div>
+      </div>
+
+      <div class="card center dark">
+        <div style="font-size: 64px; font-weight: 700; letter-spacing: -0.04em">PULDAR</div>
+        <div style="margin-top: 32px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #8A8780; font-weight: 700">Wordmark solo · Reverse</div>
+      </div>
+
+      <div class="card center">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 12px">
+          <div style="font-size: 48px; font-weight: 700; letter-spacing: -0.04em">PULDAR</div>
+          <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.32em; text-transform: uppercase; color: var(--ink2)">Less, but better.</div>
+        </div>
+        <div style="margin-top: 24px; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink3); font-weight: 700">Tagline lockup</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── 04 · DO / DON'T ─────────────── -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">04</span>
+      <span class="section-title">Do &amp; Don't</span>
+    </div>
+
+    <div class="dodont">
+      <!-- DO: use as-is -->
+      <div class="item">
+        <div class="item-vis">
+          <svg style="width: 64%; height: 64%"><use href="#mark"/></svg>
+        </div>
+        <div class="item-meta">
+          <span class="verdict yes">Do</span>
+          <span class="copy">Use the mark in its given form, on cream or white.</span>
+        </div>
+      </div>
+
+      <!-- DON'T: stretch -->
+      <div class="item">
+        <div class="item-vis">
+          <svg style="width: 80%; height: 50%"><use href="#mark"/></svg>
+        </div>
+        <div class="item-meta">
+          <span class="verdict no">Don't</span>
+          <span class="copy">Don't stretch, squash, or change the aspect ratio.</span>
+        </div>
+      </div>
+
+      <!-- DON'T: recolour individual bars -->
+      <div class="item">
+        <div class="item-vis">
+          <svg viewBox="0 0 100 100" style="width: 64%; height: 64%">
+            <rect x="14" y="15" width="22" height="70" rx="3" fill="#E63946"/>
+            <rect x="42" y="43" width="22" height="42" rx="3" fill="#FFD166"/>
+            <rect x="70" y="57" width="22" height="28" rx="3" fill="#06D6A0"/>
+          </svg>
+        </div>
+        <div class="item-meta">
+          <span class="verdict no">Don't</span>
+          <span class="copy">Don't recolour the bars individually. The trinity palette is the only palette.</span>
+        </div>
+      </div>
+
+      <!-- DO: mono on dark -->
+      <div class="item">
+        <div class="item-vis" style="background: var(--ink)">
+          <svg style="width: 64%; height: 64%; color: #F2F1ED"><use href="#mark-mono"/></svg>
+        </div>
+        <div class="item-meta">
+          <span class="verdict yes">Do</span>
+          <span class="copy">Use the cream monogram on dark grounds where colour reproduction is unsafe.</span>
+        </div>
+      </div>
+
+      <!-- DON'T: outline -->
+      <div class="item">
+        <div class="item-vis">
+          <svg viewBox="0 0 100 100" style="width: 64%; height: 64%">
+            <rect x="14" y="15" width="22" height="70" rx="3" fill="none" stroke="#0F0E0B" stroke-width="1.5"/>
+            <rect x="42" y="43" width="22" height="42" rx="3" fill="none" stroke="#0F0E0B" stroke-width="1.5"/>
+            <rect x="70" y="57" width="22" height="28" rx="3" fill="none" stroke="#0F0E0B" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div class="item-meta">
+          <span class="verdict no">Don't</span>
+          <span class="copy">Don't outline the bars. The mark is a solid form, not a frame.</span>
+        </div>
+      </div>
+
+      <!-- DON'T: rotate -->
+      <div class="item">
+        <div class="item-vis">
+          <svg viewBox="0 0 100 100" style="width: 64%; height: 64%; transform: rotate(18deg)">
+            <rect x="14" y="15" width="22" height="70" rx="3" fill="#3A5CAD"/>
+            <rect x="42" y="43" width="22" height="42" rx="3" fill="#2A8056"/>
+            <rect x="70" y="57" width="22" height="28" rx="3" fill="#C96924"/>
+          </svg>
+        </div>
+        <div class="item-meta">
+          <span class="verdict no">Don't</span>
+          <span class="copy">Don't rotate. The mark always sits upright on its baseline.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── 05 · COLOUR ─────────────── -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">05</span>
+      <span class="section-title">Colour · The Trinity</span>
+    </div>
+
+    <p style="margin-bottom: 32px">Three colours, one role each. They map directly to the buckets — never re-assigned, never re-mixed. Use them flat. No gradients.</p>
+
+    <div class="three-up">
+      <div class="swatch">
+        <div class="swatch-block" style="background: #3A5CAD"></div>
+        <div class="swatch-body">
+          <div class="swatch-name"><b>Fundamentals</b><span>50%</span></div>
+          <div class="swatch-values">
+            <div><b>HEX</b>#3A5CAD</div>
+            <div><b>RGB</b>58 · 92 · 173</div>
+            <div><b>CMYK</b>78 · 60 · 0 · 10</div>
+            <div><b>PANTONE</b>286 C (approx)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="swatch">
+        <div class="swatch-block" style="background: #2A8056"></div>
+        <div class="swatch-body">
+          <div class="swatch-name"><b>Fun</b><span>30%</span></div>
+          <div class="swatch-values">
+            <div><b>HEX</b>#2A8056</div>
+            <div><b>RGB</b>42 · 128 · 86</div>
+            <div><b>CMYK</b>80 · 20 · 75 · 8</div>
+            <div><b>PANTONE</b>356 C (approx)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="swatch">
+        <div class="swatch-block" style="background: #C96924"></div>
+        <div class="swatch-body">
+          <div class="swatch-name"><b>Future</b><span>20%</span></div>
+          <div class="swatch-values">
+            <div><b>HEX</b>#C96924</div>
+            <div><b>RGB</b>201 · 105 · 36</div>
+            <div><b>CMYK</b>15 · 65 · 95 · 5</div>
+            <div><b>PANTONE</b>1525 C (approx)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h4 style="margin-top: 56px">Neutrals</h4>
+    <p>The brand lives mostly on cream and ink. Greys are used sparingly, for rules and supporting text. White is reserved for surface cards, not for body backgrounds.</p>
+
+    <div class="neutrals">
+      <div class="n" style="background: #F5F4F0; color: var(--ink2)"><b>Cream</b>#F5F4F0</div>
+      <div class="n" style="background: #FFFFFF; color: var(--ink2); box-shadow: inset 0 0 0 1px var(--border)"><b>Paper</b>#FFFFFF</div>
+      <div class="n" style="background: #E3E0D8; color: var(--ink2)"><b>Border</b>#E3E0D8</div>
+      <div class="n" style="background: #706E69; color: #F2F1ED"><b>Ink-2</b>#706E69</div>
+      <div class="n" style="background: #0F0E0B; color: #F2F1ED"><b>Ink</b>#0F0E0B</div>
+    </div>
+  </section>
+
+  <!-- ─────────────── 06 · TYPOGRAPHY ─────────────── -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">06</span>
+      <span class="section-title">Typography</span>
+    </div>
+
+    <p>One typeface, set with intent. Helvetica Neue carries every word in the brand — from billboards down to the row labels in the app. Tight letter-spacing on display sizes, loose tracking on caps eyebrows.</p>
+
+    <div class="type-spec" style="margin-top: 32px">
+      <div class="sample" style="font-size: 156px; font-weight: 700">PULDAR</div>
+      <div class="info">
+        <b>Display</b>
+        Helvetica Neue<br/>
+        Bold · 700<br/>
+        Tracking −0.04em<br/>
+        Leading 0.95<br/><br/>
+        <b>Substitute</b>
+        Inter Tight 700 (system)
+      </div>
+    </div>
+
+    <div class="type-scale">
+      <div class="type-scale-row">
+        <span class="label">H1 / Display</span>
+        <span class="sample" style="font-size: 56px; font-weight: 200; letter-spacing: -0.035em">A budget, made visible.</span>
+        <span class="meta">56 / 60 · 200</span>
+      </div>
+      <div class="type-scale-row">
+        <span class="label">H2 / Title</span>
+        <span class="sample" style="font-size: 32px; font-weight: 700; letter-spacing: -0.025em">Three buckets, three priorities</span>
+        <span class="meta">32 / 38 · 700</span>
+      </div>
+      <div class="type-scale-row">
+        <span class="label">H3 / Section</span>
+        <span class="sample" style="font-size: 20px; font-weight: 600; letter-spacing: -0.015em">This month, you're on track.</span>
+        <span class="meta">20 / 26 · 600</span>
+      </div>
+      <div class="type-scale-row">
+        <span class="label">Body</span>
+        <span class="sample" style="font-size: 15px; font-weight: 400; color: var(--ink2); letter-spacing: 0">Fundamentals covers rent, bills, groceries — the floor under your feet. Always paid first.</span>
+        <span class="meta">15 / 23 · 400</span>
+      </div>
+      <div class="type-scale-row">
+        <span class="label">Caption</span>
+        <span class="sample" style="font-size: 12px; font-weight: 500; color: var(--ink3); letter-spacing: 0.02em">£1,247 of £2,500 spent · 14 days left</span>
+        <span class="meta">12 / 18 · 500</span>
+      </div>
+      <div class="type-scale-row">
+        <span class="label">Eyebrow</span>
+        <span class="sample" style="font-size: 10px; font-weight: 700; color: var(--ink3); letter-spacing: 0.22em; text-transform: uppercase">Fundamentals · 50%</span>
+        <span class="meta">10 · 700 · CAPS</span>
+      </div>
+      <div class="type-scale-row">
+        <span class="label">Numeric</span>
+        <span class="sample" style="font-size: 36px; font-weight: 200; letter-spacing: -0.02em; font-variant-numeric: tabular-nums">£1,247.30</span>
+        <span class="meta">Tabular · 200</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── 07 · VOICE ─────────────── -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">07</span>
+      <span class="section-title">Voice</span>
+    </div>
+
+    <h2 style="max-width: 22ch; margin-bottom: 18px">PULDAR sounds like a calm accountant who likes you.</h2>
+    <p style="max-width: 60ch">Direct, plain, slightly dry. Never cheerful, never finger-wagging. We don't explain the obvious. We don't add exclamation marks. We let the numbers do the threatening.</p>
+
+    <div class="voice-grid" style="margin-top: 40px">
+      <div class="voice yes">
+        <h4>We sound like this</h4>
+        <div class="line"><span class="tag">✓</span><span>"You spent £312 on Fun. The budget said £400. Good."</span></div>
+        <div class="line"><span class="tag">✓</span><span>"Rent is due in 6 days. Fundamentals can cover it."</span></div>
+        <div class="line"><span class="tag">✓</span><span>"You've kept 14% this month. Move it to Future?"</span></div>
+        <div class="line"><span class="tag">✓</span><span>"Less, but better."</span></div>
+      </div>
+
+      <div class="voice no">
+        <h4>Not like this</h4>
+        <div class="line"><span class="tag">✗</span><span>"🎉 Great job! You crushed your budget this month!"</span></div>
+        <div class="line"><span class="tag">✗</span><span>"Uh oh — you're spending a bit too much on Fun. Let's reel it in!"</span></div>
+        <div class="line"><span class="tag">✗</span><span>"Your financial wellness journey continues…"</span></div>
+        <div class="line"><span class="tag">✗</span><span>"Hey friend, just a little nudge…"</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── 08 · APPLICATIONS ─────────────── -->
+  <section class="section">
+    <div class="section-head">
+      <span class="section-num">08</span>
+      <span class="section-title">Applications</span>
+    </div>
+
+    <p>The interactive sheet — <b>02 Visual Reference.html</b> — shows every approved application: app icon, splash, springboard, store listing. Below, the iconography rules in print.</p>
+
+    <div class="three-up" style="margin-top: 32px">
+      <div class="card center">
+        <div style="width: 132px; height: 132px; border-radius: 30px; background: #F5F4F0; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1px var(--border)">
+          <svg style="width: 96px; height: 96px"><use href="#mark"/></svg>
+        </div>
+        <div style="margin-top: 24px; font-size: 12px; color: var(--ink); font-weight: 600">App icon · iOS</div>
+        <div style="font-size: 11px; color: var(--ink3); margin-top: 4px; letter-spacing: 0.06em">1024 · cream ground · 22.5% squircle</div>
+      </div>
+
+      <div class="card center">
+        <div style="width: 132px; height: 132px; border-radius: 30px; background: #0F0E0B; display: flex; align-items: center; justify-content: center">
+          <svg style="width: 96px; height: 96px"><use href="#mark"/></svg>
+        </div>
+        <div style="margin-top: 24px; font-size: 12px; color: var(--ink); font-weight: 600">App icon · Dark variant</div>
+        <div style="font-size: 11px; color: var(--ink3); margin-top: 4px; letter-spacing: 0.06em">Optional · for OLED hero placement</div>
+      </div>
+
+      <div class="card center">
+        <div style="width: 132px; height: 132px; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1px var(--border)">
+          <svg style="width: 96px; height: 96px"><use href="#mark"/></svg>
+        </div>
+        <div style="margin-top: 24px; font-size: 12px; color: var(--ink); font-weight: 600">Favicon · 32 / 64</div>
+        <div style="font-size: 11px; color: var(--ink3); margin-top: 4px; letter-spacing: 0.06em">White ground · 16% radius · paper border</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 56px; padding: 32px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg)">
+      <h4>Logo files in this package</h4>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 24px; font-size: 13px; color: var(--ink2); font-variant-numeric: tabular-nums">
+        <div><code style="color: var(--ink); font-weight: 600">assets/logo-primary.svg</code> — full colour</div>
+        <div><code style="color: var(--ink); font-weight: 600">assets/logo-mono-dark.svg</code> — black on light</div>
+        <div><code style="color: var(--ink); font-weight: 600">assets/logo-mono-light.svg</code> — cream on dark</div>
+        <div><code style="color: var(--ink); font-weight: 600">assets/lockup-horizontal.svg</code> — mark + wordmark</div>
+        <div><code style="color: var(--ink); font-weight: 600">assets/lockup-vertical.svg</code> — stacked</div>
+        <div><code style="color: var(--ink); font-weight: 600">assets/wordmark.svg</code> — type alone</div>
+        <div><code style="color: var(--ink); font-weight: 600">assets/app-icon.svg</code> — 1024 squircle, iOS-ready</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── Footer ─────────────── -->
+  <footer class="footer-doc">
+    <span>PULDAR · Brand Guidelines · v1.0</span>
+    <span>May 2026 · London</span>
+  </footer>
+
+</div>
+
+</body>
+</html>

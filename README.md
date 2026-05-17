@@ -259,6 +259,21 @@ without collecting user data by default.
 
 ---
 
+## Brand and App Icons
+
+- Full brand guidelines: [`docs/01 Guidelines.html`](docs/01%20Guidelines.html) (v1.0)
+- Source assets (1024 master + per-size exports): `PULDAR 2.0 Assets/2.1/App Icons/`
+- Five user-selectable icon variants (Settings → Personalization):
+  - **Default** — white-on-black
+  - **Color** — color-on-white
+  - **Color Dark** — color-on-black
+  - **Classic** — black-on-white
+  - **Tinted** — iOS 18+ grayscale variant for tinted-icon mode
+
+Variants are wired through `AppIconVariant` in `SettingsView.swift` and auto-included via `ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES` (no Info.plist entries needed).
+
+---
+
 ## Apple Frameworks and Stack
 
 - **UI:** SwiftUI

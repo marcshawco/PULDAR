@@ -105,39 +105,6 @@ PULDAR is built around three jobs:
 
 ---
 
-## Pricing Model
-
-PULDAR uses a trial-first subscription model:
-
-- **14-day free trial**
-- **$4.99/month**
-- **$49.99/year**
-
-Product IDs:
-
-- `puldar_pro_monthly`
-- `puldar_pro_yearly`
-
-Users who decline the trial still get a restricted freemium experience.
-
-### Pro Includes
-
-- unlimited entries
-- recurring expenses
-- rollover budgets
-- full export workflows
-- higher-usage budgeting workflows
-
-### Free Includes
-
-- onboarding
-- on-device model download
-- limited AI-powered entries
-- manual budgeting flow
-- restricted but usable core experience
-
----
-
 ## Privacy and AI Boundary
 
 PULDAR is intentionally local-first:
@@ -213,7 +180,6 @@ Because PULDAR does not rely on a central user database, support tooling is buil
 This helps investigate issues like:
 
 - incorrect budget math
-- unexpected subscription state
 - export failures
 - recurring expense issues
 
@@ -231,7 +197,6 @@ without collecting user data by default.
 - `DashboardView` — capture flow, budget state, recent transactions
 - `HistoryView` — filtering, grouping, exporting, deletion
 - `SettingsView` — income, allocation, diagnostics, export, personalization
-- `PaywallView` — trial-first subscription UI
 - `AppOnboardingView` — first-run onboarding
 
 ### Core Services
@@ -240,8 +205,7 @@ without collecting user data by default.
 - `BudgetEngine` — financial math, allocation, rollover, cached month state
 - `CategoryManager` — canonical/custom category mapping
 - `FinanceKitManager` — Apple Wallet import gating, import preview, deduplication scaffolding, fallback messaging
-- `StoreKitManager` — subscriptions, restore, entitlement listening
-- `UsageTracker` — free-tier usage tracking
+- `UsageTracker` — usage tracking
 - `DiagnosticLogger` — optional local support logging
 - `WidgetBudgetSnapshotStore` — widget snapshot publishing
 
@@ -278,7 +242,6 @@ Variants are wired through `AppIconVariant` in `SettingsView.swift` and auto-inc
 
 - **UI:** SwiftUI
 - **Persistence:** SwiftData
-- **Subscriptions:** StoreKit 2
 - **Widgets:** WidgetKit
 - **Receipt OCR / scan:** Vision + VisionKit
 - **Apple Wallet import:** FinanceKit-ready scaffolding
@@ -301,15 +264,6 @@ Variants are wired through `AppIconVariant` in `SettingsView.swift` and auto-inc
 1. Open [PULDAR.xcodeproj](/Users/astral/Documents/PROJECTS/XCODE/PULDAR/PULDAR.xcodeproj)
 2. Select the `PULDAR` scheme
 3. Build and run
-
-### StoreKit Testing
-
-- local config: `PULDAR/Resources/Products.storekit`
-- expected products:
-  - `puldar_pro_monthly`
-  - `puldar_pro_yearly`
-
-Note: actual introductory trial behavior still needs to be configured in App Store Connect / Xcode StoreKit configuration, not just in app copy.
 
 ### iCloud / CloudKit
 
@@ -343,9 +297,7 @@ These are usually simulator/debugger environment messages rather than app logic 
 
 ### Areas Worth Validating Before Release
 
-- onboarding → paywall → freemium fallback
-- monthly and yearly subscription purchase flow
-- restore purchases
+- onboarding flow
 - Apple Wallet eligibility and fallback messaging
 - FinanceKit import deduplication once entitlement access is granted
 - widget rendering and refresh timing

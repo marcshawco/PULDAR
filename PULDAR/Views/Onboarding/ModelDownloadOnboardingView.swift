@@ -164,7 +164,7 @@ struct ModelDownloadOnboardingView: View {
     }
 
     private var buttonTextColor: Color {
-        primaryButtonDisabled ? AppColors.textTertiary : .white
+        primaryButtonDisabled ? AppColors.textTertiary : AppColors.background
     }
 
     private func infoRow(icon: String, text: String, compact: Bool) -> some View {

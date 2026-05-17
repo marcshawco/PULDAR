@@ -191,7 +191,8 @@ struct ExpenseListView: View {
                     Image(systemName: "trash.fill")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.white)
-                        .frame(width: revealWidth, height: 56)
+                        .frame(width: revealWidth)
+                        .frame(maxHeight: .infinity)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

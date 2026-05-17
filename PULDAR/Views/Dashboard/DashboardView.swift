@@ -625,6 +625,7 @@ struct DashboardView: View {
                         onDeleteExpense: deleteExpense
                     )
                     .padding(.horizontal)
+                    .padding(.top, 10)
                 }
             }
         }

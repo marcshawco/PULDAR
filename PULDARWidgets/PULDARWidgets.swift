@@ -1,5 +1,43 @@
 import SwiftUI
+import UIKit
 import WidgetKit
+
+// MARK: - Palette
+
+/// Brand-aligned adaptive colors for the widget. Each `Color` resolves
+/// per-trait at render time, so the same view automatically picks up
+/// the system appearance change without a SwiftUI rebuild.
+private enum WidgetPalette {
+    /// Outer widget canvas. Warm cream in light mode, warm dark in dark mode.
+    static let background = adaptive(
+        light: UIColor(red: 0.961, green: 0.957, blue: 0.941, alpha: 1.0),  // #F5F4F0
+        dark:  UIColor(red: 0.102, green: 0.094, blue: 0.082, alpha: 1.0)   // #1A1816
+    )
+
+    /// Subtle tile / button fill that sits one step above the canvas.
+    static let tile = adaptive(
+        light: UIColor(red: 1.000, green: 1.000, blue: 1.000, alpha: 1.0),  // #FFFFFF
+        dark:  UIColor(red: 0.165, green: 0.153, blue: 0.141, alpha: 1.0)   // #2A2724
+    )
+
+    /// Primary text — high contrast in both modes.
+    static let ink = adaptive(
+        light: UIColor(red: 0.059, green: 0.055, blue: 0.043, alpha: 1.0),  // #0F0E0B
+        dark:  UIColor(red: 0.961, green: 0.957, blue: 0.941, alpha: 1.0)   // #F5F4F0
+    )
+
+    /// Muted secondary text.
+    static let inkMuted = adaptive(
+        light: UIColor(red: 0.541, green: 0.529, blue: 0.502, alpha: 1.0),  // #8A8780
+        dark:  UIColor(red: 0.741, green: 0.725, blue: 0.686, alpha: 1.0)   // #BDB9AF
+    )
+
+    private static func adaptive(light: UIColor, dark: UIColor) -> Color {
+        Color(UIColor { trait in
+            trait.userInterfaceStyle == .dark ? dark : light
+        })
+    }
+}
 
 // MARK: - Snapshot model & reader
 
@@ -49,7 +87,7 @@ private struct KickerLabel: View {
             .font(.system(size: 9, weight: .bold))
             .kerning(1.4)
             .textCase(.uppercase)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(WidgetPalette.inkMuted)
     }
 }
 
@@ -88,7 +126,9 @@ private struct PULDARQuickAddWidgetView: View {
             default:           mediumQuickAdd
             }
         }
-        .containerBackground(.fill.tertiary, for: .widget)
+        .containerBackground(for: .widget) {
+            WidgetPalette.background
+        }
     }
 
     private var smallQuickAdd: some View {
@@ -100,24 +140,25 @@ private struct PULDARQuickAddWidgetView: View {
 
                 ZStack {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.primary.opacity(0.08))
+                        .fill(WidgetPalette.tile)
                         .frame(width: 44, height: 44)
                     Image(systemName: "plus")
                         .font(.system(size: 22, weight: .light))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(WidgetPalette.ink)
                 }
+                .widgetAccentable()
 
                 Spacer(minLength: 10)
 
                 Text("Add expense")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(WidgetPalette.ink)
                     .lineLimit(1)
 
                 if let snapshot = entry.snapshot {
                     Text("\(snapshot.totalRemaining.formatted(.currency(code: snapshot.currencyCode))) left")
                         .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(WidgetPalette.inkMuted)
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -137,17 +178,18 @@ private struct PULDARQuickAddWidgetView: View {
             if let snapshot = entry.snapshot {
                 Text(snapshot.totalRemaining, format: .currency(code: snapshot.currencyCode))
                     .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(WidgetPalette.ink)
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
                 Text("left this month")
                     .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(WidgetPalette.inkMuted)
             } else {
                 Text("Log an expense in one tap.")
                     .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(WidgetPalette.inkMuted)
             }
 
             Spacer(minLength: 12)
@@ -166,17 +208,17 @@ private struct PULDARQuickAddWidgetView: View {
             HStack(spacing: 7) {
                 Image(systemName: icon)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(WidgetPalette.ink)
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(WidgetPalette.ink)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.primary.opacity(0.08))
+                    .fill(WidgetPalette.tile)
             )
         }
     }

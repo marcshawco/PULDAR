@@ -61,6 +61,8 @@ final class LLMService {
     private var modelContainer: ModelContainer?
     private var parseCache: [String: LLMExpenseResult] = [:]
     private let parseCacheKey = "llmParseCache.v2"
+    private var folioParseCache: [String: FolioCommandResult] = [:]
+    private let folioParseCacheKey = "llmFolioParseCache.v1"
     private var lastLoadProgressUpdate: CFTimeInterval = 0
     private var lastReportedProgressBucket: Int = -1
 
@@ -68,6 +70,7 @@ final class LLMService {
 
     init() {
         restoreParseCache()
+        restoreFolioParseCache()
     }
 
     // MARK: - Model Lifecycle
@@ -194,6 +197,267 @@ final class LLMService {
         let refined = refineParsedExpense(parsed, originalInput: input)
         cacheParsedExpense(refined, for: cacheKey)
         return refined
+    }
+
+    // MARK: - Folio (Net Worth) Inference
+
+    /// Parse a natural-language net-worth command into a structured Folio command.
+    ///
+    /// e.g. `"I added $250 to my savings"` or `"my stock portfolio went up 14%"`.
+    /// Uses a Folio-scoped prompt and a **separate** cache so it never collides
+    /// with the expense parser.  All arithmetic is done later in `FolioEngine`.
+    func parseFolioCommand(
+        from input: String,
+        currencyCode: String = "USD",
+        inputLanguage: AppPreferences.InputLanguage = .english
+    ) async throws -> FolioCommandResult {
+        if modelContainer == nil {
+            await loadModel()
+        }
+        guard let container = modelContainer else { throw LLMError.modelNotLoaded }
+
+        let cacheKey = makeFolioParseCacheKey(input: input, inputLanguage: inputLanguage)
+        if let cached = folioParseCache[cacheKey] {
+            return cached
+        }
+
+        let systemPrompt = makeFolioSystemPrompt(
+            currencyCode: currencyCode,
+            inputLanguage: inputLanguage
+        )
+
+        let messages: [[String: String]] = [
+            ["role": "system", "content": systemPrompt],
+            ["role": "user",   "content": input]
+        ]
+
+        let responseText: String = try await container.perform { context in
+            let tokenIds = try context.tokenizer.applyChatTemplate(messages: messages)
+            let promptString = context.tokenizer.decode(tokens: tokenIds)
+
+            let generateParams = GenerateParameters(temperature: 0.1)
+
+            let processedInput = try await context.processor.prepare(
+                input: .init(prompt: promptString)
+            )
+
+            var collected = ""
+            var generatedTokenCount = 0
+            let stream = try MLXLMCommon.generateTokens(
+                input: processedInput,
+                parameters: generateParams,
+                context: context
+            )
+
+            for await generation in stream {
+                if case let .token(token) = generation {
+                    collected += context.tokenizer.decode(tokens: [token])
+                    generatedTokenCount += 1
+                    if generatedTokenCount >= 200 {
+                        break
+                    }
+                }
+            }
+            return collected
+        }
+
+        let parsed = try extractFolioJSON(from: responseText, originalInput: input)
+        cacheFolioCommand(parsed, for: cacheKey)
+        return parsed
+    }
+
+    private func makeFolioSystemPrompt(
+        currencyCode: String,
+        inputLanguage: AppPreferences.InputLanguage
+    ) -> String {
+        let categories = FolioCategory.allCases
+            .filter { $0 != .other }
+            .map(\.rawValue)
+            .joined(separator: ", ")
+
+        return """
+        You are a net-worth assistant. Given a sentence about money, extract a single \
+        balance-sheet command. Do NOT do any arithmetic — only identify the item, the \
+        operation, and the number.
+
+        \(inputLanguage.parserInstruction)
+        The user's display currency is \(currencyCode). Preserve the numeric value from the input, accept dot or comma decimals, and do not convert currencies.
+
+        Respond ONLY with a single JSON object — no markdown, no commentary:
+        {"itemName": "savings", "category": "savings", "kind": "fund", "operation": "add", "amount": 250, "percent": null}
+
+        kind must be exactly one of:
+        asset, fund, liability
+        - asset: things you own (vehicle, property, collectibles, stocks, crypto).
+        - fund: cash you hold (savings, checking, sock drawer / cash, emergency fund).
+        - liability: money you owe (student loan, private loan, car loan, personal loan, medical loan, credit card).
+
+        operation must be exactly one of:
+        add, subtract, set, percentChange
+        - add: money added to a fund or asset, or a balance going up. Put the amount in "amount" and null in "percent".
+        - subtract: a payment toward a debt, a withdrawal, or a balance going down. Put the amount in "amount".
+        - set: assigning an explicit current value, e.g. "set my car to 12000" or "my house is worth 300000". Put the value in "amount".
+        - percentChange: a relative move, e.g. "went up 14%" or "dropped 8%". Put the number in "percent" (use a negative number for decreases) and null in "amount".
+
+        category must be exactly one of:
+        \(categories)
+
+        Examples:
+        - "I added $250 to my savings" -> {"itemName": "savings", "category": "savings", "kind": "fund", "operation": "add", "amount": 250, "percent": null}
+        - "My stock portfolio went up 14%" -> {"itemName": "stock portfolio", "category": "stocks", "kind": "asset", "operation": "percentChange", "amount": null, "percent": 14}
+        - "I paid $580 towards my medical loan" -> {"itemName": "medical loan", "category": "medical_loan", "kind": "liability", "operation": "subtract", "amount": 580, "percent": null}
+        - "Set my car to $12,000" -> {"itemName": "car", "category": "vehicle", "kind": "asset", "operation": "set", "amount": 12000, "percent": null}
+        """
+    }
+
+    /// Find and decode a Folio command JSON object from noisy LLM output,
+    /// falling back to regex/keyword extraction from the original phrase.
+    private func extractFolioJSON(from text: String, originalInput: String) throws -> FolioCommandResult {
+        guard let openBrace = text.firstIndex(of: "{"),
+              let closeBrace = text[openBrace...].lastIndex(of: "}") else {
+            return try folioRegexFallback(from: text, originalInput: originalInput)
+        }
+
+        let jsonSlice = String(text[openBrace...closeBrace])
+
+        guard let data = jsonSlice.data(using: .utf8) else {
+            return try folioRegexFallback(from: text, originalInput: originalInput)
+        }
+
+        do {
+            return try JSONDecoder().decode(FolioCommandResult.self, from: data)
+        } catch {
+            return try folioRegexFallback(from: text, originalInput: originalInput)
+        }
+    }
+
+    /// Last-resort Folio parser. Reads the user's original phrase (more
+    /// reliable than malformed model text) for a percentage or amount,
+    /// the operation, and the category/kind.
+    private func folioRegexFallback(from text: String, originalInput: String) throws -> FolioCommandResult {
+        let source = originalInput.isEmpty ? text : originalInput
+        let lower = source.lowercased()
+
+        let category = FolioCategory.resolve(source)
+        let kind = category.kind
+
+        // Percentage move? e.g. "up 14%", "dropped 8%".
+        let percentPattern = /(-?\d+(?:[.,]\d+)?)\s*%/
+        if let match = source.firstMatch(of: percentPattern),
+           let rawPercent = Double(String(match.1).replacingOccurrences(of: ",", with: ".")) {
+            let decreaseSignals = ["down", "dropped", "drop", "fell", "lost", "decreased", "lower", "decline"]
+            let isDecrease = decreaseSignals.contains { lower.contains($0) }
+            let signedPercent = isDecrease ? -abs(rawPercent) : rawPercent
+            return FolioCommandResult(
+                itemName: source,
+                category: category.rawValue,
+                kind: kind.rawValue,
+                operation: FolioOperation.percentChange.rawValue,
+                amount: nil,
+                percent: signedPercent
+            )
+        }
+
+        // Otherwise an absolute amount.
+        let amountPattern = /[$€£]?\s*([0-9][0-9.,]*)/
+        guard let amountMatch = source.firstMatch(of: amountPattern),
+              let amount = Self.parseLooseAmount(String(amountMatch.1)) else {
+            throw LLMError.noJSONFound(text)
+        }
+
+        let operation = inferFolioOperation(from: lower, kind: kind)
+        return FolioCommandResult(
+            itemName: source,
+            category: category.rawValue,
+            kind: kind.rawValue,
+            operation: operation.rawValue,
+            amount: amount,
+            percent: nil
+        )
+    }
+
+    private func inferFolioOperation(from lowercasedInput: String, kind: FolioKind) -> FolioOperation {
+        let subtractSignals = ["paid", "pay", "toward", "withdrew", "withdraw", "took out", "reduce", "less", "down by", "paid off", "paid down"]
+        let addSignals = ["added", "add", "deposit", "put in", "saved", "contributed", "up by", "increased", "gained", "earned"]
+        let setSignals = ["set", "now worth", "is worth", "worth", "is now", "value is", "currently", "balance is", "is at"]
+
+        if subtractSignals.contains(where: { lowercasedInput.contains($0) }) {
+            return .subtract
+        }
+        if addSignals.contains(where: { lowercasedInput.contains($0) }) {
+            return .add
+        }
+        if setSignals.contains(where: { lowercasedInput.contains($0) }) {
+            return .set
+        }
+        // Default: paying down a liability is usually subtract; otherwise set.
+        return kind == .liability ? .subtract : .set
+    }
+
+    /// Parse a possibly-grouped number string ("12,000", "12,50", "1,200.50").
+    private static func parseLooseAmount(_ raw: String) -> Double? {
+        var s = raw.replacingOccurrences(of: "[^0-9.,]", with: "", options: .regularExpression)
+        while let last = s.last, last == "." || last == "," { s.removeLast() }
+        guard !s.isEmpty else { return nil }
+
+        let hasDot = s.contains(".")
+        let hasComma = s.contains(",")
+
+        if hasDot && hasComma {
+            // Assume comma = thousands separator, dot = decimal.
+            s = s.replacingOccurrences(of: ",", with: "")
+        } else if hasComma {
+            let parts = s.split(separator: ",", omittingEmptySubsequences: false)
+            if parts.count == 2, parts.last?.count == 2 {
+                s = s.replacingOccurrences(of: ",", with: ".")  // "12,50" -> decimal
+            } else {
+                s = s.replacingOccurrences(of: ",", with: "")   // thousands separators
+            }
+        }
+
+        return Double(s)
+    }
+
+    // MARK: - Folio Parse Cache
+
+    private func makeFolioParseCacheKey(
+        input: String,
+        inputLanguage: AppPreferences.InputLanguage
+    ) -> String {
+        let normalizedInput = input
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return "folio||\(inputLanguage.rawValue)||\(normalizedInput)"
+    }
+
+    private func cacheFolioCommand(_ parsed: FolioCommandResult, for key: String) {
+        folioParseCache[key] = parsed
+        trimFolioParseCacheIfNeeded()
+        persistFolioParseCache()
+    }
+
+    private func trimFolioParseCacheIfNeeded() {
+        let maxCacheEntries = 500
+        guard folioParseCache.count > maxCacheEntries else { return }
+        let overflowCount = folioParseCache.count - maxCacheEntries
+        let keysToRemove = folioParseCache.keys.sorted().prefix(overflowCount)
+        for key in keysToRemove {
+            folioParseCache.removeValue(forKey: key)
+        }
+    }
+
+    private func restoreFolioParseCache() {
+        guard let data = UserDefaults.standard.data(forKey: folioParseCacheKey) else { return }
+        guard let decoded = try? JSONDecoder().decode([String: FolioCommandResult].self, from: data) else {
+            return
+        }
+        folioParseCache = decoded
+        trimFolioParseCacheIfNeeded()
+    }
+
+    private func persistFolioParseCache() {
+        guard let data = try? JSONEncoder().encode(folioParseCache) else { return }
+        UserDefaults.standard.set(data, forKey: folioParseCacheKey)
     }
 
     private func makeSystemPrompt(

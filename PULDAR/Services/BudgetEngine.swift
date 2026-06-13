@@ -73,7 +73,15 @@ final class BudgetEngine {
         }
     }
 
-    private var monthlyStatusCache: [String: [BucketStatus]] = [:]
+    private struct MonthlyCacheKey: Hashable {
+        let monthStamp: Int
+        let revision: UInt64
+        let dataFingerprint: Int
+    }
+
+    private var monthlyStatusCache: [MonthlyCacheKey: [BucketStatus]] = [:]
+    private var totalSpentCache: [MonthlyCacheKey: Double] = [:]
+    private var spendCapacityCache: [MonthlyCacheKey: Double] = [:]
     private var dataRevision: UInt64 = 0
 
     init() {
@@ -134,13 +142,28 @@ final class BudgetEngine {
         recurringExpenses: [RecurringExpense] = [],
         for month: Date = .now
     ) -> Double {
-        let base = effectiveMonthlyIncome(expenses: expenses, for: month)
-        guard rolloverEnabled else { return base }
-        return base + totalRolloverCarryover(
+        let key = monthlyCacheKey(
+            month: month,
             expenses: expenses,
-            recurringExpenses: recurringExpenses,
-            for: month
+            recurringExpenses: recurringExpenses
         )
+        if let cached = spendCapacityCache[key] {
+            return cached
+        }
+        let base = effectiveMonthlyIncome(expenses: expenses, for: month)
+        let result: Double
+        if rolloverEnabled {
+            result = base + totalRolloverCarryover(
+                expenses: expenses,
+                recurringExpenses: recurringExpenses,
+                for: month
+            )
+        } else {
+            result = base
+        }
+        spendCapacityCache[key] = result
+        trimCache(&spendCapacityCache)
+        return result
     }
 
     /// Current percentage (0...1) configured for a bucket.
@@ -195,13 +218,24 @@ final class BudgetEngine {
         recurringExpenses: [RecurringExpense] = [],
         for month: Date = .now
     ) -> Double {
+        let key = monthlyCacheKey(
+            month: month,
+            expenses: expenses,
+            recurringExpenses: recurringExpenses
+        )
+        if let cached = totalSpentCache[key] {
+            return cached
+        }
         let directSpent = filterToMonth(expenses, month: month)
             .filter { !isIncomeTransaction($0) }
             .reduce(0) { partial, expense in
                 partial + (expense.amount.isFinite ? expense.amount : 0)
             }
         let recurringSpent = recurringTotal(recurringExpenses)
-        return directSpent + recurringSpent
+        let result = directSpent + recurringSpent
+        totalSpentCache[key] = result
+        trimCache(&totalSpentCache)
+        return result
     }
 
     /// Build status snapshots for every bucket in the current month.
@@ -210,7 +244,7 @@ final class BudgetEngine {
         recurringExpenses: [RecurringExpense] = [],
         for month: Date = .now
     ) -> [BucketStatus] {
-        let cacheKey = makeStatusCacheKey(
+        let cacheKey = monthlyCacheKey(
             month: month,
             expenses: expenses,
             recurringExpenses: recurringExpenses
@@ -247,13 +281,13 @@ final class BudgetEngine {
                 spent: spent
             )
         }
-        cacheMonthlyStatus(result, for: cacheKey)
+        monthlyStatusCache[cacheKey] = result
+        trimCache(&monthlyStatusCache)
         return result
     }
 
     /// Bump when expense/recurring data changes to keep cached month snapshots valid.
     func markDataChanged() {
-        dataRevision &+= 1
         invalidateMonthlyStatusCache()
     }
 
@@ -414,67 +448,62 @@ final class BudgetEngine {
     private static let bucketPercentageKey = "bucketPercentages"
     private let maxMonthlyCacheEntries = 36
 
-    private func makeStatusCacheKey(
+    private func monthlyCacheKey(
         month: Date,
         expenses: [Expense],
         recurringExpenses: [RecurringExpense]
-    ) -> String {
+    ) -> MonthlyCacheKey {
         let calendar = Calendar.current
-        let monthKey = calendar.dateComponents([.year, .month], from: month)
-        let monthStamp = "\(monthKey.year ?? 0)-\(monthKey.month ?? 0)"
-        let percentagesStamp = BudgetBucket.allCases.map { bucket in
-            "\(bucket.rawValue):\(percentage(for: bucket))"
-        }
-        .joined(separator: "|")
-        let expenseStamp = filterToMonth(expenses, month: month)
-            .map { expense in
-                [
-                    expense.id.uuidString,
-                    String(format: "%.2f", expense.amount),
-                    expense.bucket,
-                    expense.category,
-                    "\(expense.date.timeIntervalSinceReferenceDate)",
-                    "\(expense.updatedAt?.timeIntervalSinceReferenceDate ?? 0)"
-                ].joined(separator: ":")
-            }
-            .sorted()
-            .joined(separator: "|")
-        let recurringStamp = recurringExpenses
-            .map { recurring in
-                [
-                    recurring.id.uuidString,
-                    String(format: "%.2f", recurring.safeAmount),
-                    recurring.bucket,
-                    recurring.isActive ? "active" : "inactive",
-                    "\(recurring.updatedAt?.timeIntervalSinceReferenceDate ?? 0)"
-                ].joined(separator: ":")
-            }
-            .sorted()
-            .joined(separator: "|")
-
-        return [
-            monthStamp,
-            "dataRevision:\(dataRevision)",
-            "income:\(monthlyIncome)",
-            "rollover:\(rolloverEnabled)",
-            percentagesStamp,
-            "expenses:\(expenseStamp)",
-            "recurring:\(recurringStamp)"
-        ].joined(separator: "||")
+        let comps = calendar.dateComponents([.year, .month], from: month)
+        let monthStamp = (comps.year ?? 0) * 100 + (comps.month ?? 0)
+        return MonthlyCacheKey(
+            monthStamp: monthStamp,
+            revision: dataRevision,
+            dataFingerprint: dataFingerprint(expenses: expenses, recurring: recurringExpenses)
+        )
     }
 
-    private func cacheMonthlyStatus(_ status: [BucketStatus], for key: String) {
-        monthlyStatusCache[key] = status
-        guard monthlyStatusCache.count > maxMonthlyCacheEntries else { return }
-        let overflow = monthlyStatusCache.count - maxMonthlyCacheEntries
-        let keysToRemove = monthlyStatusCache.keys.sorted().prefix(overflow)
-        for keyToRemove in keysToRemove {
-            monthlyStatusCache.removeValue(forKey: keyToRemove)
+    /// Cheap fingerprint to invalidate caches when the SwiftData arrays change
+    /// without an explicit `markDataChanged()` call (e.g. iCloud sync).
+    private func dataFingerprint(
+        expenses: [Expense],
+        recurring: [RecurringExpense]
+    ) -> Int {
+        var hasher = Hasher()
+        hasher.combine(expenses.count)
+        hasher.combine(recurring.count)
+        var latestExpense: Date = .distantPast
+        var totalAmount: Double = 0
+        for expense in expenses {
+            let stamp = expense.updatedAt ?? expense.date
+            if stamp > latestExpense { latestExpense = stamp }
+            totalAmount += expense.amount.isFinite ? expense.amount : 0
+        }
+        hasher.combine(latestExpense)
+        hasher.combine(totalAmount)
+        var latestRecurring: Date = .distantPast
+        for r in recurring {
+            let stamp = r.updatedAt ?? .distantPast
+            if stamp > latestRecurring { latestRecurring = stamp }
+        }
+        hasher.combine(latestRecurring)
+        return hasher.finalize()
+    }
+
+    private func trimCache<V>(_ cache: inout [MonthlyCacheKey: V]) {
+        guard cache.count > maxMonthlyCacheEntries else { return }
+        let overflow = cache.count - maxMonthlyCacheEntries
+        let keysToRemove = cache.keys.prefix(overflow)
+        for key in keysToRemove {
+            cache.removeValue(forKey: key)
         }
     }
 
     private func invalidateMonthlyStatusCache() {
+        dataRevision &+= 1
         monthlyStatusCache.removeAll(keepingCapacity: true)
+        totalSpentCache.removeAll(keepingCapacity: true)
+        spendCapacityCache.removeAll(keepingCapacity: true)
     }
 
     private func configureCloudSync() {

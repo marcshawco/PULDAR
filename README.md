@@ -72,6 +72,24 @@ PULDAR is built around three jobs:
 - monthly remaining summary
 - Home Screen widget support for glanceable balances
 
+### Folio — Net Worth
+
+PULDAR also tracks the other half of your finances: a **balance sheet**.
+
+- **Net Worth = Assets + Funds − Liabilities**, shown as a big number at the top
+- three groups you manage:
+  - **Liabilities** — student, private, car, personal, medical loans, credit cards
+  - **Assets** — vehicles, property, collectibles, stocks, crypto
+  - **Funds** — savings, checking, sock drawer, emergency fund
+- the **same on-device AI chat**, scoped to net-worth phrases:
+  - `I added $250 to my savings`
+  - `my stock portfolio went up 14%`
+  - `I paid $580 towards my medical loan`
+  - `set my car to $12,000`
+- a **full ledger**: every change is a dated entry, powering a net-worth-over-time series, a history view, and CSV / JSON export
+- **manual valuation only** — no price APIs, fully offline
+- **fully separate from the monthly budget** — Folio never touches budget buckets
+
 ### History and Data Portability
 
 - month-based history view
@@ -195,14 +213,16 @@ without collecting user data by default.
 
 - `ContentView` — root shell, dependency injection, onboarding presentation
 - `DashboardView` — capture flow, budget state, recent transactions
+- `FolioView` — net-worth balance sheet, breakdown chart, AI net-worth chat
 - `HistoryView` — filtering, grouping, exporting, deletion
 - `SettingsView` — income, allocation, diagnostics, export, personalization
 - `AppOnboardingView` — first-run onboarding
 
 ### Core Services
 
-- `LLMService` — model lifecycle, prompting, parse extraction, parse cache
+- `LLMService` — model lifecycle, prompting, parse extraction, parse cache (expense + Folio command parsing, separate caches)
 - `BudgetEngine` — financial math, allocation, rollover, cached month state
+- `FolioEngine` — net-worth math, group subtotals, net-worth-over-time series, and applying parsed Folio commands (match/create item, compute, ledger)
 - `CategoryManager` — canonical/custom category mapping
 - `FinanceKitManager` — Apple Wallet import gating, import preview, deduplication scaffolding, fallback messaging
 - `DiagnosticLogger` — optional local support logging
@@ -213,6 +233,8 @@ without collecting user data by default.
 - SwiftData:
   - `Expense`
   - `RecurringExpense`
+  - `FolioItem` (assets, funds, liabilities)
+  - `FolioEntry` (net-worth ledger)
 - UserDefaults / iCloud KVS:
   - usage state
   - theme

@@ -14,6 +14,7 @@ import UIKit
 struct ContentView: View {
     private enum RootTab: Hashable {
         case home
+        case folio
         case history
         case settings
     }
@@ -22,6 +23,7 @@ struct ContentView: View {
 
     @State private var llmService = LLMService()
     @State private var budgetEngine = BudgetEngine()
+    @State private var folioEngine = FolioEngine()
     @State private var categoryManager = CategoryManager()
     @State private var networkMonitor = NetworkMonitor()
     @State private var diagnosticLogger = DiagnosticLogger.shared
@@ -72,6 +74,16 @@ struct ContentView: View {
                 }
                 .tag(RootTab.home)
 
+            FolioView()
+                .environment(folioEngine)
+                .environment(llmService)
+                .environment(appPreferences)
+                .environment(diagnosticLogger)
+                .tabItem {
+                    Label("Folio", systemImage: "building.columns")
+                }
+                .tag(RootTab.folio)
+
             HistoryView()
                 .environment(appPreferences)
                 .environment(budgetEngine)
@@ -94,6 +106,7 @@ struct ContentView: View {
         }
         .environment(llmService)
         .environment(budgetEngine)
+        .environment(folioEngine)
         .environment(categoryManager)
         .environment(networkMonitor)
         .environment(diagnosticLogger)
@@ -181,5 +194,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [Expense.self, RecurringExpense.self], inMemory: true)
+        .modelContainer(for: [Expense.self, RecurringExpense.self, FolioItem.self, FolioEntry.self], inMemory: true)
 }

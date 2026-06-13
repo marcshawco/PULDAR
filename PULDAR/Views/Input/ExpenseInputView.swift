@@ -3,6 +3,7 @@ import SwiftUI
 struct ExpenseInputView: View {
     let isProcessing: Bool
     let onSubmit: (String) async -> Bool
+    var placeholder: String = "spent 45 at whole foods…"
     var focusTrigger: Int = 0
     var onCameraTap: (() -> Void)? = nil
     var onFocusChange: ((Bool) -> Void)? = nil
@@ -14,7 +15,7 @@ struct ExpenseInputView: View {
     var body: some View {
         HStack(spacing: 8) {
             TextField(
-                "spent 45 at whole foods…",
+                placeholder,
                 text: $inputText
             )
             .textFieldStyle(.plain)
@@ -29,17 +30,19 @@ struct ExpenseInputView: View {
                 onFocusChange?(isFocused)
             }
 
-            Button {
-                isFocused = false
-                onCameraTap?()
-            } label: {
-                Image(systemName: "camera")
-                    .font(.system(size: 18, weight: .light))
-                    .foregroundStyle(AppColors.textTertiary)
-                    .padding(4)
+            if onCameraTap != nil {
+                Button {
+                    isFocused = false
+                    onCameraTap?()
+                } label: {
+                    Image(systemName: "camera")
+                        .font(.system(size: 18, weight: .light))
+                        .foregroundStyle(AppColors.textTertiary)
+                        .padding(4)
+                }
+                .buttonStyle(.plain)
+                .disabled(isProcessing)
             }
-            .buttonStyle(.plain)
-            .disabled(isProcessing)
 
             Button(action: handleSubmit) {
                 Group {

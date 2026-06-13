@@ -24,7 +24,9 @@ struct PULDARApp: App {
     static let sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Expense.self,
-            RecurringExpense.self
+            RecurringExpense.self,
+            FolioItem.self,
+            FolioEntry.self
         ])
 
         do {

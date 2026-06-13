@@ -56,6 +56,24 @@ final class LLMService {
             || defaults.bool(forKey: "didCompleteModelOnboarding")
     }
 
+    /// Whether this device can reasonably run the local model.
+    ///
+    /// Low-RAM devices (≈ 3 GB, e.g. iPhone XR / SE 2) can't safely hold the
+    /// ~400 MB model plus the Metal working set, so we skip it and fall back to
+    /// the deterministic parser. The Simulator can't run MLX at all.
+    var supportsLocalModel: Bool {
+        #if targetEnvironment(simulator)
+        return false
+        #else
+        return Self.hasEnoughMemoryForLocalModel
+        #endif
+    }
+
+    private static let hasEnoughMemoryForLocalModel: Bool = {
+        let minimumRAM: UInt64 = 4 * 1024 * 1024 * 1024  // 4 GB
+        return ProcessInfo.processInfo.physicalMemory >= minimumRAM
+    }()
+
     // MARK: - Internals
 
     private var modelContainer: ModelContainer?
@@ -86,6 +104,13 @@ final class LLMService {
         loadState = .error("Local AI runs on a physical device. Continue to test the app UI in Simulator.")
         return
         #else
+        guard Self.hasEnoughMemoryForLocalModel else {
+            // Low-RAM device: skip the model. Parsing uses the deterministic
+            // fallback, so there's no error banner — it just works, faster.
+            loadState = .idle
+            return
+        }
+
         // If we've already downloaded once, skip the noisy "downloading" state.
         loadState = hasDownloadedModel ? .loading : .downloading(progress: 0)
 
@@ -130,7 +155,11 @@ final class LLMService {
         if modelContainer == nil {
             await loadModel()
         }
-        guard let container = modelContainer else { throw LLMError.modelNotLoaded }
+        guard let container = modelContainer else {
+            // No model available (low-RAM device, Simulator, or load failure):
+            // fall back to the deterministic parser instead of failing.
+            return deterministicParseExpense(from: input)
+        }
 
         let categories = (allowedCategories?.isEmpty == false)
             ? (allowedCategories ?? defaultCategories)
@@ -214,7 +243,10 @@ final class LLMService {
         if modelContainer == nil {
             await loadModel()
         }
-        guard let container = modelContainer else { throw LLMError.modelNotLoaded }
+        guard let container = modelContainer else {
+            // No model available: fall back to the deterministic Folio parser.
+            return try folioRegexFallback(from: input, originalInput: input)
+        }
 
         let cacheKey = makeFolioParseCacheKey(input: input, inputLanguage: inputLanguage)
         if let cached = folioParseCache[cacheKey] {
@@ -725,6 +757,65 @@ final class LLMService {
             amount: amount,
             category: category,
             transactionType: transactionType
+        )
+    }
+
+    // MARK: - Deterministic Fallback
+
+    /// Parse an expense **without** the model — regex amount + deterministic
+    /// category (reusing `ExpenseCategory`'s alias/keyword banks) + a heuristic
+    /// merchant. Used on devices that can't run the local model or when loading
+    /// fails. Sign / income detection is handled downstream by
+    /// `LLMExpenseResult.signedAmount` / `isIncome` on the raw input.
+    private func deterministicParseExpense(from input: String) -> LLMExpenseResult {
+        let amount = Self.firstAmount(in: input) ?? 0
+        let category = ExpenseCategory.resolve(input)
+        let merchant = Self.heuristicMerchant(from: input)
+        return LLMExpenseResult(
+            merchant: merchant,
+            amount: amount,
+            category: category.rawValue,
+            transactionType: nil
+        )
+    }
+
+    private static func firstAmount(in text: String) -> Double? {
+        guard let match = text.firstMatch(of: /[$€£]?\s*([0-9][0-9.,]*)/) else { return nil }
+        return parseLooseAmount(String(match.1))
+    }
+
+    /// Best-effort merchant from raw text: prefer the phrase after a connector
+    /// ("at", "from", …), else the leftover words with amounts and filler
+    /// stripped.
+    private static func heuristicMerchant(from input: String) -> String {
+        let stripped = stripAmountTokens(input)
+
+        for marker in [" at ", " from ", " to ", " for ", " on "] {
+            if let range = stripped.range(of: marker, options: .caseInsensitive) {
+                let tail = stripped[range.upperBound...].trimmingCharacters(in: .whitespaces)
+                if !tail.isEmpty {
+                    return tail.normalizedMerchantName()
+                }
+            }
+        }
+
+        let stopWords: Set<String> = [
+            "spent", "paid", "bought", "got", "i", "just", "a", "an",
+            "the", "for", "on", "at", "from", "to", "of", "my"
+        ]
+        let words = stripped
+            .split(separator: " ")
+            .map(String.init)
+            .filter { !stopWords.contains($0.lowercased()) }
+        let candidate = words.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        return candidate.isEmpty ? "Unknown" : candidate.normalizedMerchantName()
+    }
+
+    private static func stripAmountTokens(_ text: String) -> String {
+        text.replacingOccurrences(
+            of: "[$€£]?\\s*\\d+(?:[.,]\\d{1,2})?",
+            with: " ",
+            options: .regularExpression
         )
     }
 

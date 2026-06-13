@@ -48,6 +48,7 @@ PULDAR is built around three jobs:
 - supports receipt scanning with Vision/VisionKit OCR
 - improves merchant and total extraction for real receipts
 - keeps parsing local to the device
+- **degrades gracefully**: the MLX model runs on capable devices (≈4 GB+ RAM); low-memory devices and the Simulator skip it and use a deterministic parser (regex amounts + `CategoryManager` keyword/alias banks) instead of failing
 
 ### Clear Budgeting Model
 

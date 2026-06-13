@@ -1229,6 +1229,7 @@ struct DashboardView: View {
     }
 
     private func presentModelOnboardingIfNeeded() async {
+        guard llmService.supportsLocalModel else { return }
         guard didCompleteAppOnboarding else { return }
         guard !didCompleteModelOnboarding else { return }
         guard !showModelOnboarding else { return }

@@ -18,16 +18,17 @@ struct FolioBreakdownChart: View {
         horizontalSizeClass == .regular ? 280 : 210
     }
 
-    private var centerValueFontSize: CGFloat {
-        horizontalSizeClass == .regular ? 34 : 28
-    }
+    /// Inner radius of the donut as a fraction of the outer radius. Used both
+    /// for the `SectorMark` and to size the centre label so it always fits
+    /// inside the hole.
+    private let innerRadiusRatio: CGFloat = 0.618
 
     var body: some View {
         VStack(spacing: 16) {
             Chart(slices) { slice in
                 SectorMark(
                     angle: .value("Total", sectorWeight(for: slice)),
-                    innerRadius: .ratio(0.618),
+                    innerRadius: .ratio(innerRadiusRatio),
                     angularInset: 2.0
                 )
                 .foregroundStyle(slice.kind.color)
@@ -35,7 +36,11 @@ struct FolioBreakdownChart: View {
             }
             .chartLegend(.hidden)
             .chartBackground { _ in
-                centerView
+                GeometryReader { geo in
+                    let holeDiameter = min(geo.size.width, geo.size.height) * innerRadiusRatio
+                    centerView(holeDiameter: holeDiameter)
+                        .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
+                }
             }
             .frame(height: chartHeight)
 
@@ -54,21 +59,29 @@ struct FolioBreakdownChart: View {
         return appeared ? max(value, 0.01) : 0.01
     }
 
-    private var centerView: some View {
-        VStack(spacing: 2) {
+    /// Net-worth label inscribed inside the donut hole. The frame is derived
+    /// from the actual hole diameter so the value scales to fit and never
+    /// spills under the surrounding ring.
+    private func centerView(holeDiameter: CGFloat) -> some View {
+        // Inscribe the content in the hole with a small inset so glyphs never
+        // touch the ring. Width is the limiting dimension for the number.
+        let contentWidth = holeDiameter * 0.86
+        let contentHeight = holeDiameter * 0.78
+
+        return VStack(spacing: 2) {
             Text("Net Worth")
-                .font(.caption2)
+                .font(.system(size: max(9, holeDiameter * 0.11), weight: .regular))
                 .foregroundStyle(AppColors.textTertiary)
 
             Text(netWorthText)
-                .font(.system(size: centerValueFontSize, weight: .bold, design: .rounded))
+                .font(.system(size: holeDiameter * 0.30, weight: .bold, design: .rounded))
                 .foregroundStyle(netWorth < 0 ? AppColors.overspend : AppColors.textPrimary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.4)
+                .minimumScaleFactor(0.3)
                 .allowsTightening(true)
         }
         .multilineTextAlignment(.center)
-        .frame(width: 160, height: 92, alignment: .center)
+        .frame(width: contentWidth, height: contentHeight, alignment: .center)
     }
 
     private var legend: some View {
